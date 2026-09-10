@@ -1,0 +1,14 @@
+# Hourly retention run. Alternative to the cron line in the README.
+#
+#   sudo cp deploy/failure-network-prune.* /etc/systemd/system/
+#   sudo systemctl enable --now failure-network-prune.timer
+
+[Unit]
+Description=Prune raw observations of FailEcho
+
+[Timer]
+OnCalendar=*:15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

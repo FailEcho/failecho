@@ -1,0 +1,11 @@
+# Optional origin-level fallback for the secondary domain.
+#
+# Prefer a Cloudflare Redirect Rule (see the README's Cloudflare checklist):
+# it answers at the edge, never touches this server, and costs nothing on the
+# free plan. Use this file only if you would rather serve .dev from the origin.
+#
+# Append to /etc/caddy/Caddyfile, then: systemctl reload caddy
+
+failecho.dev, www.failecho.dev {
+	redir https://failecho.com{uri} permanent
+}

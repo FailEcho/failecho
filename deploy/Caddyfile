@@ -1,0 +1,40 @@
+# Production Caddy configuration for FailEcho.
+# Copy to /etc/caddy/Caddyfile, then: systemctl reload caddy
+# (reload, not restart -- the installer starts Caddy with its own
+# default config, and forgetting to reload serves that instead.)
+
+# FailEcho -- TLS termination and reverse proxy.
+#
+# Caddy obtains and renews a Let's Encrypt certificate automatically. The app
+# itself listens only on 127.0.0.1:8000 and never faces the internet directly.
+
+failecho.com {
+	encode zstd gzip
+
+	# Static brand assets and the stylesheet change rarely.
+	@static path /static/*
+	header @static Cache-Control "public, max-age=3600"
+
+	# Live data must never be cached by the browser or an intermediary.
+	@live path /v1/* /health /mcp
+	header @live Cache-Control "no-store"
+
+	# Crawl surfaces: short TTL. Cloudflare defaults .txt and .xml to four
+	# hours, which would keep serving a stale robots.txt or sitemap long after
+	# a deploy changed it.
+	@crawl path /robots.txt /sitemap.xml /llms.txt
+	header @crawl Cache-Control "public, max-age=300"
+
+	reverse_proxy 127.0.0.1:8000
+
+	log {
+		output file /var/log/caddy/failecho.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}
+
+www.failecho.com {
+	redir https://failecho.com{uri} permanent
+}
