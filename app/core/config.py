@@ -209,6 +209,14 @@ class Settings:
         default_factory=lambda: _env_str("FIN_DEMO_MODE", "0") == "1"
     )
 
+    # ---- read caching ----------------------------------------------------
+    # The three read-only dashboard endpoints return network-wide numbers that
+    # are identical for every caller, so they are memoised for this long.
+    # 0 disables it, which is what the test suite uses.
+    dashboard_cache_seconds: float = field(
+        default_factory=lambda: _env_float("FIN_DASHBOARD_CACHE_SECONDS", 10.0)
+    )
+
     # ---- misc ------------------------------------------------------------
     services_default_limit: int = field(
         default_factory=lambda: _env_int("FIN_SERVICES_DEFAULT_LIMIT", 100)

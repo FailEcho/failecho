@@ -20,9 +20,13 @@ TEST_DB = Path(tempfile.mkdtemp(prefix="fin-tests-")) / "test.db"
 
 os.environ["FIN_DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB}"
 os.environ["FIN_REPORTER_SALT"] = "test-salt"
+# Tests assert on writes they just made, so the dashboard cache is off here.
+# Its behaviour is covered directly in tests/test_cache.py.
+os.environ["FIN_DASHBOARD_CACHE_SECONDS"] = "0"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.core.cache import dashboard_cache  # noqa: E402
 from app.core.ratelimit import write_limiter  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -47,9 +51,13 @@ def client():
     with TestClient(app) as test_client:
         _truncate()
         write_limiter.reset()
+        # The dashboard endpoints memoise for 10s; tests assert on writes they
+        # just made, so every test starts with a cold cache.
+        dashboard_cache.clear()
         yield test_client
         _truncate()
         write_limiter.reset()
+        dashboard_cache.clear()
 
 
 def _truncate() -> None:

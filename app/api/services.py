@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 from sqlalchemy import case, func, select
 
 from app.api.deps import SessionDep
+from app.core.cache import dashboard_cache
 from datetime import timedelta
 
 from app.core.clock import ago, isoformat_z, utcnow
@@ -80,6 +81,12 @@ async def services(
         default=settings.services_default_limit, ge=1, le=500, description="Max rows."
     ),
 ) -> list[ServiceStatus]:
+    # Identical for every caller, so compute it at most once per TTL.
+    cache_key = f"services:{service}:{limit}"
+    cached = dashboard_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     long_rows = {
         (r.service, r.operation): r
         for r in (await session.execute(_rollup(settings.window_long_seconds))).all()
@@ -123,7 +130,7 @@ async def services(
             r.operation,
         )
     )
-    return results[:limit]
+    return dashboard_cache.set(cache_key, results[:limit])
 
 
 @router.get(
@@ -138,6 +145,10 @@ async def services(
     ),
 )
 async def stats(session: SessionDep) -> NetworkStats:
+    cached = dashboard_cache.get("stats")
+    if cached is not None:
+        return cached
+
     raw_total = (
         await session.execute(select(func.count()).select_from(Observation))
     ).scalar_one()
@@ -294,7 +305,7 @@ async def stats(session: SessionDep) -> NetworkStats:
     synthetic_total = int(raw_synthetic or 0) + archived_synthetic
     demo_agent_total = int(demo_agent_rows or 0) + archived_demo_agent
 
-    return NetworkStats(
+    return dashboard_cache.set("stats", NetworkStats(
         observations_total=int(raw_total or 0) + archived_total,
         observations_1h=int(long_row.total or 0),
         failures_1h=int(long_row.failures or 0),
@@ -326,7 +337,7 @@ async def stats(session: SessionDep) -> NetworkStats:
         real_failure_fingerprints=int(real_day.fingerprints or 0),
         archived_observations=archived_total,
         generated_at=isoformat_z(utcnow()) or "",
-    )
+    ))
 
 
 @router.get(
@@ -348,6 +359,11 @@ async def recovery_intelligence(
         default=True, description="Include entries backed by synthetic demo data."
     ),
 ) -> list[RecoveryIntelligence]:
+    cache_key = f"recovery:{limit}:{include_demo}"
+    cached = dashboard_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     # Candidate fingerprints: anything with recovery evidence, live or archived.
     live = (
         await session.execute(
@@ -428,7 +444,7 @@ async def recovery_intelligence(
         )
 
     results.sort(key=lambda r: (-r.confidence, -r.attempts))
-    return results[:limit]
+    return dashboard_cache.set(cache_key, results[:limit])
 
 
 def _round(value: float | None) -> float | None:
