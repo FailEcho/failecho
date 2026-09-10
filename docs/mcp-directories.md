@@ -76,18 +76,61 @@ description, endpoint or tool set changes.
 
 ## 2. Community directories
 
-| Directory | How to get listed |
-|---|---|
-| **Glama** | Indexes GitHub automatically. Having `server.json` in the repo root and the MCP topic set is usually enough. Claim the listing afterwards. |
-| **PulseMCP** | Crawls the official registry and GitHub. Has a submission form for anything it missed. |
-| **Smithery** | Submission via their site; oriented toward hosted/remote servers, which FailEcho is. |
-| **mcp.so** | Submission form. |
-| **awesome-mcp-servers lists** | Pull requests against the relevant GitHub list, under the category that fits — reliability/observability tooling. |
+Three of the four need nothing from you beyond the official registry entry.
+Only Smithery needs a real publish step.
 
-Search for the current submission URL rather than trusting a link from this
-file; these sites change often enough that a hardcoded URL here would rot.
+### Glama — automatic, then claim
 
----
+Glama crawls GitHub and the official registry, so `FailEcho/failecho` should
+appear on its own within days. When it does, open the listing at
+<https://glama.ai/mcp/servers> (search "failecho") and **claim** it with the
+GitHub account that owns the repository. Claiming moves the entry from
+crawled-and-unverified to owner-controlled, and lets you fix the description
+and links.
+
+Nothing to submit. Check back in a few days.
+
+### PulseMCP — automatic, with a form as a fallback
+
+PulseMCP indexes the ecosystem, including the official registry. Search
+<https://www.pulsemcp.com/servers> for "failecho" after a few days. If it has
+not appeared, use the **Submit** button in the site navigation.
+
+### Smithery — a real publish step
+
+Smithery publishes remote HTTP servers directly, and it is the one directory
+that needs authentication.
+
+```bash
+export PATH="/root/.nvm/versions/node/v22.23.2/bin:$PATH"
+
+# 1. Log in. In a non-interactive shell this prints an auth_url to open
+#    in your browser.
+npx -y @smithery/cli@latest auth login
+
+# 2. Publish the remote endpoint under the FailEcho namespace.
+npx -y @smithery/cli@latest mcp publish https://failecho.com/mcp \
+  -n failecho/failecho
+
+# 3. Confirm.
+npx -y @smithery/cli@latest mcp search failecho
+```
+
+The CLI is already verified working on this server (v4.11.1); only the login
+is missing, and it must be done by whoever owns the Smithery account.
+
+### mcp.so — submission form
+
+Open <https://mcp.so>, use the **Submit** button, and paste the listing copy
+from the next section. Some entries are also accepted through their GitHub
+issues.
+
+### awesome-mcp-servers — pull request
+
+`punkpeye/awesome-mcp-servers` is a curated GitHub list. Open a pull request
+adding one line under the category that fits (developer tooling / reliability),
+in the file's existing format. Read the contribution rules first; curated lists
+reject entries that ignore them, and a rejected PR is worse than no entry.
 
 ## 3. What to write in every listing
 
