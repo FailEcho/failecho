@@ -982,7 +982,7 @@ Every setting is an environment variable; defaults are in
 | `FIN_MCP_ALLOWED_ORIGINS` | *(empty)* | comma list; same |
 | `FIN_ALLOWED_ORIGINS` | `*` | CORS origins for browsers (comma-separated) |
 | `FIN_PUBLIC_URL` | `http://localhost:8000` | canonical public origin; drives canonical/OG tags, `/llms.txt` and every on-page example |
-| `FIN_GITHUB_URL` | *(empty)* | repository link; while empty, no GitHub link is rendered anywhere |
+| `FIN_GITHUB_URL` | *(empty)* | repository link (`https://github.com/FailEcho/failecho` in production); while empty, no GitHub link is rendered anywhere |
 | `FIN_DEMO_MODE` | `0` | label this deployment as a demo instance (generates nothing) |
 
 ### Deploying on a small VPS
