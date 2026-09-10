@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "com.failecho/failecho",
+  "description": "Check what other agents hit the same tool failure \u2014 and what recovery worked. Ask before retrying.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/FailEcho/failecho",
+    "source": "github"
+  },
+  "websiteUrl": "https://failecho.com",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://failecho.com/mcp"
+    }
+  ]
+}
