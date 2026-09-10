@@ -28,6 +28,11 @@ LOCKUP_MASTER = BRAND / "failecho-wordmark-separated.png"
 #: Page ink, matching --ink in style.css.
 INK = (23, 33, 29)
 
+#: Google will not show a favicon in search results unless it is square and,
+#: per its documentation, ideally a multiple of 48px. The mark is 1.12:1, so
+#: it gets padded rather than squashed.
+FAVICON_SQUARE_PX = 144
+
 #: Retina: every asset is rendered at twice its largest CSS size.
 MARK_PX = 128          # displayed up to 64
 LOCKUP_PX = 640        # displayed up to ~320 wide
@@ -61,6 +66,25 @@ def fit_height(image: Image.Image, height: int) -> Image.Image:
 def fit_width(image: Image.Image, width: int) -> Image.Image:
     height = max(1, round(image.height * width / image.width))
     return image.resize((width, height), Image.LANCZOS)
+
+
+def square(image: Image.Image, size: int, margin: float = 0.08) -> Image.Image:
+    """Centre the mark on a transparent square canvas.
+
+    Padding, never stretching: a distorted logo is worse than a small one. The
+    margin keeps the strokes off the edge, where browsers and search results
+    tend to crop or round the corners.
+    """
+    inner = round(size * (1 - 2 * margin))
+    scaled = (
+        fit_width(image, inner) if image.width >= image.height
+        else fit_height(image, inner)
+    )
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    canvas.alpha_composite(
+        scaled, ((size - scaled.width) // 2, (size - scaled.height) // 2)
+    )
+    return canvas
 
 
 def recolour_neutrals(image: Image.Image, colour: tuple[int, int, int]) -> Image.Image:
@@ -120,7 +144,7 @@ def main() -> None:
     lockup = trim(Image.open(LOCKUP_MASTER).convert("RGBA"))
 
     save(fit_height(mark, MARK_PX), "logo.png", PALETTE)
-    save(fit_height(mark, FAVICON_PX), "favicon.png", PALETTE)
+    save(square(mark, FAVICON_SQUARE_PX), "favicon.png", PALETTE)
 
     # The master is white-on-transparent: correct for dark, invisible on light.
     save(fit_width(lockup, LOCKUP_PX), "wordmark-dark.png", PALETTE)

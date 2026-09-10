@@ -150,6 +150,19 @@ def test_wordmark_is_used_on_the_dark_page(client):
     assert (STATIC / "wordmark-light.png").exists()
 
 
+def test_favicon_is_square_for_search_results():
+    """Google shows no favicon at all unless it is square and >= 48px.
+
+    Regression: shipped 72x64, so search results had a blank icon.
+    """
+    from PIL import Image
+
+    icon = Image.open(STATIC / "favicon.png")
+    assert icon.width == icon.height, f"not square: {icon.size}"
+    assert icon.width >= 48
+    assert icon.width % 48 == 0, "Google prefers a multiple of 48px"
+
+
 def test_favicon_is_reachable_at_the_legacy_path(client):
     response = client.get("/favicon.ico")
     assert response.status_code == 200

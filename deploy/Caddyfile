@@ -29,6 +29,12 @@ failecho.com {
 	@crawl path /robots.txt /sitemap.xml /llms.txt
 	header @crawl Cache-Control "public, max-age=300"
 
+	# /favicon.ico has no version string to bust, and Cloudflare caches .ico
+	# for four hours by default -- long enough that a corrected favicon stays
+	# invisible in search results. One hour, so a fix propagates the same day.
+	@icon path /favicon.ico
+	header @icon Cache-Control "public, max-age=3600"
+
 	reverse_proxy 127.0.0.1:8000
 
 	log {
