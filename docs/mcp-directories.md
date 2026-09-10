@@ -96,34 +96,49 @@ PulseMCP indexes the ecosystem, including the official registry. Search
 <https://www.pulsemcp.com/servers> for "failecho" after a few days. If it has
 not appeared, use the **Submit** button in the site navigation.
 
-### Smithery — a real publish step
+### Smithery — published ✅
 
-Smithery publishes remote HTTP servers directly, and it is the one directory
-that needs authentication.
+Live at `failecho/failecho`. The full sequence, for reference and for
+republishing:
 
 ```bash
 export PATH="/root/.nvm/versions/node/v22.23.2/bin:$PATH"
 
-# 1. Log in. In a non-interactive shell this prints an auth_url to open
-#    in your browser.
+# 1. Log in (browser). In a non-interactive shell this prints an auth_url.
 npx -y @smithery/cli@latest auth login
 
-# 2. Publish the remote endpoint under the FailEcho namespace.
+# 2. Claim the brand namespace. This is a CLI command, not a dashboard step --
+#    a Smithery "organization" is not required, the namespace is the identity.
+npx -y @smithery/cli@latest namespace create failecho
+
+# 3. Publish the remote endpoint.
 npx -y @smithery/cli@latest mcp publish https://failecho.com/mcp \
   -n failecho/failecho
-
-# 3. Confirm.
-npx -y @smithery/cli@latest mcp search failecho
 ```
 
-The CLI is already verified working on this server (v4.11.1); only the login
-is missing, and it must be done by whoever owns the Smithery account.
+Publishing an external URL carries no metadata, so the listing starts with an
+empty description and no icon. Fill it in with the update API:
 
-### mcp.so — submission form
+```bash
+TOKEN=$(npx -y @smithery/cli@latest auth whoami --full \
+        | grep -oE 'smry_[A-Za-z0-9+/=_-]+' | head -1)
 
-Open <https://mcp.so>, use the **Submit** button, and paste the listing copy
-from the next section. Some entries are also accepted through their GitHub
-issues.
+curl -X PATCH "https://api.smithery.ai/servers/failecho%2Ffailecho" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  --data @listing.json
+```
+
+where `listing.json` carries `displayName`, `description`, `homepage`,
+`repositoryUrl`, `license` and `iconUrl`. Smithery connected to the endpoint
+and enumerated all four tools on publish, which doubles as a live check that
+the MCP surface works from outside.
+
+### mcp.so — skipped, paid
+
+Listing costs $39. Not worth it while the network has no real reporters and no
+evidence that MCP directories send meaningful traffic. Revisit once the free
+channels prove otherwise — then it is an informed $39 rather than a hopeful
+one.
 
 ### awesome-mcp-servers — pull request
 
