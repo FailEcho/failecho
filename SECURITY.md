@@ -8,16 +8,18 @@ separating.
 
 **Please do not open a public issue for a security problem.**
 
-Use GitHub's private vulnerability reporting: on the repository, go to
-**Security → Report a vulnerability**. It creates a private advisory visible
-only to maintainers.
+Two private channels, either is fine:
 
-There is no security email address yet. When one exists it will be listed
-here; until then the GitHub advisory flow is the only channel, and inventing an
-address that nobody reads would be worse than saying so.
+- **Email:** security@failecho.com
+- **GitHub:** on the repository, go to **Security → Report a vulnerability**.
+  It creates a private advisory visible only to maintainers.
 
 Expect an acknowledgement within a few days. This is a small project run by a
-small number of people, not a vendor with an on-call rotation.
+small number of people, not a vendor with an on-call rotation. There is no bug
+bounty.
+
+If a report needs encryption, say so in a first message and we will arrange a
+key rather than publishing one that may go unmaintained.
 
 ## What counts as a vulnerability
 

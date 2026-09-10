@@ -113,7 +113,11 @@ app = FastAPI(
     summary="Live failure intelligence for autonomous software.",
     description=API_DESCRIPTION,
     lifespan=lifespan,
-    contact={"name": "FailEcho", "url": settings.base_url()},
+    contact={
+        "name": "FailEcho",
+        "url": settings.base_url(),
+        "email": "support@failecho.com",
+    },
     license_info={"name": "MIT"},
 )
 

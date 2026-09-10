@@ -198,13 +198,41 @@ def test_configured_public_url_wins_everywhere(client):
         object.__setattr__(settings, "public_url", "http://localhost:8000")
 
 
-def test_the_domain_is_never_hardcoded_in_code():
-    """One configuration source. Docs may name the domain; code may not."""
+def test_the_production_origin_is_never_hardcoded_in_code():
+    """One configuration source for the origin.
+
+    Every URL must come from FIN_PUBLIC_URL. Email addresses are exempt: an
+    address is not an origin, does not change between environments, and cannot
+    be derived from the public URL -- making it configurable would add a knob
+    nobody would ever turn.
+    """
+    import re
+
     root = Path(__file__).resolve().parents[1]
-    checked = list((root / "app").rglob("*.py")) + list((root / "app" / "web" / "static").glob("*"))
+    checked = list((root / "app").rglob("*.py")) + list(
+        (root / "app" / "web" / "static").glob("*")
+    )
+    # A hardcoded URL: the domain NOT preceded by an "@" (which would make it
+    # an email address).
+    hardcoded_url = re.compile(r"(?<!@)\bfailecho\.(com|dev)\b")
     for path in checked:
         if path.suffix in (".py", ".html", ".css", ".js"):
-            assert "failecho.com" not in path.read_text(), path
+            found = hardcoded_url.findall(path.read_text())
+            assert not found, f"{path} hardcodes the origin instead of FIN_PUBLIC_URL"
+
+
+def test_contact_addresses_are_published_consistently(client):
+    """The three real addresses, each in the one place it belongs."""
+    body = client.get("/").text
+    assert "mailto:contact@failecho.com" in body
+    assert "mailto:security@failecho.com" in body
+
+    contact = client.get("/openapi.json").json()["info"]["contact"]
+    assert contact["email"] == "support@failecho.com"
+
+    security = (Path(__file__).resolve().parents[1] / "SECURITY.md").read_text()
+    assert "security@failecho.com" in security
+    assert "no security email address yet" not in security.lower()
 
 
 def test_github_link_is_omitted_until_configured(client):
@@ -324,10 +352,13 @@ def test_production_config_leaks_no_localhost(client):
 
 def test_local_default_stays_local(client):
     """Unconfigured, the page describes the origin it was actually served from."""
+    import re
+
     assert settings.base_url() == "http://localhost:8000"
     body = client.get("/").text
     assert "http://testserver/mcp" in body
-    assert "failecho.com" not in body
+    # Mailto addresses are fixed and allowed; production URLs are not.
+    assert not re.search(r"(?<!@)\bfailecho\.com\b", body)
 
 
 def test_robots_allows_indexing(client):

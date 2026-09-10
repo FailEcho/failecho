@@ -1298,6 +1298,13 @@ useful:
 - [`docs/search-console.md`](docs/search-console.md) — indexing checklist for
   Google Search Console and Bing, and what actually moves brand search
 
+## Contact
+
+- General: contact@failecho.com
+- Integration help: support@failecho.com
+- Security reports: security@failecho.com — see [SECURITY.md](SECURITY.md);
+  please do not open a public issue for a vulnerability
+
 ## Licence
 
 MIT.
