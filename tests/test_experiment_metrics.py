@@ -189,3 +189,50 @@ def test_mcp_query_counts_the_same_way(client):
     stats = client.get("/v1/stats").json()
     assert stats["known_query_hits_24h"] == 1
     assert stats["cross_agent_help_24h"] == 1
+
+
+def test_counter_increments_are_atomic(client):
+    """Regression: read-then-write raced, and an agent's query 500'd.
+
+    Two concurrent queries both saw "no counter row yet", both INSERTed, and
+    one died on the unique constraint -- turning a metric into an outage on
+    the endpoint an agent calls while it is already handling a failure.
+    """
+    import concurrent.futures
+
+    observe(client)  # something for the query to find
+
+    def ask(index: int):
+        return client.post(
+            "/v1/query",
+            json={**FAILURE, "error_message": f"Repository {700000 + index} was not found"},
+            headers={"X-Reporter-ID": f"agent-{index}"},
+        ).status_code
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        codes = list(pool.map(ask, range(48)))
+
+    assert set(codes) == {200}, f"non-200 responses: {sorted(set(codes))}"
+
+    stats = client.get("/v1/stats").json()
+    counted = stats["known_query_hits_24h"] + stats["unknown_query_hits_24h"]
+    assert counted == 48, f"counted {counted} of 48 queries"
+
+
+def test_a_broken_counter_never_breaks_the_answer(client, monkeypatch):
+    """Telemetry about the network must never take the network down."""
+    import app.core.service as service
+
+    async def explode(*args, **kwargs):
+        raise RuntimeError("counter backend on fire")
+
+    monkeypatch.setattr(service, "bump_counter", explode)
+
+    observe(client)
+    response = client.post(
+        "/v1/query",
+        json={**FAILURE, "error_message": "Repository 918272 was not found"},
+        headers={"X-Reporter-ID": "agent-b"},
+    )
+    assert response.status_code == 200
+    assert response.json()["known"] is True

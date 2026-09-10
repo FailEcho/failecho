@@ -1,8 +1,3 @@
-# Production Caddy configuration for FailEcho.
-# Copy to /etc/caddy/Caddyfile, then: systemctl reload caddy
-# (reload, not restart -- the installer starts Caddy with its own
-# default config, and forgetting to reload serves that instead.)
-
 # FailEcho -- TLS termination and reverse proxy.
 #
 # Caddy obtains and renews a Let's Encrypt certificate automatically. The app
@@ -15,9 +10,18 @@ failecho.com {
 	@static path /static/*
 	header @static Cache-Control "public, max-age=3600"
 
-	# Live data must never be cached by the browser or an intermediary.
-	@live path /v1/* /health /mcp
+	# Per-request endpoints must never be cached: each answer belongs to one
+	# caller and one failure.
+	@live path /v1/query /v1/observe /v1/outcome /health /mcp
 	header @live Cache-Control "no-store"
+
+	# The three read-only endpoints the homepage polls are a different case.
+	# Every visitor asks for the same network-wide numbers every 30s, so a
+	# 10-second edge cache collapses a launch-day crowd into a handful of
+	# origin queries. Ten seconds of staleness is invisible on a dashboard
+	# that refreshes every thirty.
+	@dashboard path /v1/stats /v1/services /v1/recovery-intelligence
+	header @dashboard Cache-Control "public, max-age=10"
 
 	# Crawl surfaces: short TTL. Cloudflare defaults .txt and .xml to four
 	# hours, which would keep serving a stale robots.txt or sitemap long after

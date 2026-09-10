@@ -295,3 +295,11 @@ def test_polling_is_conservative():
 def test_mobile_layout_rules_exist():
     assert "max-width: 480px" in CSS
     assert "overflow-x: auto" in CSS  # tables and code blocks scroll, page does not
+
+
+def test_polling_pauses_when_the_tab_is_hidden():
+    """A forgotten tab used to poll three endpoints forever, inflating both
+    the origin load and our own traffic numbers."""
+    assert 'addEventListener("visibilitychange"' in JS
+    assert "document.hidden" in JS
+    assert "clearInterval" in JS

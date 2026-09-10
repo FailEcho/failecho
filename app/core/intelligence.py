@@ -467,19 +467,35 @@ async def bump_counter(
 ) -> None:
     """Increment one daily counter. Integers only, no identities.
 
-    Read-then-write rather than a dialect-specific UPSERT, so the same code
-    runs on SQLite today and PostgreSQL later. Contention is a non-issue at
-    one uvicorn worker.
+    An atomic UPSERT, not read-then-write. The obvious version --
+    ``get()`` then ``add()`` or ``+=`` -- races: two concurrent queries both
+    see no row, both INSERT, and one of them dies on the unique constraint.
+    Under load that surfaced as HTTP 500s on /v1/query, i.e. an agent asking
+    what to do got an error instead of its evidence, because of a *metric*.
+
+    SQLite and PostgreSQL share the same ``ON CONFLICT ... DO UPDATE`` syntax,
+    so one branch per dialect keeps the migration path intact.
     """
     from app.core.clock import utcnow
+    from app.db.database import engine
     from app.db.models import DailyCounter
 
     bucket = day or utcnow().strftime("%Y-%m-%d")
-    row = await session.get(DailyCounter, (bucket, name))
-    if row is None:
-        session.add(DailyCounter(day=bucket, name=name, value=amount))
+
+    if engine.dialect.name == "postgresql":  # pragma: no cover - not used yet
+        from sqlalchemy.dialects.postgresql import insert as dialect_insert
     else:
-        row.value += amount
+        from sqlalchemy.dialects.sqlite import insert as dialect_insert
+
+    statement = dialect_insert(DailyCounter).values(
+        day=bucket, name=name, value=amount
+    )
+    await session.execute(
+        statement.on_conflict_do_update(
+            index_elements=["day", "name"],
+            set_={"value": DailyCounter.__table__.c.value + amount},
+        )
+    )
 
 
 def is_cross_reporter_evidence(action: RecoveryAction, querying_reporter: str | None) -> bool:

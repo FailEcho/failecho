@@ -237,8 +237,33 @@
       });
   }
 
+  // Poll only while the tab is actually being looked at. A forgotten open tab
+  // used to keep asking every 30s forever -- pure load, and it inflated our
+  // own traffic numbers to the point of hiding real visitors.
+  var timer = null;
+
+  function startPolling() {
+    if (timer === null) timer = setInterval(refresh, REFRESH_MS);
+  }
+
+  function stopPolling() {
+    if (timer !== null) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      stopPolling();
+    } else {
+      refresh();
+      startPolling();
+    }
+  });
+
   showEndpoints();
   wireCopyButtons();
   refresh();
-  setInterval(refresh, REFRESH_MS);
+  if (!document.hidden) startPolling();
 })();

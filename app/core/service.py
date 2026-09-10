@@ -333,13 +333,21 @@ async def query_intelligence(
     )
 
     # Experiment counters. Real traffic only, integers only, no identities.
+    #
+    # Wrapped: measuring the network must never be able to break it. If a
+    # counter write fails for any reason, the agent still gets its answer --
+    # losing a metric is survivable, returning a 500 to an agent that is
+    # already handling a failure is not.
     if source == SOURCE_AGENT:
-        await bump_counter(
-            session, COUNTER_QUERY_KNOWN if known else COUNTER_QUERY_UNKNOWN
-        )
-        if chosen and is_cross_reporter_evidence(chosen[0], reporter_hash):
-            await bump_counter(session, COUNTER_CROSS_AGENT_HELP)
-        await session.commit()
+        try:
+            await bump_counter(
+                session, COUNTER_QUERY_KNOWN if known else COUNTER_QUERY_UNKNOWN
+            )
+            if chosen and is_cross_reporter_evidence(chosen[0], reporter_hash):
+                await bump_counter(session, COUNTER_CROSS_AGENT_HELP)
+            await session.commit()
+        except Exception:  # noqa: BLE001 - telemetry is never worth an outage
+            await session.rollback()
 
     return response
 
