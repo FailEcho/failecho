@@ -76,25 +76,65 @@ description, endpoint or tool set changes.
 
 ## 2. Community directories
 
-Three of the four need nothing from you beyond the official registry entry.
-Only Smithery needs a real publish step.
+Most need nothing beyond the official registry entry. Smithery needed a
+publish step, and Glama a claim plus a hosting configuration.
 
-### Glama — automatic, then claim
+### Glama — claimed ✅, hosted through the stdio relay
 
-Glama crawls GitHub and the official registry, so `FailEcho/failecho` should
-appear on its own within days. When it does, open the listing at
-<https://glama.ai/mcp/servers> (search "failecho") and **claim** it with the
-GitHub account that owns the repository. Claiming moves the entry from
-crawled-and-unverified to owner-controlled, and lets you fix the description
-and links.
+Claimed 2026-09-11 with `glama.json` at the repository root (maintainer
+`Fuyuki0`), plus a `v0.1.0` GitHub release so the "Glama release" check
+passes.
 
-Nothing to submit. Check back in a few days.
+Glama's hosting runner can only start a stdio server: its generated
+Dockerfile wraps the start command in `mcp-proxy`, which talks to the child
+process over stdin/stdout. FailEcho's server speaks Streamable HTTP, so
+pointing the runner at `uvicorn` times out with
+`MCP error -32001: Request timed out`. The container therefore runs the relay
+in `failecho_mcp/`, which forwards to the shared network and stores nothing,
+so a hosted instance can never become a separate, empty FailEcho.
 
-### PulseMCP — automatic, with a form as a fallback
+Settings (Glama → server → Dockerfile configuration):
 
-PulseMCP indexes the ecosystem, including the official registry. Search
-<https://www.pulsemcp.com/servers> for "failecho" after a few days. If it has
-not appeared, use the **Submit** button in the site navigation.
+| Field | Value |
+|---|---|
+| Base image | `debian:trixie-slim` (either works; nothing needs a newer glibc) |
+| Python version | default, or `3.12` |
+| Build steps | `["uv sync"]` |
+| CMD arguments | `["mcp-proxy", "--", "uv", "run", "failecho-mcp"]` |
+| Placeholder parameters | empty |
+| Pinned commit SHA | empty, meaning the latest commit |
+
+Environment variables JSON schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "FAILECHO_URL": {
+      "type": "string",
+      "description": "FailEcho network to relay to. Defaults to https://failecho.com/mcp."
+    }
+  },
+  "required": []
+}
+```
+
+Glama validates against its own clone of the repository. Push first and press
+**Sync with GitHub** before saving, or a commit it has not fetched yet is
+rejected as "Commit not found".
+
+Verified locally in the same shape: a fresh tree, `uv sync`, then
+`mcp-proxy -- uv run failecho-mcp` served all four tools and relayed a call.
+
+"No recent usage" on the quality checklist measures real traffic. Nothing
+fixes it except users.
+
+### PulseMCP — automatic; submissions paused
+
+As of 2026-09-11 PulseMCP has paused new submissions (notice dated
+2026-09-03) and asks servers to publish to the official MCP registry instead,
+which it ingests automatically when it reopens. FailEcho is already there
+(`com.failecho/failecho`, status `active`), so there is nothing to do.
 
 ### Smithery — published ✅
 
@@ -140,12 +180,16 @@ evidence that MCP directories send meaningful traffic. Revisit once the free
 channels prove otherwise — then it is an informed $39 rather than a hopeful
 one.
 
-### awesome-mcp-servers — pull request
+### awesome-mcp-servers — pull request open
 
-`punkpeye/awesome-mcp-servers` is a curated GitHub list. Open a pull request
-adding one line under the category that fits (developer tooling / reliability),
-in the file's existing format. Read the contribution rules first; curated lists
-reject entries that ignore them, and a rejected PR is worse than no entry.
+PR [#14162](https://github.com/punkpeye/awesome-mcp-servers/pull/14162) adds
+one line under **Monitoring**, alphabetically between `esp4ce/infra-mcp` and
+`firecrawl/firecrawl-mcp-server`, in the list's own format (Glama score badge
+and legend icons). Maintainers merge in batches.
+
+The sister list `awesome-remote-mcp-servers` requires OAuth or API-key
+authentication for inclusion. FailEcho is deliberately unauthenticated, so it
+was not submitted there.
 
 ## 3. What to write in every listing
 

@@ -449,6 +449,45 @@ curl -s localhost:8000/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
+### Local stdio server
+
+Some hosts can only start a local process and talk to it over stdin/stdout.
+`failecho-mcp` is for them. It is a relay, not a second FailEcho: it has no
+database and stores nothing. Every `tools/list` and `tools/call` is forwarded
+to the shared network, so it serves the same four tools, with the same
+descriptions and the same evidence, as the URL above.
+
+```bash
+uvx --from git+https://github.com/FailEcho/failecho failecho-mcp
+```
+
+It is not on PyPI yet, so `uvx` installs it from the repository. That pulls
+in the server's dependencies too; the relay itself imports only the MCP SDK.
+
+Client config (`mcpServers` style):
+
+```json
+{
+  "mcpServers": {
+    "failecho": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/FailEcho/failecho", "failecho-mcp"]
+    }
+  }
+}
+```
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FAILECHO_URL` | `https://failecho.com/mcp` | Network to relay to. Point it at your own server if you self-host. |
+| `FAILECHO_REPORTER_KIND` | unset | Set to `demo` for demo agents, so their reports stay out of adoption numbers. |
+
+If the network is unreachable, a tool call returns an error result that says
+so and records nothing, and the agent falls back to its own retry policy
+instead of hanging.
+
+Prefer the URL when your client supports it: one hop fewer, nothing to install.
+
 ### Tools
 
 | Tool | Purpose |
