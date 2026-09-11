@@ -24,14 +24,14 @@ JS = (STATIC / "app.js").read_text()
 
 
 def test_hero_states_the_product_immediately(client):
-    """Ten seconds: what it is, the tagline, what it does, how to connect."""
+    """Five to ten seconds: the problem, the category, the tagline, the CTA."""
     body = client.get("/").text
-    assert "FailEcho" in body
-    assert "Failure intelligence for AI agents and autonomous software." in body
+    assert "AI agents shouldn't debug" in body and "the same failure twice." in body
+    assert "Live failure and recovery intelligence for autonomous software." in body
     assert "Before you retry, check the echo." in body
-    assert "which recovery actions actually worked" in body
+    assert "what actually worked, before you retry" in body
     assert "Connect MCP" in body
-    assert "Read the API docs" in body
+    assert "See it work" in body
     assert "MCP · REST · OpenAPI · No account required" in body
 
 
@@ -39,15 +39,12 @@ def test_hero_states_the_product_immediately(client):
     "heading",
     [
         "Live Network",
-        "Active Incidents",
+        "See It Happen",
         "Recovery Echoes",
         "How FailEcho Works",
-        "See It Happen",
         "Connect an Agent",
         "For Developers",
-        "Why Successes Matter",
-        "Privacy",
-        "No Guessing",
+        "Built to be checked",
         "Questions",
     ],
 )
@@ -83,21 +80,17 @@ def test_all_three_integration_paths_are_copyable():
         assert f'href="{link}"' in HTML
 
 
-def test_privacy_section_lists_what_we_refuse():
-    for item in (
-        "prompts",
-        "API keys",
-        "tool arguments",
-        "tool results",
-        "request bodies",
-        "customer data",
-        "secrets",
-    ):
-        assert f"<li>{item}</li>" in HTML
-    assert "Shared intelligence without shared workloads." in HTML
-    assert "Raw error text is discarded after normalization." in HTML
-    assert "Reporter IDs are optional and hashed before storage." in HTML
-    assert "No model is used to generate the confidence score." in HTML
+def test_trust_section_keeps_the_load_bearing_promises():
+    """Compressed to three principles, but the specific claims must survive."""
+    for principle in ("Privacy-safe", "Evidence-based", "Deterministic"):
+        assert f"<h3>{principle}</h3>" in HTML
+    assert "No prompts. No secrets. No tool arguments or results." in HTML
+    assert "Raw error text is discarded after normalization" in HTML
+    assert "reporter IDs are optional and hashed before storage" in HTML
+    assert "No model produces a recovery recommendation or a confidence score." in HTML
+    assert "INSUFFICIENT_DATA" in HTML
+    # The full privacy contract now lives on /about, and is linked.
+    assert 'href="/about"' in HTML
 
 
 # ---------------------------------------------------------------------------
@@ -131,16 +124,23 @@ def test_hidden_elements_actually_hide():
 
 
 def test_the_zero_is_shown_not_hidden():
-    assert "No real telemetry yet." in HTML
-    assert "one of the first" in HTML and "real echoes" in HTML
+    """Empty must read as bootstrapping, never as broken -- and never as fake."""
+    assert "Public network is bootstrapping." in HTML
+    assert "No real external telemetry has been reported today." in HTML
+    assert "Be one of the first agents contributing to the network." in HTML
     assert 'show("real-empty", stats.real_observations_24h === 0)' in JS
+    # The metric elements remain, so the real zeros are still rendered.
+    for element in ("stat-real-24h", "stat-real-reporters",
+                    "stat-real-fingerprints", "stat-real-incidents"):
+        assert f'id="{element}"' in HTML
 
 
 def test_empty_states_exist_for_every_live_section():
     """Empty must look deliberate, never broken."""
-    assert "No real telemetry yet." in HTML
-    assert "No active incidents." in JS
-    assert "No recovery echo has enough evidence yet." in JS
+    assert "Public network is bootstrapping." in HTML
+    assert "No active incidents." in HTML
+    assert 'show("incidents-table", rows.length > 0)' in JS
+    assert "No recovery echo has enough real evidence yet." in JS
 
 
 def test_recovery_echo_shows_the_whole_evidence_basis():
@@ -241,12 +241,16 @@ def test_palette_is_committed_and_explicit():
 # ---------------------------------------------------------------------------
 
 
-def test_one_h1_and_it_is_the_brand():
-    """Search engines should read one heading, and it should say FailEcho."""
+def test_one_h1_stating_the_problem():
+    """One heading. It names the problem; the brand is in the title, the header
+    wordmark and the entity sentence, so the h1 does not have to repeat it."""
     assert HTML.count("<h1") == 1
     assert 'id="hero-title"' in HTML
     heading = HTML[HTML.index("<h1") : HTML.index("</h1>")]
-    assert 'alt="FailEcho"' in heading
+    assert "same failure twice." in heading
+    # The brand still has to be unmissable for a crawler.
+    assert "<title>FailEcho" in HTML
+    assert "FailEcho is a shared failure intelligence network for AI agents" in HTML
 
 
 def test_no_framework_no_cdn_no_webfont():
@@ -271,8 +275,8 @@ def test_no_framework_no_cdn_no_webfont():
 
 def test_static_assets_stay_small():
     """A status page has no excuse to be heavy on a small VPS."""
-    assert len(HTML) < 26_000  # includes the FAQ and the JSON-LD block
-    assert len(CSS) < 20_000
+    assert len(HTML) < 30_000  # includes the demo story, FAQ and JSON-LD
+    assert len(CSS) < 26_000
     assert len(JS) < 12_000
     assert sum(len(x) for x in (HTML, CSS, JS)) < 55_000
 
@@ -284,7 +288,7 @@ def test_static_assets_stay_small():
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-light.png").stat().st_size
     )
-    assert per_visit < 110_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 120_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -303,3 +307,43 @@ def test_polling_pauses_when_the_tab_is_hidden():
     assert 'addEventListener("visibilitychange"' in JS
     assert "document.hidden" in JS
     assert "clearInterval" in JS
+
+
+def test_python_example_does_not_advertise_a_package_that_is_not_published():
+    """The client is not on PyPI, so the page must not imply pip install."""
+    snippet = HTML[HTML.index('id="code-python"') : HTML.index("</code></pre>", HTML.index('id="code-python"'))]
+    assert "pip install failecho" not in snippet
+    assert "Not published to PyPI yet" in snippet
+    assert 'sys.path.insert(0, "client")' in snippet, "the setup that actually works"
+
+
+def test_no_unsubstituted_tokens_reach_the_page(client):
+    """Regression: {{GITHUB_URL}} sat in a code comment outside the block that
+    strips it, so an unconfigured instance would have shipped the raw token."""
+    body = client.get("/").text
+    for token in ("{{PUBLIC_URL}}", "{{ASSET_V}}", "{{GITHUB_URL}}"):
+        assert token not in body, token
+
+
+def test_demo_output_is_behind_a_disclosure():
+    """The proof stays available; it just no longer dominates the page."""
+    assert "<details class=\"disclosure\">" in HTML
+    assert "View full demo output" in HTML
+    assert "6ed9ef705ff4037af2c977306b8b9f92" in HTML, "the real fingerprint"
+
+
+def test_the_demo_story_states_the_payoff():
+    assert "Agent B recovered using evidence it never generated itself." in HTML
+    assert "Agent B benefits from evidence it never generated itself." in HTML
+
+
+def test_status_legend_matches_the_backend_thresholds():
+    from app.core.config import settings
+
+    assert settings.healthy_max_failure_rate == 0.05
+    assert settings.degraded_max_failure_rate == 0.30
+    assert settings.min_observations_for_status == 10
+    assert "under 5% failures" in HTML
+    assert "5–30%" in HTML
+    assert "above 30%" in HTML
+    assert "at least 10 observations" in HTML

@@ -174,38 +174,45 @@ a:hover { color: var(--red); }
 }
 
 /* ---- hero -------------------------------------------------------------- */
-.hero { padding-block: 92px 76px; }
-
-.hero-brand { margin: 0 0 30px; }
-.hero-brand img { display: block; width: auto; height: clamp(44px, 6vw, 60px); }
+.hero { padding-block: 104px 84px; }
 
 h1 {
-  margin: 0 0 22px;
+  margin: 0 0 26px;
   font-family: var(--serif);
   font-weight: 400;
-  font-size: clamp(36px, 6vw, 62px);
-  line-height: 1.06;
-  letter-spacing: -0.02em;
+  font-size: clamp(38px, 6.6vw, 68px);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
 }
 
-.hero-tagline {
-  margin: 0 0 22px;
-  padding-left: 18px;
-  border-left: 2px solid var(--red);
-  font-family: var(--serif);
-  font-size: clamp(19px, 2.6vw, 26px);
-  line-height: 1.35;
+.hero-lede {
+  margin: 0 0 20px;
+  font-size: clamp(18px, 2.3vw, 22px);
+  line-height: 1.4;
   color: var(--ink);
+  max-width: 46ch;
+  text-wrap: balance;
 }
 
 .hero-support {
-  margin: 0 0 34px;
+  margin: 0 0 36px;
   color: var(--ink-2);
   font-size: 16.5px;
-  max-width: 58ch;
+  line-height: 1.65;
+  max-width: 56ch;
 }
 
-.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 26px; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 32px; }
+
+.hero-tagline {
+  margin: 0 0 10px;
+  padding-left: 16px;
+  border-left: 2px solid var(--red);
+  font-family: var(--serif);
+  font-size: clamp(17px, 2.1vw, 21px);
+  color: var(--ink);
+}
 
 .hero-meta {
   margin: 0;
@@ -559,3 +566,100 @@ footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
 .prose code { font-size: 13.5px; color: var(--ink); }
 
 .band .yes-list, .band .no-list { max-width: 68ch; }
+
+
+/* ---- bootstrap / empty states ------------------------------------------ */
+.bootstrap {
+  border: 1px dashed var(--line-2);
+  border-radius: 3px;
+  padding: 24px 26px;
+  margin-bottom: 26px;
+  max-width: 70ch;
+}
+.bootstrap p { margin: 0 0 12px; color: var(--ink-2); font-size: 15px; }
+.bootstrap p:last-child { margin-bottom: 0; }
+.bootstrap-lead {
+  font-family: var(--serif);
+  font-size: clamp(19px, 2.4vw, 24px) !important;
+  color: var(--ink) !important;
+  line-height: 1.3;
+}
+
+/* ---- sub-sections inside a band ---------------------------------------- */
+.subband { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--line); }
+.subband .label { margin-bottom: 16px; }
+
+.band-intro {
+  margin: 0 0 30px;
+  color: var(--ink-2);
+  font-size: 16.5px;
+  line-height: 1.65;
+  max-width: 62ch;
+}
+
+/* ---- status legend ------------------------------------------------------ */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 10px 32px;
+  margin: 18px 0 0;
+}
+.legend > div { display: flex; align-items: baseline; gap: 10px; }
+.legend dt { margin: 0; }
+.legend dd { margin: 0; color: var(--ink-3); font-size: 13px; }
+
+/* ---- the demo story ----------------------------------------------------- */
+.story {
+  list-style: none; margin: 0 0 32px; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line);
+  border-radius: 3px; overflow: hidden;
+}
+.story li { background: var(--surface); padding: 22px 20px; display: flex; gap: 14px; }
+.story-step {
+  font-family: var(--mono); font-size: 12px; color: var(--red);
+  border: 1px solid var(--line-2); border-radius: 2px;
+  width: 24px; height: 24px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.story-head { margin: 0 0 10px; font-size: 14.5px; font-weight: 600; }
+.story-body { margin: 0 0 5px; font-size: 13.5px; color: var(--ink-2); }
+.story-body code { font-size: 13px; color: var(--ink); }
+
+/* ---- disclosure --------------------------------------------------------- */
+.disclosure { margin-top: 30px; border-top: 1px solid var(--line); padding-top: 18px; }
+.disclosure summary {
+  cursor: pointer; font-size: 14px; color: var(--ink-2);
+  padding: 6px 0; list-style-position: outside;
+}
+.disclosure summary:hover { color: var(--ink); }
+.disclosure summary::marker { color: var(--ink-3); }
+.disclosure[open] summary { margin-bottom: 16px; color: var(--ink); }
+
+/* ---- how it works flow --------------------------------------------------- */
+.flow {
+  list-style: none; margin: 0 0 28px; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px;
+  counter-reset: flow;
+}
+.flow li { position: relative; padding-top: 20px; border-top: 2px solid var(--line-2); }
+.flow li:first-child { border-top-color: var(--red); }
+.flow-name {
+  margin: 0 0 8px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+}
+.flow-body { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+
+.flow-summary {
+  margin: 0 0 8px; color: var(--ink-2); font-size: 16px;
+}
+
+@media (max-width: 900px) {
+  .story { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+}
+
+@media (max-width: 560px) {
+  .story { grid-template-columns: minmax(0, 1fr); }
+  .flow { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .legend { gap: 8px 20px; }
+  .bootstrap { padding: 20px; }
+}

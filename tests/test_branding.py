@@ -142,9 +142,13 @@ def test_wordmark_ships_a_variant_for_each_theme():
 
 
 def test_wordmark_is_used_on_the_dark_page(client):
-    """The page commits to the dark palette, so the white master is the one used."""
+    """The page commits to the dark palette, so the white master is the one used.
+
+    Header and footer only: the hero now leads with the problem statement
+    rather than repeating the wordmark the header already establishes.
+    """
     body = client.get("/").text
-    assert body.count("/static/wordmark-dark.png?v=") >= 3, "header, hero, footer"
+    assert body.count("/static/wordmark-dark.png?v=") >= 2, "header and footer"
     assert 'alt="FailEcho"' in body
     # The light variant still ships for the social card and any light context.
     assert (STATIC / "wordmark-light.png").exists()
@@ -430,8 +434,8 @@ def test_brand_entity_sentence_is_visible_html(client):
         "FailEcho is a shared failure intelligence network for AI agents and"
         in body
     )
-    assert "Failure intelligence for AI agents and autonomous software." in body
-    assert "Model Context Protocol (MCP)" in body
+    assert "Live failure and recovery intelligence for autonomous software." in body
+    assert "Model Context Protocol endpoint that AI agents can" in body
 
 
 def test_no_noindex_anywhere(client):
@@ -525,7 +529,7 @@ def test_faq_schema_matches_the_visible_faq(client):
         .group(1)
     )
     faq = next(n for n in data["@graph"] if n["@type"] == "FAQPage")
-    assert len(faq["mainEntity"]) == 6
+    assert len(faq["mainEntity"]) == 4, "trimmed to the questions that matter"
     for question in faq["mainEntity"]:
         assert f"<dt>{question['name']}</dt>" in body, question["name"]
         # The answer's first sentence must appear verbatim on the page.

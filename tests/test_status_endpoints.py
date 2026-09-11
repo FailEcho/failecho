@@ -72,7 +72,7 @@ def test_stats_counts_the_network(client):
 def test_homepage_and_docs_are_served(client):
     home = client.get("/")
     assert home.status_code == 200
-    assert "Failure intelligence for AI agents" in home.text
+    assert "AI agents shouldn't debug" in home.text
     assert client.get("/static/app.js").status_code == 200
     assert client.get("/docs").status_code == 200
 

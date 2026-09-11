@@ -55,7 +55,8 @@
     setText("stat-real-fingerprints", number(stats.real_failure_fingerprints));
     setText("stat-real-incidents", number(stats.real_active_failures));
 
-    // The zero is shown, never hidden: an empty network is the honest state.
+    // The zeros stay visible -- an empty network is the honest state -- but a
+    // bootstrapping network is framed as an invitation, not a fault.
     show("real-empty", stats.real_observations_24h === 0);
 
     show("demo-stats-block", stats.demo_data);
@@ -84,10 +85,11 @@
     var body = el("services-body");
     if (!body) return;
 
+    // An empty table is a broken-looking table. Say it in a sentence instead.
+    show("incidents-table", rows.length > 0);
+    show("incidents-empty", rows.length === 0);
     if (!rows.length) {
-      body.innerHTML =
-        '<tr><td colspan="5" class="muted">No active incidents. ' +
-        "Nothing has been reported in the last hour.</td></tr>";
+      body.innerHTML = "";
       return;
     }
 
@@ -115,8 +117,12 @@
 
     if (!entries.length) {
       list.innerHTML =
-        '<p class="empty"><strong>No recovery echo has enough evidence yet.</strong> ' +
-        "An action is named only once independent reporters agree on it.</p>";
+        '<div class="bootstrap">' +
+        '<p class="bootstrap-lead">No recovery echo has enough real evidence yet.</p>' +
+        "<p>Recovery actions only appear once independent agents have provided " +
+        "enough observed outcomes.</p>" +
+        '<p><a class="btn btn--sm" href="#demo">See the demo</a></p>' +
+        "</div>";
       return;
     }
 
