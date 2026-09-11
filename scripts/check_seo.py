@@ -57,6 +57,56 @@ def fetch(url: str) -> tuple[int, str]:
         raise SystemExit(2) from None
 
 
+def fetch_bytes(url: str) -> tuple[int, bytes]:
+    request = urllib.request.Request(url, headers={"User-Agent": "failecho-seo-check"})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status, response.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, b""
+    except (urllib.error.URLError, OSError) as exc:
+        print(f"cannot reach {url}: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None
+
+
+def png_size(data: bytes) -> tuple[int, int] | None:
+    """Width and height from a PNG's IHDR chunk. No Pillow on the server."""
+    if not data.startswith(b"\x89PNG\r\n\x1a\n") or data[12:16] != b"IHDR":
+        return None
+    return (
+        int.from_bytes(data[16:20], "big"),
+        int.from_bytes(data[20:24], "big"),
+    )
+
+
+def check_icons(report: "Report", base: str, home: str) -> None:
+    """Google shows a favicon only if it is square and a multiple of 48px.
+
+    It accepts rel="icon", "shortcut icon" and "apple-touch-icon" as sources,
+    so every one of them has to satisfy the rule -- a non-square apple-touch
+    icon is enough to lose the favicon in search results.
+    """
+    icons = re.findall(
+        r'<link[^>]*rel="(icon|shortcut icon|apple-touch-icon)"[^>]*href="([^"]+)"',
+        home,
+    )
+    report.check("favicon link present", bool(icons), f"{len(icons)} icon links")
+
+    for rel, href in icons:
+        url = href if href.startswith("http") else f"{base}{href}"
+        status, data = fetch_bytes(url)
+        if not report.check(f'{rel} fetches', status == 200, f"got {status}"):
+            continue
+        size = png_size(data)
+        if size is None:
+            # .ico is a valid favicon format; only PNGs can be measured here.
+            report.check(f"{rel} is a real image", bool(data), f"{len(data)} bytes")
+            continue
+        width, height = size
+        report.check(f"{rel} is square", width == height, f"{width}x{height}")
+        report.check(f"{rel} is a multiple of 48px", width % 48 == 0, f"{width}px")
+
+
 def main(base: str) -> int:
     base = base.rstrip("/")
     report = Report()
@@ -142,6 +192,8 @@ def main(base: str) -> int:
         report.check("sitemap is valid XML", False, str(exc))
     for path in ("/", "/docs", "/llms.txt"):
         report.check(f"sitemap lists {path}", any(u.endswith(path) for u in locs))
+
+    check_icons(report, base, home)
 
     for path in ("/docs", "/llms.txt", "/openapi.json", "/health"):
         status, _ = fetch(f"{base}{path}")

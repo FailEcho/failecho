@@ -33,10 +33,19 @@ INK = (23, 33, 29)
 #: it gets padded rather than squashed.
 FAVICON_SQUARE_PX = 144
 
+#: iOS home-screen icon. Apple composites a transparent icon onto black and
+#: rounds the corners itself, so this one is rendered square and opaque on the
+#: page background. Google also accepts rel="apple-touch-icon" as a favicon
+#: source, which means it has to satisfy the same square rule as favicon.png.
+APPLE_TOUCH_PX = 192
+
 #: Retina: every asset is rendered at twice its largest CSS size.
 MARK_PX = 128          # displayed up to 64
 LOCKUP_PX = 640        # displayed up to ~320 wide
 FAVICON_PX = 64
+
+#: Page ground, matching --bg in style.css. Used behind the opaque icons.
+BACKDROP = (13, 14, 16)
 
 #: Chart-paper ground, matching --paper in style.css.
 PAPER = (239, 241, 236)
@@ -84,6 +93,18 @@ def square(image: Image.Image, size: int, margin: float = 0.08) -> Image.Image:
     canvas.alpha_composite(
         scaled, ((size - scaled.width) // 2, (size - scaled.height) // 2)
     )
+    return canvas
+
+
+def opaque(image: Image.Image, colour: tuple[int, int, int]) -> Image.Image:
+    """Flatten a transparent icon onto a solid ground.
+
+    iOS does not honour transparency in a home-screen icon; it fills the gaps
+    with black and rounds the corners. Compositing here means the icon looks
+    the same everywhere instead of depending on the platform's guess.
+    """
+    canvas = Image.new("RGBA", image.size, (*colour, 255))
+    canvas.alpha_composite(image)
     return canvas
 
 
@@ -145,6 +166,11 @@ def main() -> None:
 
     save(fit_height(mark, MARK_PX), "logo.png", PALETTE)
     save(square(mark, FAVICON_SQUARE_PX), "favicon.png", PALETTE)
+    save(
+        opaque(square(mark, APPLE_TOUCH_PX, margin=0.14), BACKDROP),
+        "apple-touch-icon.png",
+        PALETTE,
+    )
 
     # The master is white-on-transparent: correct for dark, invisible on light.
     save(fit_width(lockup, LOCKUP_PX), "wordmark-dark.png", PALETTE)
