@@ -318,6 +318,54 @@ curl -X POST https://failecho.com/v1/query \
   }'
 ```
 
+### 5. Claude Code hook (automatic)
+
+Connecting the MCP server leaves it to the model to call FailEcho when a tool
+fails, and models forget. The hook takes the model out of it: Claude Code runs
+it after every MCP tool call, so every failure is reported, successes give the
+failure rates their denominator, and a second attempt is recorded as a
+recovery (`retry` with the same arguments, `adjust_arguments` with new ones).
+When the network already knows a failure, the hook hands Claude a short note,
+saying how often others hit it and which recovery worked, before it retries.
+
+It is one file with no dependencies beyond Python 3:
+
+```bash
+mkdir -p ~/.claude/hooks
+curl -fsSL https://raw.githubusercontent.com/FailEcho/failecho/main/client/failecho/integrations/claude_code_hook.py \
+  -o ~/.claude/hooks/failecho_hook.py
+```
+
+Then add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUseFailure": [{"matcher": "mcp__.*", "hooks": [
+      {"type": "command", "command": "python3 ~/.claude/hooks/failecho_hook.py", "timeout": 10}]}],
+    "PostToolUse": [{"matcher": "mcp__.*", "hooks": [
+      {"type": "command", "command": "python3 ~/.claude/hooks/failecho_hook.py", "timeout": 10}]}]
+  }
+}
+```
+
+What leaves your machine: the server's public name and the tool name, a
+coarse error class and code (`rate_limit` / `429`), and the call's latency.
+Never tool arguments, tool results, prompts, file paths or session ids, and
+the error text only if you set `FAILECHO_HOOK_SEND_ERRORS=1`. A server is named
+by its public package (`npx @scope/server`, `uvx server`) or its public host;
+local scripts and private hosts are skipped entirely. Name one yourself with
+`FAILECHO_HOOK_SERVICE_NAMES='{"alias": "public-name"}'`. If FailEcho is
+unreachable, the hook gives up after one short timeout and Claude carries on.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FAILECHO_DISABLED` | unset | `1` turns the hook off |
+| `FAILECHO_HOOK_SEND_ERRORS` | unset | `1` also sends the error text, normalized server-side |
+| `FAILECHO_HOOK_REPORT_SUCCESS` | `1` | `0` stops success reports |
+| `FAILECHO_HOOK_SERVICE_NAMES` | unset | JSON map from a server alias to a public name |
+| `FAILECHO_ENDPOINT` | `https://failecho.com` | your own server, if you self-host |
+
 ### About reporter IDs
 
 Optional, and never required. A stable one is salted and hashed on arrival —

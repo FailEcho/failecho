@@ -4,39 +4,35 @@ This repository is FailEcho, a shared failure-intelligence network for AI
 agents. Claude Code sessions here use it on themselves: that is how the
 network gets its first-party evidence while it bootstraps.
 
-## Use FailEcho when a tool fails
+## FailEcho reporting is automatic here
 
-The `failecho` MCP server is connected with the operator header
-(`X-FailEcho-Operator`), so everything reported from here is stored as
-`first_party`: shown to other agents as our own evidence, never counted as
-adoption. If `claude mcp get failecho` does not list that header, report
-nothing -- it would be counted as a real external agent.
+A Claude Code hook reports MCP tool failures on this machine: every failure,
+every success (failure rates need a denominator), and whether a second attempt
+worked. It runs after the tool call, without the model deciding anything.
 
-When a call to an external service fails:
+So **do not call `report_tool_failure`, `report_tool_success` or
+`report_recovery_outcome` for MCP tools**. The hook already did; a second
+report would count the same failure twice.
 
-1. Before retrying, call `check_tool_failure`. If it returns a
-   recommendation, weigh it; if `evidence_sources` is only `first_party`,
-   it is our own past experience, not independent evidence.
-2. Call `report_tool_failure` with the same fields.
-3. After trying a recovery (retry, wait, reauthenticate, use_fallback,
-   refresh_schema, ...), call `report_recovery_outcome` with the
-   fingerprint and whether it worked. One report per attempt, not one per
-   loop iteration.
-4. When a service that failed earlier in the session works again, call
-   `report_tool_success` for it once.
+After an MCP tool fails, the hook hands you what the network knows, if
+anything. Use it: an action that worked for several other agents is worth more
+than another blind retry. `check_tool_failure` stores nothing, so calling it
+for more detail is free and safe at any time.
 
-Report failures of shared infrastructure that other agents also call:
+## Failures the hook does not see
 
-- MCP server tools (any server except `failecho` itself)
-- HTTP APIs: 4xx/5xx, timeouts, rate limits, auth errors (GitHub, PyPI,
-  npm, Cloudflare, ...)
+The hook only covers MCP tools. Report these yourself, as shared
+infrastructure other agents also call:
+
+- HTTP APIs called from Bash or scripts: 4xx/5xx, timeouts, rate limits, auth
+  errors (GitHub, PyPI, npm, Cloudflare, ...)
 - Package installs and git remote operations that fail on the remote side
 - CLIs that fail while talking to a remote service (`gh`, `npx`, `uvx`, ...)
 
-Do not report bugs in our own code, failing tests, typos in commands,
-commands the user rejected, local file errors, `grep` finding nothing, or
-anything from FailEcho itself. Those are not shared failures, and reporting
-them is noise nobody will ever query.
+Do not report bugs in our own code, failing tests, typos in commands, commands
+the user rejected, local file errors, `grep` finding nothing, or anything from
+FailEcho itself. Those are not shared failures, and reporting them is noise
+nobody will ever query.
 
 ## Filling in the fields
 

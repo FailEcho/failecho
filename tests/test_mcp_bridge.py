@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 import subprocess
 import sys
-import tempfile
 import time
 import tomllib
 import urllib.request
@@ -27,6 +25,7 @@ from mcp.shared.exceptions import MCPError
 
 import failecho_mcp
 from failecho_mcp import DEFAULT_URL, REPORTER_KIND_HEADER, Relay
+from tests.live_server import free_port, running_failecho
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {
@@ -44,51 +43,11 @@ FAILURE = {
 }
 
 
-def _free_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-
-
 @pytest.fixture(scope="module")
 def upstream():
     """A real FailEcho server with its own database, reachable over HTTP."""
-    port = _free_port()
-    base = f"http://127.0.0.1:{port}"
-    workdir = Path(tempfile.mkdtemp(prefix="fin-relay-"))
-    env = {
-        **os.environ,
-        "FIN_DATABASE_URL": f"sqlite+aiosqlite:///{workdir / 'upstream.db'}",
-        "FIN_PUBLIC_URL": base,
-        "FIN_DASHBOARD_CACHE_SECONDS": "0",
-        "FIN_REPORTER_SALT": "relay-test-salt",
-        "FIN_FIRST_PARTY_TOKEN": RELAY_OPERATOR_TOKEN,
-    }
-    log = (workdir / "upstream.log").open("w")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port),
-         "--log-level", "warning"],
-        cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT,
-    )
-    try:
-        deadline = time.monotonic() + 30
-        while True:
-            try:
-                urllib.request.urlopen(f"{base}/health", timeout=1)
-                break
-            except OSError:
-                if time.monotonic() > deadline or proc.poll() is not None:
-                    log.flush()
-                    raise RuntimeError(
-                        "upstream FailEcho did not start:\n"
-                        + (workdir / "upstream.log").read_text()
-                    ) from None
-                time.sleep(0.2)
-        yield base
-    finally:
-        proc.terminate()
-        proc.wait(timeout=10)
-        log.close()
+    with running_failecho(FIN_FIRST_PARTY_TOKEN=RELAY_OPERATOR_TOKEN) as server:
+        yield server.base
 
 
 def through(relay: Relay, action):
@@ -243,7 +202,7 @@ def test_the_relay_never_loads_a_database():
 
 
 def test_an_unreachable_network_is_an_answer_not_a_hang():
-    relay = Relay(f"http://127.0.0.1:{_free_port()}/mcp")
+    relay = Relay(f"http://127.0.0.1:{free_port()}/mcp")
 
     started = time.monotonic()
     assert anyio.run(relay.warm) is False
