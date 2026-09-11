@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import OPERATOR_HEADER
 from app.core.privacy import hash_reporter_id
 from app.core.service import source_from_kind
 from app.core.ratelimit import check_write_limit, client_key
@@ -50,8 +51,20 @@ async def reporter_source(
             ),
         ),
     ] = None,
+    x_failecho_operator: Annotated[
+        str | None,
+        Header(
+            alias=OPERATOR_HEADER,
+            include_in_schema=False,
+            description=(
+                "Operator secret, sent only by FailEcho's own agents. With the "
+                "right value the report is labelled first_party; a wrong one "
+                "is stored as demo."
+            ),
+        ),
+    ] = None,
 ) -> str:
-    return source_from_kind(x_reporter_kind)
+    return source_from_kind(x_reporter_kind, x_failecho_operator)
 
 
 SourceDep = Annotated[str, Depends(reporter_source)]

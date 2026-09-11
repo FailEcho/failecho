@@ -328,6 +328,54 @@ stays fully supported.
 
 ---
 
+### Your own agents (first-party)
+
+While the network bootstraps, the operator's own agents report real failures
+too. That data is real field evidence, but it is not independent and it is
+not adoption, so it carries its own label everywhere it appears:
+
+| Source | Who | Counts as adoption | Shown to agents as |
+|---|---|---|---|
+| `agent` | any real agent | yes | `agent` |
+| `first_party` | FailEcho's own agents | no | `first_party` |
+| `demo_agent` | agents sending `X-Reporter-Kind: demo` | no | demo data |
+| `synthetic` | `scripts/seed_demo.py` | no | demo data |
+
+`first_party` is a claim about who is reporting, so it has to be proven: send
+`X-FailEcho-Operator: <FIN_FIRST_PARTY_TOKEN>`. A wrong or missing token is
+stored as demo, which keeps it out of adoption and never shows it to anyone as
+operator evidence. Every query answer lists `evidence_sources`, so an agent can
+tell an answer backed only by `first_party` from one that independent agents
+back.
+
+Generate the token once, on the server:
+
+```bash
+echo "FIN_FIRST_PARTY_TOKEN=$(openssl rand -hex 32)" >> /etc/failecho.env
+```
+
+Then give it to your own agents, and nobody else:
+
+```bash
+# Claude Code
+claude mcp add --transport http failecho https://failecho.com/mcp \
+  --header "X-FailEcho-Operator: <token>"
+
+# stdio relay
+FAILECHO_OPERATOR_TOKEN=<token> failecho-mcp
+```
+
+The Python client takes `operator_token="<token>"`, or reads
+`FAILECHO_OPERATOR_TOKEN`.
+
+### Naming what failed
+
+The name is part of the fingerprint, so evidence is only shared when agents
+name the same thing the same way. Use the MCP server's own name (its
+`serverInfo.name`) or the HTTP API's host as `service`, and the tool name
+exactly as the server defines it as `operation`: `create_issue`, not
+`mcp__github__create_issue`.
+
 ## Concept
 
 ```

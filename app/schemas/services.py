@@ -28,8 +28,15 @@ class ServiceStatus(BaseModel):
         default=False,
         description=(
             "True when every observation behind this row came from demo or "
-            "synthetic sources, i.e. no real agent traffic contributed. Mixed "
-            "rows are reported as real."
+            "synthetic sources, i.e. neither real agents nor FailEcho's own "
+            "agents contributed. Mixed rows are reported as real."
+        ),
+    )
+    first_party_data: bool = Field(
+        default=False,
+        description=(
+            "True when FailEcho's own agents (first_party) contributed "
+            "observations to this row: real calls, but not independent ones."
         ),
     )
 
@@ -86,6 +93,14 @@ class NetworkStats(BaseModel):
             "Observations reported by agents that labelled themselves demo "
             "(X-Reporter-Kind: demo). Real evidence, deliberately excluded "
             "from adoption metrics."
+        ),
+    )
+    first_party_observations: int = Field(
+        default=0,
+        description=(
+            "Observations reported by FailEcho's own agents, proven with the "
+            "operator header. Real evidence, shown to agents as first_party, "
+            "never counted as adoption."
         ),
     )
     real_observations_total: int = Field(
@@ -182,4 +197,8 @@ class RecoveryIntelligence(BaseModel):
     last_seen: str | None = None
     demo_data: bool = Field(
         description="True when synthetic demo rows back this entry."
+    )
+    first_party_data: bool = Field(
+        default=False,
+        description="True when FailEcho's own agents contributed evidence to this entry.",
     )

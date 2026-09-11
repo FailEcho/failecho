@@ -18,6 +18,7 @@ from app.core.config import (
     OUTCOME_FAILURE,
     SOURCE_AGENT,
     SOURCE_DEMO_AGENT,
+    SOURCE_FIRST_PARTY,
     SOURCE_SYNTHETIC,
     settings,
 )
@@ -27,6 +28,7 @@ from app.core.intelligence import (
     recommend,
     recovery_actions,
 )
+from app.core.service import evidence_sources
 from app.db.models import (
     DailyCounter,
     Fingerprint,
@@ -57,6 +59,9 @@ def _rollup(seconds: int):
             func.coalesce(
                 func.sum(case((Observation.source == SOURCE_AGENT, 1), else_=0)), 0
             ).label("real_total"),
+            func.coalesce(
+                func.sum(case((Observation.source == SOURCE_FIRST_PARTY, 1), else_=0)), 0
+            ).label("first_party_total"),
         )
         .where(Observation.created_at >= ago(seconds))
         .group_by(Observation.service, Observation.operation)
@@ -116,8 +121,12 @@ async def services(
                 observations_5m=short.total,
                 observations_1h=long.total,
                 last_seen=isoformat_z(long_row.last_seen),
-                # No real observations behind the row -> it is demo-only.
-                demo_data=int(long_row.real_total or 0) == 0,
+                # Neither real nor first-party observations behind the row ->
+                # it is demo-only.
+                demo_data=int(long_row.real_total or 0)
+                + int(long_row.first_party_total or 0)
+                == 0,
+                first_party_data=int(long_row.first_party_total or 0) > 0,
             )
         )
 
@@ -185,12 +194,40 @@ async def stats(session: SessionDep) -> NetworkStats:
                     ),
                     0,
                 ).label("demo_agent"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                HourlyStat.source == SOURCE_AGENT,
+                                HourlyStat.success_count + HourlyStat.failure_count,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("real"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                HourlyStat.source == SOURCE_FIRST_PARTY,
+                                HourlyStat.success_count + HourlyStat.failure_count,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("first_party"),
             )
         )
     ).one()
     archived_total = int(archived_row.total or 0)
     archived_synthetic = int(archived_row.synthetic or 0)
     archived_demo_agent = int(archived_row.demo_agent or 0)
+    # Counted directly, never as "total minus the other kinds": a subtraction
+    # silently turns every newly added source into real adoption.
+    archived_real = int(archived_row.real or 0)
+    archived_first_party = int(archived_row.first_party or 0)
 
     long_row = (
         await session.execute(
@@ -247,6 +284,11 @@ async def stats(session: SessionDep) -> NetworkStats:
             select(func.count()).where(Observation.source == SOURCE_DEMO_AGENT)
         )
     ).scalar_one()
+    first_party_rows = (
+        await session.execute(
+            select(func.count()).where(Observation.source == SOURCE_FIRST_PARTY)
+        )
+    ).scalar_one()
 
     # ---- real telemetry, kept strictly separate from demo data -----------
     real_total = (
@@ -254,7 +296,6 @@ async def stats(session: SessionDep) -> NetworkStats:
             select(func.count()).where(Observation.source == SOURCE_AGENT)
         )
     ).scalar_one()
-    archived_real = archived_total - archived_synthetic - archived_demo_agent
 
     real_day = (
         await session.execute(
@@ -318,6 +359,7 @@ async def stats(session: SessionDep) -> NetworkStats:
         demo_mode=settings.demo_mode,
         synthetic_observations=synthetic_total,
         demo_agent_observations=demo_agent_total,
+        first_party_observations=int(first_party_rows or 0) + archived_first_party,
         real_observations_total=int(real_total or 0) + archived_real,
         real_observations_24h=real_total_day,
         real_failures_24h=real_failures,
@@ -420,6 +462,7 @@ async def recovery_intelligence(
                 )
             ).scalar_one()
         is_demo = bool(demo)
+        first_party = SOURCE_FIRST_PARTY in await evidence_sources(session, fingerprint)
         if is_demo and not include_demo:
             continue
 
@@ -440,6 +483,7 @@ async def recovery_intelligence(
                 observations=catalogue.observation_count,
                 last_seen=isoformat_z(catalogue.last_seen),
                 demo_data=is_demo,
+                first_party_data=first_party,
             )
         )
 

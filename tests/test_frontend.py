@@ -161,8 +161,18 @@ def test_recovery_echo_shows_the_whole_evidence_basis():
 
 def test_demo_rows_are_badged(client):
     assert 'class="tag">DEMO<' in JS
-    assert "row.demo_data" in JS
-    assert "entry.demo_data" in JS
+    # Rows and recovery echoes are both tagged from their own provenance.
+    assert "item.demo_data" in JS
+    assert "sourceTags(row)" in JS
+    assert "sourceTags(entry)" in JS
+
+
+def test_first_party_rows_are_badged_and_counted_apart():
+    assert 'class="tag">FIRST-PARTY<' in JS
+    assert "item.first_party_data" in JS
+    assert 'id="first-party-block"' in HTML
+    assert 'id="stat-first-party"' in HTML
+    assert "never counted as adoption" in HTML
 
 
 def test_demo_badge_data_is_actually_served(client):

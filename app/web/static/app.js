@@ -59,6 +59,10 @@
     // bootstrapping network is framed as an invitation, not a fault.
     show("real-empty", stats.real_observations_24h === 0);
 
+    // FailEcho's own agents: real evidence, labelled, never adoption.
+    show("first-party-block", stats.first_party_observations > 0);
+    setText("stat-first-party", number(stats.first_party_observations || 0));
+
     show("demo-stats-block", stats.demo_data);
     if (stats.demo_data) {
       setText("stat-demo-agent", number(stats.demo_agent_observations));
@@ -81,6 +85,15 @@
     );
   }
 
+  // Where a row's evidence came from, so demo and first-party data can never
+  // pass for independent agents.
+  function sourceTags(item) {
+    return (
+      (item.demo_data ? '<span class="tag">DEMO</span>' : "") +
+      (item.first_party_data ? '<span class="tag">FIRST-PARTY</span>' : "")
+    );
+  }
+
   function renderServices(rows) {
     var body = el("services-body");
     if (!body) return;
@@ -96,10 +109,10 @@
     body.innerHTML = rows
       .map(function (row) {
         var rate = row.failure_rate_5m !== null ? row.failure_rate_5m : row.failure_rate_1h;
-        var demo = row.demo_data ? '<span class="tag">DEMO</span>' : "";
+        var tags = sourceTags(row);
         return (
           "<tr>" +
-          '<td class="svc">' + escapeHtml(row.service) + demo + "</td>" +
+          '<td class="svc">' + escapeHtml(row.service) + tags + "</td>" +
           '<td class="op">' + escapeHtml(row.operation) + "</td>" +
           "<td>" + statusCell(row.status) + "</td>" +
           '<td class="num">' + percent(rate) + "</td>" +
@@ -128,12 +141,12 @@
 
     list.innerHTML = entries
       .map(function (entry) {
-        var demo = entry.demo_data ? '<span class="tag">DEMO</span>' : "";
+        var tags = sourceTags(entry);
         return (
           '<article class="echo">' +
           '<div class="echo-head">' +
           '<span class="echo-target">' +
-          escapeHtml(entry.service) + " / " + escapeHtml(entry.operation) + demo +
+          escapeHtml(entry.service) + " / " + escapeHtml(entry.operation) + tags +
           "</span>" +
           '<span class="echo-kind">' + escapeHtml(entry.error_type || "") + "</span>" +
           "</div>" +

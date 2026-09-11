@@ -23,16 +23,22 @@ STATUS_INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 OUTCOME_SUCCESS = "success"
 OUTCOME_FAILURE = "failure"
 
-# Provenance of a row. Three kinds, kept apart everywhere they surface:
-#   agent       telemetry from a real autonomous system (counts as adoption)
-#   demo_agent  an example/demo agent that self-identified as such
-#   synthetic   rows generated locally by scripts/seed_demo.py
+# Provenance of a row. Four kinds, kept apart everywhere they surface:
+#   agent        telemetry from a real autonomous system (counts as adoption)
+#   first_party  FailEcho's operator's own agents, proven by a secret header.
+#                Real calls and real evidence, but not independent, and never
+#                adoption
+#   demo_agent   an example/demo agent that self-identified as such
+#   synthetic    rows generated locally by scripts/seed_demo.py
 # Only SOURCE_AGENT is ever reported as real adoption.
 SOURCE_AGENT = "agent"
+SOURCE_FIRST_PARTY = "first_party"
 SOURCE_DEMO_AGENT = "demo_agent"
 SOURCE_SYNTHETIC = "synthetic"
 
-# Sources that must never be counted as real adoption.
+# Illustrative sources: demo data, never field evidence and never adoption.
+# first_party is deliberately absent -- it is field evidence, just not
+# independent -- and adoption is decided by SOURCE_AGENT alone.
 NON_REAL_SOURCES = (SOURCE_DEMO_AGENT, SOURCE_SYNTHETIC)
 
 # Aggregate counter names (see app/db/models.py::DailyCounter).
@@ -43,6 +49,9 @@ COUNTER_CROSS_AGENT_HELP = "cross_agent_help"
 # Request header a caller uses to label itself as a demo agent.
 REPORTER_KIND_HEADER = "X-Reporter-Kind"
 REPORTER_KIND_DEMO = "demo"
+
+# Header the operator's own agents send, carrying FIN_FIRST_PARTY_TOKEN.
+OPERATOR_HEADER = "X-FailEcho-Operator"
 
 
 def _env_str(name: str, default: str) -> str:
@@ -82,6 +91,12 @@ class Settings:
     # this value makes previously stored reporter hashes unlinkable.
     reporter_salt: str = field(
         default_factory=lambda: _env_str("FIN_REPORTER_SALT", "dev-salt-change-me")
+    )
+    # Secret proving a caller is one of the operator's own agents
+    # (X-FailEcho-Operator). Empty disables the label: every such claim is
+    # then stored as demo -- never as adoption, never as operator evidence.
+    first_party_token: str = field(
+        default_factory=lambda: _env_str("FIN_FIRST_PARTY_TOKEN", "")
     )
 
     # ---- time windows (seconds) -----------------------------------------

@@ -57,6 +57,20 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
 
 
+#: How to name what was called. Fingerprints only match when agents name the
+#: same thing the same way, which is the difference between shared evidence
+#: and a private log.
+SERVICE_NAMING = (
+    "What was called, named the way other agents will name it: an MCP "
+    "server's own name (the one it reports in serverInfo.name), or an HTTP "
+    "API's host, e.g. 'api.github.com'. Not your client's local alias for it."
+)
+OPERATION_NAMING = (
+    "The tool or endpoint exactly as the server defines it, e.g. "
+    "'create_issue' -- without client prefixes such as 'mcp__github__'."
+)
+
+
 class CallIdentity(StrictModel):
     """The four fields that identify *what was called*.
 
@@ -65,11 +79,11 @@ class CallIdentity(StrictModel):
     """
 
     service: ServiceName = Field(
-        description="Tool/service identifier, e.g. 'github-mcp'.",
+        description=SERVICE_NAMING,
         examples=["github-mcp"],
     )
     operation: OperationName = Field(
-        description="Operation/tool name within the service, e.g. 'create_issue'.",
+        description=OPERATION_NAMING,
         examples=["create_issue"],
     )
     version: ShortToken | None = Field(

@@ -9,6 +9,8 @@ true by construction instead of by discipline.
 
 from __future__ import annotations
 
+import hmac
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +25,7 @@ from app.core.config import (
     REPORTER_KIND_DEMO,
     SOURCE_AGENT,
     SOURCE_DEMO_AGENT,
+    SOURCE_FIRST_PARTY,
     settings,
 )
 from app.core.fingerprint import compute_fingerprint
@@ -38,6 +41,7 @@ from app.core.intelligence import (
 from app.core.normalize import normalize_error
 from app.db.models import (
     Fingerprint,
+    HourlyRecoveryStat,
     HourlyStat,
     Observation,
     RecoveryOutcome,
@@ -54,13 +58,26 @@ from app.schemas.query import (
 )
 
 
-def source_from_kind(reporter_kind: str | None) -> str:
-    """Map the optional ``X-Reporter-Kind`` header to a stored source label.
+def source_from_kind(
+    reporter_kind: str | None, operator_token: str | None = None
+) -> str:
+    """Map the optional self-label headers to a stored source label.
 
-    Self-labelling only ever *downgrades* a report: a caller can declare
-    itself a demo agent and be excluded from adoption metrics, but nothing can
-    promote a row to real telemetry. That is why trusting the header is safe.
+    ``X-Reporter-Kind: demo`` only ever *downgrades* a report -- a caller can
+    exclude itself from adoption metrics, never promote itself into them -- so
+    it is trusted as sent.
+
+    ``X-FailEcho-Operator`` is different: it claims the report came from
+    FailEcho's own agents, and answers repeat that claim to other agents. So
+    it is honoured only with the configured secret. A claim that fails the
+    check is stored as demo: kept out of adoption exactly like the real
+    thing, but never presented to anyone as operator evidence.
     """
+    if operator_token is not None:
+        expected = settings.first_party_token
+        if expected and hmac.compare_digest(operator_token.encode(), expected.encode()):
+            return SOURCE_FIRST_PARTY
+        return SOURCE_DEMO_AGENT
     if reporter_kind and reporter_kind.strip().lower() == REPORTER_KIND_DEMO:
         return SOURCE_DEMO_AGENT
     return SOURCE_AGENT
@@ -203,6 +220,21 @@ async def record_recovery_outcome(
     return OutcomeResponse(accepted=True)
 
 
+async def evidence_sources(session: AsyncSession, fingerprint: str) -> list[str]:
+    """Every provenance label behind a fingerprint, raw rows and aggregates.
+
+    Tells a caller whether independent agents saw this failure, or only
+    FailEcho's own agents, or only demo data -- before it acts on the answer.
+    """
+    found: set[str] = set()
+    for table in (Observation, HourlyStat, RecoveryOutcome, HourlyRecoveryStat):
+        result = await session.execute(
+            select(table.source).where(table.fingerprint == fingerprint).distinct()
+        )
+        found.update(result.scalars())
+    return sorted(found)
+
+
 async def _includes_demo_data(session: AsyncSession, fingerprint: str) -> bool:
     """True when demo rows (seeded or demo-agent) back this fingerprint.
 
@@ -330,6 +362,7 @@ async def query_intelligence(
         demo_data_included=await _includes_demo_data(session, fingerprint)
         if known
         else False,
+        evidence_sources=await evidence_sources(session, fingerprint) if known else [],
     )
 
     # Experiment counters. Real traffic only, integers only, no identities.

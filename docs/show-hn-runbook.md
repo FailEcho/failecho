@@ -21,11 +21,12 @@ in the thread falls off /new without ever reaching the front page.
       this and how do I connect" without scrolling.
 - [ ] Re-run `python scripts/loadtest.py` against the origin and write the
       numbers down. You will be asked "what happens when HN hits it".
-- [ ] Read the current stats and be ready to say them out loud. On
-      2026-09-11 they were: 0 observations, 0 fingerprints, 1 query.
-- [ ] Decide in advance that you will not seed the database to look busier.
-      If a single row appears the morning of the launch, the honesty that is
-      the strongest thing about the post is gone.
+- [ ] Read the current stats and be ready to say them out loud, split by
+      source: `real_observations_total` (independent agents) and
+      `first_party_observations` (your own agents). On 2026-09-11 both were 0.
+- [ ] Never seed the database to look busier. Your own agents' real calls,
+      labelled first-party with the operator token, are fine: they are
+      disclosed on the page and in every answer. Synthetic rows are not.
 
 ## 2. Submitting
 
@@ -76,11 +77,11 @@ Connect over MCP: https://failecho.com/mcp (streamable HTTP, no auth, no key).
 Four tools: check_tool_failure, report_tool_failure, report_tool_success,
 report_recovery_outcome. There is a plain REST API too if you don't want MCP.
 
-Honest state of it: the network is empty. It went live this week and has 0
-observations and 1 query so far, which you can verify at
-https://failecho.com/v1/stats — the live page shows zeros rather than demo
-data. So this is a protocol and an empty room, not a product with a graph to
-show you. I'd rather post it that way than seed it.
+Honest state of it: no independent agent has reported anything yet. Anything
+in it so far comes from my own agents, labelled first-party. The live page
+and every answer (`evidence_sources`) say so, and none of it counts as
+adoption. You can check the split at https://failecho.com/v1/stats. So this is
+a protocol and a nearly empty room, not a product with a graph to show you.
 
 Deliberately boring stack: FastAPI, SQLite in WAL mode, one process, about
 100 MB of RAM on a small VPS.
@@ -98,6 +99,10 @@ The two things I'd genuinely like input on: how much cross-tenant failure
 overlap actually exists outside popular public APIs, and whether recovery
 outcome reports ever arrive in practice — an agent has to come back and tell
 the network after it recovered, which is the fragile part of the whole idea.
+
+If you run agents against MCP servers and would leave this on for a week, I'm
+looking for 5–10 people to do exactly that. I'll publish what the network sees
+afterwards, whatever it turns out to be.
 ```
 
 ## 5. Objection playbook
@@ -121,9 +126,11 @@ Point at `app/core/normalize.py`; it is short and readable, and the argument
 lands better as code than as a promise. Then say the honest part: it is
 self-hostable, and a team that does not want to share can run its own.
 
-**"The network is empty, so this does nothing."**
-Correct, and it is in the post. The bet is that the protocol is worth having
-before the data is. Do not get defensive here; agree and move on.
+**"The network is empty, so this does nothing." / "It's just your own data."**
+Correct, and it is in the post. What exists is labelled first-party, kept out
+of adoption, and every answer says so in `evidence_sources`; point at that
+rather than arguing. The bet is that the protocol is worth having before the
+data is, and the volunteer ask is how the data stops being yours.
 
 **"My failures are unique to my stack, so overlap is zero."**
 This is the real objection and the honest answer is that you don't know yet —

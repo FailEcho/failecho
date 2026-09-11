@@ -35,6 +35,7 @@ TOOLS = {
     "report_tool_success",
     "report_recovery_outcome",
 }
+RELAY_OPERATOR_TOKEN = "relay-operator-token"
 FAILURE = {
     "service": "relay-test-api",
     "operation": "create_widget",
@@ -61,6 +62,7 @@ def upstream():
         "FIN_PUBLIC_URL": base,
         "FIN_DASHBOARD_CACHE_SECONDS": "0",
         "FIN_REPORTER_SALT": "relay-test-salt",
+        "FIN_FIRST_PARTY_TOKEN": RELAY_OPERATOR_TOKEN,
     }
     log = (workdir / "upstream.log").open("w")
     proc = subprocess.Popen(
@@ -205,6 +207,23 @@ def test_the_demo_label_travels_through_the_relay(upstream):
     assert after["real_observations_total"] == before["real_observations_total"]
 
 
+def test_the_operator_secret_travels_through_the_relay(upstream):
+    """FAILECHO_OPERATOR_TOKEN labels relayed reports first-party, not adoption."""
+    before = stats(upstream)
+    relay = warmed(f"{upstream}/mcp", operator_token=RELAY_OPERATOR_TOKEN)
+
+    through(
+        relay,
+        lambda session: session.call_tool(
+            "report_tool_failure", {**FAILURE, "operation": "operator_widget"}
+        ),
+    )
+
+    after = stats(upstream)
+    assert after["first_party_observations"] == before["first_party_observations"] + 1
+    assert after["real_observations_total"] == before["real_observations_total"]
+
+
 def test_the_relay_never_loads_a_database():
     """It stores nothing because it cannot: the storage stack is never imported."""
     probe = (
@@ -305,3 +324,13 @@ def test_relay_identifies_itself_and_mirrors_the_server_label():
 
     demo = Relay("http://example.invalid/mcp", reporter_kind="demo")
     assert demo.headers[REPORTER_KIND_HEADER] == "demo"
+
+
+def test_relay_operator_header_matches_the_server():
+    from app.core.config import OPERATOR_HEADER as SERVER_OPERATOR_HEADER
+
+    assert failecho_mcp.OPERATOR_HEADER == SERVER_OPERATOR_HEADER
+
+    relay = Relay("http://example.invalid/mcp", operator_token="t")
+    assert relay.headers[failecho_mcp.OPERATOR_HEADER] == "t"
+    assert failecho_mcp.OPERATOR_HEADER not in Relay("http://example.invalid/mcp").headers

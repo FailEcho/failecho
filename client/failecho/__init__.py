@@ -93,6 +93,7 @@ class FailEcho:
         enabled: bool | None = None,
         success_sample_rate: float = 1.0,
         demo: bool = False,
+        operator_token: str | None = None,
     ) -> None:
         """
         :param reporter_id: optional stable identifier for this agent or
@@ -110,6 +111,10 @@ class FailEcho:
         :param demo: send ``X-Reporter-Kind: demo`` so this traffic is stored
             and usable but excluded from FailEcho's real-adoption metrics. Use
             it for examples and tutorials, never for production agents.
+        :param operator_token: FailEcho's own agents only. Proves the traffic
+            comes from the network's operator, so it is labelled first-party:
+            shown to other agents as such and never counted as adoption.
+            Falls back to ``FAILECHO_OPERATOR_TOKEN``. Everyone else: omit it.
         :param enabled: master switch. Defaults to on unless
             ``FAILECHO_DISABLED`` is set in the environment.
         """
@@ -118,6 +123,7 @@ class FailEcho:
         self.timeout = timeout
         self.success_sample_rate = max(0.0, min(1.0, success_sample_rate))
         self.demo = demo
+        self.operator_token = operator_token or os.environ.get("FAILECHO_OPERATOR_TOKEN") or None
         if enabled is None:
             enabled = os.environ.get("FAILECHO_DISABLED", "") not in ("1", "true", "yes")
         self.enabled = enabled
@@ -130,6 +136,8 @@ class FailEcho:
             headers["X-Reporter-ID"] = self.reporter_id
         if self.demo:
             headers["X-Reporter-Kind"] = "demo"
+        if self.operator_token:
+            headers["X-FailEcho-Operator"] = self.operator_token
         return headers
 
     def _post_sync(self, path: str, payload: dict[str, Any]) -> _Result:

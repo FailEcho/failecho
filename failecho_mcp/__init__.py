@@ -50,6 +50,10 @@ STARTUP_TIMEOUT_SECONDS = 15.0
 #: Mirrors app.core.config.REPORTER_KIND_HEADER without importing the server.
 REPORTER_KIND_HEADER = "X-Reporter-Kind"
 
+#: Header proving a caller is one of FailEcho's own agents. Mirrors
+#: app.core.config.OPERATOR_HEADER.
+OPERATOR_HEADER = "X-FailEcho-Operator"
+
 #: JSON-RPC "Internal error".
 _INTERNAL_ERROR = -32603
 
@@ -81,13 +85,20 @@ def _describe(exc: BaseException) -> str:
 class Relay:
     """Forwards MCP tool traffic from a local client to the FailEcho network."""
 
-    def __init__(self, url: str = DEFAULT_URL, reporter_kind: str | None = None) -> None:
+    def __init__(
+        self,
+        url: str = DEFAULT_URL,
+        reporter_kind: str | None = None,
+        operator_token: str | None = None,
+    ) -> None:
         self.url = url
         # Identifies relayed traffic in the server's logs, so adoption through
         # this path can be counted honestly rather than guessed.
         self.headers = {"User-Agent": f"failecho-mcp/{__version__}"}
         if reporter_kind:
             self.headers[REPORTER_KIND_HEADER] = reporter_kind
+        if operator_token:
+            self.headers[OPERATOR_HEADER] = operator_token
         self._tools: list[types.Tool] | None = None
         self._init: types.InitializeResult | None = None
 
@@ -177,8 +188,12 @@ class Relay:
         )
 
 
-async def serve(url: str = DEFAULT_URL, reporter_kind: str | None = None) -> None:
-    relay = Relay(url, reporter_kind)
+async def serve(
+    url: str = DEFAULT_URL,
+    reporter_kind: str | None = None,
+    operator_token: str | None = None,
+) -> None:
+    relay = Relay(url, reporter_kind, operator_token)
     await relay.warm()
     server = relay.build_server()
     async with stdio_server() as (read, write):
@@ -193,8 +208,10 @@ def main() -> None:
 
     url = os.environ.get("FAILECHO_URL") or DEFAULT_URL
     reporter_kind = os.environ.get("FAILECHO_REPORTER_KIND") or None
+    # Only FailEcho's own agents have this; everyone else leaves it unset.
+    operator_token = os.environ.get("FAILECHO_OPERATOR_TOKEN") or None
     log.info("relaying to %s", url)
     try:
-        anyio.run(serve, url, reporter_kind)
+        anyio.run(serve, url, reporter_kind, operator_token)
     except KeyboardInterrupt:
         pass

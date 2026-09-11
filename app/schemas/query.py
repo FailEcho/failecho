@@ -177,3 +177,13 @@ class QueryResponse(StrictModel):
             "the recommendation as an illustration, not as field evidence."
         ),
     )
+    evidence_sources: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Where the evidence behind this answer came from. 'agent': "
+            "independent agents. 'first_party': FailEcho's own agents -- real "
+            "calls, but not independent. 'demo_agent' and 'synthetic': demo "
+            "data. Weigh an answer backed only by 'first_party' as one "
+            "reporter's experience."
+        ),
+    )
