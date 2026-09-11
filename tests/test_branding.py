@@ -552,3 +552,30 @@ def test_openapi_description_leads_with_ai_agents(client):
     )
     for term in ("Model Context Protocol", "tool failures", "recovery"):
         assert term in description
+
+
+def test_the_square_icons_are_centred():
+    """The mark sits in the middle of every square icon.
+
+    An off-centre master once went straight into the favicon, because faint
+    anti-aliasing made the whole canvas count as content and the build's trim
+    step did nothing. Measure visible pixels only, as the build now does.
+    """
+    import pytest
+
+    Image = pytest.importorskip("PIL.Image")
+    from PIL import ImageChops
+
+    static = Path(__file__).resolve().parents[1] / "app" / "web" / "static"
+    for name in ("favicon.png", "apple-touch-icon.png"):
+        icon = Image.open(static / name).convert("RGBA")
+        if icon.getchannel("A").getextrema()[0] == 255:
+            # Opaque icon: the mark is whatever differs from the backdrop.
+            ground = Image.new("RGB", icon.size, icon.getpixel((0, 0))[:3])
+            visible = ImageChops.difference(icon.convert("RGB"), ground).convert("L")
+        else:
+            visible = icon.getchannel("A")
+        left, top, right, bottom = visible.point(lambda v: 255 if v > 16 else 0).getbbox()
+        width, height = icon.size
+        assert abs(left - (width - right)) <= 2, f"{name} off-centre horizontally"
+        assert abs(top - (height - bottom)) <= 2, f"{name} off-centre vertically"

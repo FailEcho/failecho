@@ -67,6 +67,19 @@ def trim(image: Image.Image) -> Image.Image:
     return image.crop(box) if box else image
 
 
+#: Alpha at or below this counts as empty when measuring the mark. The master's
+#: anti-aliasing leaves faint pixels right out to the canvas edge; measured with
+#: alpha > 0 the "content" was the whole canvas, trimming did nothing, and any
+#: offset in the file went straight into the favicon.
+SOLID_ALPHA = 16
+
+
+def trim_solid(image: Image.Image) -> Image.Image:
+    """Crop to the visible mark, ignoring faint anti-aliasing at the edges."""
+    box = image.getchannel("A").point(lambda a: 255 if a > SOLID_ALPHA else 0).getbbox()
+    return image.crop(box) if box else image
+
+
 def fit_height(image: Image.Image, height: int) -> Image.Image:
     width = max(1, round(image.width * height / image.height))
     return image.resize((width, height), Image.LANCZOS)
@@ -161,7 +174,7 @@ def build_og_card(lockup: Image.Image) -> Image.Image:
 
 
 def main() -> None:
-    mark = trim(Image.open(MARK_MASTER).convert("RGBA"))
+    mark = trim_solid(Image.open(MARK_MASTER).convert("RGBA"))
     lockup = trim(Image.open(LOCKUP_MASTER).convert("RGBA"))
 
     save(fit_height(mark, MARK_PX), "logo.png", PALETTE)
