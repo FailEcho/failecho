@@ -19,8 +19,11 @@ in the thread falls off /new without ever reaching the front page.
       `tools/list`, `https://failecho.com/v1/stats` returns JSON.
 - [ ] The GitHub repo is public and the README's first screen answers "what is
       this and how do I connect" without scrolling.
-- [ ] Re-run `python scripts/loadtest.py` against the origin and write the
-      numbers down. You will be asked "what happens when HN hits it".
+- [x] Load tested 2026-09-11 on a throwaway copy on the production box
+      (50 concurrent, 20s, zero failures): homepage ~210–270 req/s, p99 ~1s;
+      `/v1/query` ~60 req/s, p99 ~1.1s. At 200 concurrent nothing failed,
+      but p99 rose to ~5s (homepage) and ~6.5s (query). Re-run
+      `.venv/bin/python scripts/loadtest.py` if the code changes before launch.
 - [ ] Read the current stats and be ready to say them out loud, split by
       source: `real_observations_total` (independent agents) and
       `first_party_observations` (your own agents). On 2026-09-11 both were 0.
@@ -147,9 +150,12 @@ there is no auth today, and that reputation is the obvious next thing if the
 network gets real traffic worth attacking.
 
 **"SQLite on one box will melt on the front page."**
-Give the measured numbers from your pre-flight run. Reads are cached at the
-origin for 10s and Cloudflare caches in front of that; the write path is what
-would hurt, and writes are the rare case. Say the number, not an adjective.
+Measured on the production box (one process, 500 MB VPS): the homepage and
+its live data serve ~210–270 req/s with zero failures at 50 concurrent
+connections, and Cloudflare caches in front of that. The agent query path does
+~60 req/s, about 5 million queries a day. At 200 concurrent nothing fails;
+latency climbs to a few seconds. Writes are rate limited per client by design.
+Say the number, not an adjective.
 
 **"Why MCP?"**
 Because it's how an agent already reaches a tool, so integration is a URL

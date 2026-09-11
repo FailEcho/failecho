@@ -1,5 +1,5 @@
 [project]
-name = "agent-failure-intelligence-network"
+name = "failecho-server"
 version = "0.1.0"
 description = "Live failure intelligence for autonomous software. Before your agent retries, check what happened to everyone else."
 readme = "README.md"

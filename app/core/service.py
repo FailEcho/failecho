@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hmac
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, union
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -226,13 +226,14 @@ async def evidence_sources(session: AsyncSession, fingerprint: str) -> list[str]
     Tells a caller whether independent agents saw this failure, or only
     FailEcho's own agents, or only demo data -- before it acts on the answer.
     """
-    found: set[str] = set()
-    for table in (Observation, HourlyStat, RecoveryOutcome, HourlyRecoveryStat):
-        result = await session.execute(
-            select(table.source).where(table.fingerprint == fingerprint).distinct()
-        )
-        found.update(result.scalars())
-    return sorted(found)
+    # One round trip: UNION de-duplicates across the four tables. This sits on
+    # the path an agent calls mid-failure, where four separate lookups cost a
+    # measurable slice of throughput.
+    tables = (Observation, HourlyStat, RecoveryOutcome, HourlyRecoveryStat)
+    result = await session.execute(
+        union(*(select(t.source).where(t.fingerprint == fingerprint) for t in tables))
+    )
+    return sorted(result.scalars())
 
 
 async def _includes_demo_data(session: AsyncSession, fingerprint: str) -> bool:

@@ -305,6 +305,9 @@ def test_packaging_exposes_the_relay_command():
     packages = project["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"]
     assert "failecho_mcp" in packages
     assert project["project"]["version"] == failecho_mcp.__version__
+    # "failecho" stays free for the Python client. This distribution installs
+    # the server and the relay; `import failecho` would fail after installing it.
+    assert project["project"]["name"] == "failecho-server"
 
 
 def test_default_is_the_network_declared_to_registries():
