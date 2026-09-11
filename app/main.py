@@ -272,7 +272,7 @@ Sitemap: {base_url}/sitemap.xml
 #: Pages worth indexing. Deliberately short: the API endpoints are for
 #: machines, not for search results, and listing them would only dilute the
 #: three surfaces that actually explain what FailEcho is.
-SITEMAP_PAGES = ("/", "/docs", "/llms.txt")
+SITEMAP_PAGES = ("/", "/about", "/docs", "/llms.txt")
 
 
 #: Injected into the Swagger page. Swagger UI ships no description, no
@@ -393,14 +393,14 @@ def asset_version() -> str:
     return hashlib.sha256(str(stamp).encode()).hexdigest()[:8]
 
 
-def render_homepage(base_url: str) -> str:
-    """Substitute brand tokens into the static page.
+def render_page(filename: str, base_url: str) -> str:
+    """Substitute brand tokens into a static page.
 
     Deliberately a string replace rather than a template engine: three tokens
     do not justify a dependency. The GitHub link is removed entirely when no
     repository URL is configured -- an invented URL would be worse than none.
     """
-    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    html = (STATIC_DIR / filename).read_text(encoding="utf-8")
     html = html.replace("{{PUBLIC_URL}}", base_url)
     html = html.replace("{{ASSET_V}}", asset_version())
     if settings.github_url:
@@ -414,9 +414,20 @@ def render_homepage(base_url: str) -> str:
     return html
 
 
+def render_homepage(base_url: str) -> str:
+    """Kept as a named entry point; the homepage is just one rendered page."""
+    return render_page("index.html", base_url)
+
+
 @app.get("/", include_in_schema=False)
 async def homepage(request: Request) -> HTMLResponse:
-    return HTMLResponse(render_homepage(public_base_url(request)))
+    return HTMLResponse(render_page("index.html", public_base_url(request)))
+
+
+@app.get("/about", include_in_schema=False)
+async def about(request: Request) -> HTMLResponse:
+    """What FailEcho is, for humans and for search engines."""
+    return HTMLResponse(render_page("about.html", public_base_url(request)))
 
 
 @app.get("/favicon.ico", include_in_schema=False)

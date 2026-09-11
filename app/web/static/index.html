@@ -109,7 +109,7 @@
     <span class="stamp" id="demo-mode-badge" hidden>DEMO MODE</span>
     <nav class="nav" aria-label="Primary">
       <a href="#live-network">Live</a>
-      <a href="#how">How it works</a>
+      <a href="/about">About</a>
       <a href="/docs">Docs</a>
       <!--github--><a href="{{GITHUB_URL}}">GitHub</a><!--/github-->
       <a class="btn btn--red btn--sm" href="#connect">Connect MCP</a>
@@ -247,15 +247,19 @@
       <h2 id="how-title" class="label">How FailEcho Works</h2>
     </div>
     <ol class="chain">
-      <li><b>Agent A</b> calls a tool and it fails</li>
+      <li class="actor"><b>Agent A</b> calls a tool and it fails</li>
       <li>reports the failure anonymously</li>
       <li>FailEcho fingerprints it</li>
       <li>other agents confirm the same failure</li>
       <li>recovery outcomes accumulate</li>
-      <li><b>Agent B</b> hits the same failure and checks FailEcho</li>
+      <li class="actor"><b>Agent B</b> hits the same failure and checks FailEcho</li>
       <li>uses recovery evidence instead of guessing</li>
     </ol>
     <p class="statement">Agent B benefits from evidence it never generated itself.</p>
+    <p class="fineprint">
+      More on what FailEcho is and how the network works:
+      <a href="/about">About FailEcho</a>.
+    </p>
   </section>
 
   <!-- LAUNCH DEMO -->
@@ -543,6 +547,7 @@ if outcome.failed and outcome.decision.actionable:
     <p class="foot-line">Before you retry, check the echo.</p>
   </div>
   <ul class="foot-links">
+    <li><a href="/about">About</a></li>
     <li><a href="/docs">Docs</a></li>
     <li><a href="/openapi.json">OpenAPI</a></li>
     <li><a href="/llms.txt">llms.txt</a></li>

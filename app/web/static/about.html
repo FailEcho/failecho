@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About FailEcho — Failure Intelligence for AI Agents</title>
+<meta name="description" content="Learn what FailEcho is: a live failure intelligence network for AI agents and autonomous software that shares privacy-safe tool failures and recovery outcomes.">
+<link rel="canonical" href="{{PUBLIC_URL}}/about">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FailEcho">
+<meta property="og:title" content="About FailEcho — Failure Intelligence for AI Agents">
+<meta property="og:description" content="FailEcho is a live failure intelligence network for AI agents and autonomous software, built on shared tool failures and observed recovery outcomes.">
+<meta property="og:url" content="{{PUBLIC_URL}}/about">
+<meta property="og:image" content="{{PUBLIC_URL}}/static/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0e10">
+<link rel="icon" href="/static/favicon.png?v={{ASSET_V}}" type="image/png" sizes="144x144">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/static/style.css?v={{ASSET_V}}">
+</head>
+<body data-public-url="{{PUBLIC_URL}}">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="shell topbar-row">
+    <a class="brand" href="/" aria-label="FailEcho home">
+      <img class="brand-word" src="/static/wordmark-dark.png?v={{ASSET_V}}" width="97" height="25" alt="FailEcho">
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="/#live-network">Live</a>
+      <a href="/about" aria-current="page">About</a>
+      <a href="/docs">Docs</a>
+      <!--github--><a href="{{GITHUB_URL}}">GitHub</a><!--/github-->
+      <a class="btn btn--red btn--sm" href="/#connect">Connect MCP</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="shell hero hero--page" aria-labelledby="about-title">
+    <h1 id="about-title">About FailEcho</h1>
+    <p class="hero-tagline">
+      FailEcho is a live failure intelligence network for AI agents and
+      autonomous software.
+    </p>
+    <div class="prose">
+      <p>
+        FailEcho helps autonomous systems learn from failures that happened to
+        other agents.
+      </p>
+      <p>
+        When an AI agent encounters a failure from a tool, API,
+        or Model Context Protocol (MCP) operation, it can query FailEcho to see
+        whether other agents are experiencing the same problem and which
+        recovery actions have actually worked.
+      </p>
+      <p>
+        Agents contribute privacy-safe metadata about successes, failures and
+        recovery outcomes. FailEcho turns those observations into live
+        reliability intelligence that other autonomous systems can use before
+        retrying.
+      </p>
+    </div>
+  </section>
+
+  <section class="shell band" aria-labelledby="network-title">
+    <div class="band-head">
+      <h2 id="network-title" class="label">How the network works</h2>
+    </div>
+    <ol class="chain">
+      <li class="actor"><b>Agent A</b> encounters a tool failure</li>
+      <li>FailEcho normalizes and fingerprints it</li>
+      <li>other agents report the same failure and their recovery outcomes</li>
+      <li>evidence accumulates against that fingerprint</li>
+      <li class="actor"><b>Agent B</b> encounters the same failure</li>
+      <li>Agent B checks FailEcho before retrying</li>
+      <li>Agent B sees what actually worked</li>
+    </ol>
+    <p class="statement">Agent B benefits from evidence it never generated itself.</p>
+    <p class="fineprint">
+      You can watch this happen on the
+      <a href="/#live-network">live network page</a>, which shows real
+      observations, active incidents and recovery echoes as they arrive.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="observes-title">
+    <div class="band-head">
+      <h2 id="observes-title" class="label">What FailEcho observes</h2>
+      <p class="band-sub">Structured metadata, and nothing else.</p>
+    </div>
+    <ul class="yes-list">
+      <li>service</li>
+      <li>operation</li>
+      <li>version</li>
+      <li>schema hash</li>
+      <li>normalized failure fingerprint</li>
+      <li>error type</li>
+      <li>error code</li>
+      <li>latency</li>
+      <li>observed recovery action</li>
+      <li>recovery outcome</li>
+    </ul>
+    <p class="fineprint">
+      Successful calls matter as much as failed ones: a failure count means
+      nothing without a denominator. One hundred failures out of two hundred
+      calls is a different service from one hundred out of a million.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="privacy-title">
+    <div class="band-head">
+      <h2 id="privacy-title" class="label">Privacy by design</h2>
+    </div>
+    <p class="lead">FailEcho does not need your workload to learn from your failures.</p>
+    <ul class="no-list">
+      <li>prompts</li>
+      <li>API keys</li>
+      <li>authorization headers</li>
+      <li>tool arguments</li>
+      <li>tool results</li>
+      <li>request bodies</li>
+      <li>response bodies</li>
+      <li>secrets</li>
+      <li>customer content</li>
+    </ul>
+    <p class="fineprint">
+      The API has no field for any of it, and unknown fields are dropped before
+      storage. Raw error text is normalized and discarded — only the normalized
+      form is kept. Reporter identifiers are optional and hashed before storage.
+      The full contract is on the
+      <a href="/#privacy">homepage privacy section</a> and in the
+      <a href="/llms.txt">machine-readable agent guide</a>.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="evidence-title">
+    <div class="band-head">
+      <h2 id="evidence-title" class="label">Evidence, not generated advice</h2>
+    </div>
+    <div class="prose">
+      <p>
+        FailEcho does not use a language model to invent recovery
+        recommendations. Recovery intelligence is derived entirely from
+        outcomes that agents observed and reported.
+      </p>
+      <p>
+        Confidence is deterministic — a Wilson score lower bound over recorded
+        attempts, which you can recompute from the counts returned alongside
+        it. Evidence from several independent reporters outranks volume from
+        one.
+      </p>
+      <p>
+        When the evidence is thin, FailEcho says so. A query returns
+        <code>INSUFFICIENT_DATA</code> and no recommendation rather than
+        dressing up a guess as certainty.
+      </p>
+    </div>
+  </section>
+
+  <section class="shell band" aria-labelledby="why-title">
+    <div class="band-head">
+      <h2 id="why-title" class="label">Why FailEcho exists</h2>
+    </div>
+    <div class="prose">
+      <p>
+        Autonomous systems often encounter the same API, tool and MCP failures
+        independently. A renamed field, a deprecated parameter, a permission
+        change, an expired schema — each agent meets it alone.
+      </p>
+      <p>
+        Without shared evidence, every agent retries, debugs and relearns the
+        same failure in isolation. Often the retry could never have worked.
+      </p>
+      <p>
+        FailEcho exists to make those failures reusable knowledge.
+      </p>
+    </div>
+  </section>
+
+  <section class="shell band" aria-labelledby="who-title">
+    <div class="band-head">
+      <h2 id="who-title" class="label">Who FailEcho is for</h2>
+    </div>
+    <ul class="yes-list">
+      <li>AI agents that call tools and APIs</li>
+      <li>autonomous software running unattended</li>
+      <li>agent frameworks reporting tool telemetry</li>
+      <li>MCP clients and MCP server authors</li>
+      <li>developers building tool-using systems</li>
+      <li>infrastructure maintainers who want to see failures spread in real time</li>
+    </ul>
+  </section>
+
+  <section class="shell band" id="connect" aria-labelledby="connect-title">
+    <div class="band-head">
+      <h2 id="connect-title" class="label">Connect to FailEcho</h2>
+      <p class="band-sub">No account. No API key. Free during the public MVP.</p>
+    </div>
+    <ul class="links">
+      <li><a href="/">FailEcho homepage</a><span>live network status</span></li>
+      <li><a href="/#connect">MCP endpoint</a><span><code>{{PUBLIC_URL}}/mcp</code></span></li>
+      <li><a href="/docs">API documentation</a><span><code>/docs</code></span></li>
+      <li><a href="/openapi.json">OpenAPI schema</a><span><code>/openapi.json</code></span></li>
+      <li><a href="/llms.txt">Machine-readable agent guide</a><span><code>/llms.txt</code></span></li>
+      <!--github--><li><a href="{{GITHUB_URL}}">Source on GitHub</a><span>MIT licensed</span></li><!--/github-->
+      <li><a href="mailto:contact@failecho.com">contact@failecho.com</a><span>general enquiries</span></li>
+    </ul>
+  </section>
+</main>
+
+<footer class="shell">
+  <div class="foot-top">
+    <p class="foot-brand">
+      <img src="/static/wordmark-dark.png?v={{ASSET_V}}" width="93" height="24" alt="FailEcho">
+    </p>
+    <p class="foot-line">Before you retry, check the echo.</p>
+  </div>
+  <ul class="foot-links">
+    <li><a href="/about">About</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="/openapi.json">OpenAPI</a></li>
+    <li><a href="/llms.txt">llms.txt</a></li>
+    <!--github--><li><a href="{{GITHUB_URL}}">GitHub</a></li><!--/github-->
+    <li><a href="mailto:contact@failecho.com">Contact</a></li>
+  </ul>
+  <p class="fineprint">
+    MIT · Security reports: <a href="mailto:security@failecho.com">security@failecho.com</a>
+  </p>
+</footer>
+</body>
+</html>

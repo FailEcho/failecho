@@ -365,7 +365,7 @@ td.num { font-family: var(--mono); }
   content: ""; position: absolute; left: -4px; top: 10px;
   width: 7px; height: 7px; border-radius: 50%; background: var(--line-2);
 }
-.chain li:first-child::before, .chain li:nth-child(6)::before { background: var(--red); }
+.chain li.actor::before { background: var(--red); }
 .chain b { color: var(--ink); font-weight: 600; }
 
 .statement {
@@ -544,3 +544,18 @@ footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
   letter-spacing: -0.02em;
   max-width: 20ch;
 }
+
+/* ---- content pages ----------------------------------------------------- */
+.hero--page { padding-block: 68px 44px; }
+
+.hero--page h1 {
+  font-size: clamp(34px, 5.4vw, 54px);
+  margin-bottom: 20px;
+}
+
+.prose { max-width: 68ch; }
+.prose p { margin: 0 0 16px; color: var(--ink-2); font-size: 16.5px; }
+.prose p:last-child { margin-bottom: 0; }
+.prose code { font-size: 13.5px; color: var(--ink); }
+
+.band .yes-list, .band .no-list { max-width: 68ch; }
