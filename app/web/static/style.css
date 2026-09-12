@@ -88,9 +88,10 @@ a:hover { color: var(--red); }
 .label {
   margin: 0;
   font-family: var(--sans);
-  font-size: clamp(21px, 2.6vw, 27px);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-family: var(--serif);
+  font-size: clamp(24px, 2.9vw, 32px);
+  font-weight: 400;
+  letter-spacing: -0.015em;
   color: var(--ink);
 }
 .label--quiet { font-size: 15px; font-weight: 550; color: var(--ink-2); letter-spacing: 0; }
@@ -219,11 +220,11 @@ a:hover { color: var(--red); }
 
 h1 {
   margin: 0 0 24px;
-  font-family: var(--sans);
-  font-weight: 600;
-  font-size: clamp(36px, 4.3vw, 55px);
-  line-height: 1.06;
-  letter-spacing: -0.035em;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(38px, 4.6vw, 60px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
@@ -260,10 +261,11 @@ h1 {
 .band--bleed { border-top-color: transparent; }
 
 .band-head {
-  display: flex; align-items: baseline; gap: 10px 24px; flex-wrap: wrap;
-  margin-bottom: 26px;
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+  gap: 10px 24px; margin-bottom: 26px;
 }
-.band-sub { flex-basis: 100%; margin: 0; color: var(--ink-2); font-size: 15px; max-width: 64ch; }
+.band-head > .band-sub { grid-column: 1 / -1; }
+.band-sub { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 64ch; }
 .band-sub code { font-size: 13px; color: var(--ink); }
 .band-meta {
   margin: 0 0 0 auto;
