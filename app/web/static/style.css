@@ -830,26 +830,27 @@ footer.shell {
 }
 
 /* ---- the echo, in the margins ------------------------------------------ */
-/* One signal running the height of the page, mirrored on both sides. It is
-   painted behind everything, so the full-bleed bands cover it and it shows
-   only where the page is at its darkest -- which is the point: the echo is
-   what is underneath. Dropped below 1300px rather than crowding the text. */
+/* Two sines woven through each other, running the height of the page and
+   dissolving inward. Painted behind everything, so the full-bleed bands
+   cover it and it shows only on the dark ground. Plain background images:
+   a CSS mask that a browser declines to apply leaves a coloured bar, and a
+   bar is worse than nothing. Dropped below 1340px rather than crowding the
+   text, and the two sides are different drawings -- an echo does not come
+   back symmetrical. */
 body { position: relative; }
 
 body::before, body::after {
   content: none;
   position: absolute; top: 0; bottom: 0; z-index: -1;
   width: 56px;
-  background-color: var(--red);
-  opacity: 0.55;
-  -webkit-mask: url("/static/wave.svg") repeat-y left top / 56px 600px;
-  mask: url("/static/wave.svg") repeat-y left top / 56px 600px;
+  background-repeat: repeat-y;
+  background-size: 56px 1200px;
 }
 
 @media (min-width: 1340px) {
   body::before, body::after { content: ""; }
-  body::before { left: 0; }
-  body::after { right: 0; transform: scaleX(-1); }
+  body::before { left: 0; background-image: url("/static/wave-left.svg"); }
+  body::after { right: 0; background-image: url("/static/wave-right.svg"); }
 }
 
 /* A CTA closing a band sits under its heading, not against it. */

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="56" height="1200"
+     viewBox="0 0 56 1200" fill="none">
+<!-- Two sines of unequal period sharing a centre line, so they weave through
+     each other, and dissolving into the page as they go inward. The two
+     sides carry different periods on purpose: an echo does not come back
+     symmetrical. The colour lives here rather than in a CSS mask, so a
+     browser that declines the drawing shows nothing instead of a red bar. -->
+<defs>
+  <linearGradient id="g" x1="0" x2="56" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#f83030" stop-opacity=".55"/>
+    <stop offset=".45" stop-color="#f83030" stop-opacity=".26"/>
+    <stop offset="1" stop-color="#f83030" stop-opacity="0"/>
+  </linearGradient>
+</defs>
+<path d="M26 -300c24.0 50.0 24.0 100.0 0 150.0c-24.0 50.0 -24.0 100.0 0 150.0c24.0 50.0 24.0 100.0 0 150.0c-24.0 50.0 -24.0 100.0 0 150.0c24.0 50.0 24.0 100.0 0 150.0c-24.0 50.0 -24.0 100.0 0 150.0c24.0 50.0 24.0 100.0 0 150.0c-24.0 50.0 -24.0 100.0 0 150.0c24.0 50.0 24.0 100.0 0 150.0c-24.0 50.0 -24.0 100.0 0 150.0c24.0 50.0 24.0 100.0 0 150.0c-24.0 50.0 -24.0 100.0 0 150.0" stroke="url(#g)" stroke-width="2.2"/>
+<path d="M26 -70c16.0 33.3 16.0 66.7 0 100.0c-16.0 33.3 -16.0 66.7 0 100.0c16.0 33.3 16.0 66.7 0 100.0c-16.0 33.3 -16.0 66.7 0 100.0c16.0 33.3 16.0 66.7 0 100.0c-16.0 33.3 -16.0 66.7 0 100.0c16.0 33.3 16.0 66.7 0 100.0c-16.0 33.3 -16.0 66.7 0 100.0c16.0 33.3 16.0 66.7 0 100.0c-16.0 33.3 -16.0 66.7 0 100.0c16.0 33.3 16.0 66.7 0 100.0c-16.0 33.3 -16.0 66.7 0 100.0c16.0 33.3 16.0 66.7 0 100.0c-16.0 33.3 -16.0 66.7 0 100.0c16.0 33.3 16.0 66.7 0 100.0" stroke="url(#g)" stroke-width="1.1"/>
+</svg>
