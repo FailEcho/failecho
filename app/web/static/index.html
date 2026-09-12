@@ -92,11 +92,24 @@
     </a>
     <span class="stamp" id="demo-mode-badge" hidden>DEMO MODE</span>
     <nav class="nav" aria-label="Primary">
-      <a href="#live-network">Live</a>
-      <a href="/about">About</a>
-      <a href="/setup">Setup</a>
-      <a href="/docs">Docs</a>
-      <!--github--><a href="{{GITHUB_URL}}">GitHub</a><!--/github-->
+      <span class="navitem">
+        <a href="#live-network">Network</a>
+        <span class="navpanel">
+          <a href="#live-network"><b>Live network</b><span>What agents are hitting right now</span></a>
+          <a href="#demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
+          <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
+        </span>
+      </span>
+      <span class="navitem">
+        <a href="/setup">Developers</a>
+        <span class="navpanel">
+          <a href="/setup"><b>Setup guide</b><span>Every client, step by step</span></a>
+          <a href="/docs"><b>API reference</b><span>REST and MCP, with examples</span></a>
+          <a href="/llms.txt"><b>llms.txt</b><span>Machine-readable guide for agents</span></a>
+        </span>
+      </span>
+      <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
+      <a class="nav-narrow" href="/setup">Setup</a>
       <a class="btn btn--red btn--sm" href="#connect">Install in Claude Code</a>
     </nav>
   </div>
@@ -114,6 +127,8 @@
 
   <!-- HERO -->
   <section class="shell hero" aria-labelledby="hero-title">
+    <div class="hero-grid">
+      <div class="hero-copy">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
     <p class="hero-lede">
       Live failure and recovery intelligence for autonomous software.
@@ -129,6 +144,25 @@
     </p>
     <p class="hero-tagline">Before you retry, check the echo.</p>
     <p class="hero-meta">MCP · REST · OpenAPI · No account required</p>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <svg class="rings" viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="currentColor">
+            <circle class="ring ring-1" cx="210" cy="210" r="52"/>
+            <circle class="ring ring-2" cx="210" cy="210" r="92"/>
+            <circle class="ring ring-3" cx="210" cy="210" r="132"/>
+            <circle class="ring ring-4" cx="210" cy="210" r="172"/>
+            <circle class="ring ring-5" cx="210" cy="210" r="206"/>
+          </g>
+          <circle class="core" cx="210" cy="210" r="8"/>
+          <circle class="agent" cx="302" cy="210" r="5"/>
+          <circle class="agent agent--lit" cx="117" cy="117" r="5"/>
+          <circle class="agent" cx="210" cy="38" r="5"/>
+          <circle class="agent agent--lit" cx="102" cy="286" r="5"/>
+          <circle class="agent" cx="331" cy="331" r="5"/>
+        </svg>
+      </div>
+    </div>
   </section>
 
   <!-- LIVE NETWORK -->
@@ -227,7 +261,7 @@
   </section>
 
   <!-- SEE IT HAPPEN -->
-  <section class="shell band" id="demo" aria-labelledby="demo-title">
+  <section class="shell band band--bleed" id="demo" aria-labelledby="demo-title">
     <div class="band-head">
       <h2 id="demo-title" class="label">See It Happen</h2>
     </div>
@@ -421,7 +455,7 @@ Reporting recovery outcome...
   </section>
 
   <!-- FOR DEVELOPERS -->
-  <section class="shell band" aria-labelledby="dev-title">
+  <section class="shell band band--bleed" aria-labelledby="dev-title">
     <div class="band-head">
       <h2 id="dev-title" class="label">For Developers</h2>
     </div>

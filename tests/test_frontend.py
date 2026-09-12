@@ -297,14 +297,17 @@ def test_no_framework_no_cdn_no_webfont():
 def test_static_assets_stay_small():
     """A status page has no excuse to be heavy on a small VPS."""
     assert len(HTML) < 30_000  # includes the demo story, FAQ and JSON-LD
-    assert len(CSS) < 26_000
+    # 26,000 -> 28,000 for the 2026-09-12 redesign: the hover nav panels, the
+    # hero echo and the full-bleed bands are new surface, not decoration on
+    # top of old rules. Dead selectors were dropped first.
+    assert len(CSS) < 28_000
     assert len(JS) < 12_000
     # 55,000 -> 56,000 when the plugin install joined the page, -> 57,000 when
     # the services table gained a cap. Both times I trimmed first and both
     # times the last few dozen bytes came out of explanatory comments, which
     # is a bad trade. per_visit below is the number that matters, and it has
     # barely moved: ~80KB against 120,000.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 57_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 62_000
 
     # Brand images are raster (the supplied masters are PNG). What a visitor
     # actually downloads is the markup, the mark and ONE wordmark variant --
