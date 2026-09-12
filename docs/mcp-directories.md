@@ -191,6 +191,54 @@ The sister list `awesome-remote-mcp-servers` requires OAuth or API-key
 authentication for inclusion. FailEcho is deliberately unauthenticated, so it
 was not submitted there.
 
+### Claude Code plugin — the community marketplace
+
+FailEcho ships as a Claude Code plugin in `plugin/`, installable from our own
+marketplace, which is `.claude-plugin/marketplace.json` in this repository:
+
+```
+/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho
+```
+
+Anthropic runs two public marketplaces, and only one of them takes
+submissions:
+
+- **`claude-plugins-official`** is curated by Anthropic at its own discretion.
+  There is no application process, and the submission form does not add
+  plugins to it. Nothing to do here.
+- **`claude-community`** (`anthropics/claude-plugins-community`) is where
+  third-party submissions land after review. Users add it with
+  `/plugin marketplace add anthropics/claude-plugins-community`.
+
+Submit through an in-app form:
+
+- **Console**, for individual authors: <https://platform.claude.com/plugins/submit>
+- **claude.ai**, which needs a Team or Enterprise organisation with directory
+  management access:
+  <https://claude.ai/admin-settings/directory/submissions/plugins/new>
+
+Run `claude plugin validate ./plugin` first; the review pipeline runs the same
+check plus automated safety screening. On 2026-09-12 the plugin manifest and
+the marketplace manifest both passed, `--strict` included.
+
+What the form is asking about, in one place:
+
+| | |
+|---|---|
+| Plugin name | `failecho` — an immutable slug; renaming later needs a `renames` entry |
+| Repository | <https://github.com/FailEcho/failecho>, public, MIT |
+| Marketplace | `FailEcho/failecho` |
+| Plugin directory | `plugin/` |
+| What it installs | the FailEcho MCP server (`https://failecho.com/mcp`, no auth, no key) and `PostToolUse` / `PostToolUseFailure` hooks matching `mcp__.*` |
+| What it sends | the server's public name, the tool name, a coarse error class and code, and latency. Never tool arguments, results, prompts, paths or session ids; error text only with `FAILECHO_HOOK_SEND_ERRORS=1`. Servers it cannot name publicly are skipped |
+| Off switch | `FAILECHO_DISABLED=1` |
+
+After approval the plugin is pinned to a commit SHA in the community catalog
+and CI bumps the pin as we push. The public catalog syncs nightly, so there is
+a delay between approval and the plugin being installable; check for the name
+in `anthropics/claude-plugins-community`'s `.claude-plugin/marketplace.json`.
+
 ## 3. What to write in every listing
 
 Consistency matters more than cleverness: the same words in every directory is

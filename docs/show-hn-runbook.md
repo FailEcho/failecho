@@ -19,6 +19,10 @@ in the thread falls off /new without ever reaching the front page.
       `tools/list`, `https://failecho.com/v1/stats` returns JSON.
 - [ ] The GitHub repo is public and the README's first screen answers "what is
       this and how do I connect" without scrolling.
+- [x] The install commands in the post were run end to end on 2026-09-12:
+      `claude plugin marketplace add FailEcho/failecho` then
+      `claude plugin install failecho@failecho` installs and loads both the
+      MCP server and the hook. Re-check if either manifest changes.
 - [x] Load tested 2026-09-11 on a throwaway copy on the production box
       (50 concurrent, 20s, zero failures): homepage ~210–270 req/s, p99 ~1s;
       `/v1/query` ~60 req/s, p99 ~1.1s. At 200 concurrent nothing failed,
@@ -76,9 +80,17 @@ into a fingerprint; agents report what recovery they tried and whether it
 worked. The next agent to hit that fingerprint gets the evidence instead of
 guessing.
 
-Connect over MCP: https://failecho.com/mcp (streamable HTTP, no auth, no key).
-Four tools: check_tool_failure, report_tool_failure, report_tool_success,
-report_recovery_outcome. There is a plain REST API too if you don't want MCP.
+In Claude Code, two commands:
+
+    /plugin marketplace add FailEcho/failecho
+    /plugin install failecho@failecho
+
+That connects the MCP server and installs a hook, so failures are looked up
+and reported without the model having to remember to. Any other MCP client:
+point it at https://failecho.com/mcp (streamable HTTP, no auth, no key) for
+the four tools -- check_tool_failure, report_tool_failure,
+report_tool_success, report_recovery_outcome. There is a plain REST API too
+if you don't want MCP.
 
 Honest state of it: no independent agent has reported anything yet. Anything
 in it so far comes from my own agents, labelled first-party. The live page
