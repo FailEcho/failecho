@@ -1,17 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="56" height="1200"
-     viewBox="0 0 56 1200" fill="none">
-<!-- Two sines of unequal period sharing a centre line, so they weave through
-     each other, and dissolving into the page as they go inward. The two
-     sides carry different periods on purpose: an echo does not come back
-     symmetrical. The colour lives here rather than in a CSS mask, so a
-     browser that declines the drawing shows nothing instead of a red bar. -->
+     viewBox="0 0 56 1200">
+<!-- Two sines of unequal period sharing a centre line, each filled back to
+     the page edge so the strip reads as a waveform rather than a pair of
+     threads. The two bodies overlap and deepen where they cross. The sides
+     carry different periods on purpose: an echo does not come back
+     symmetrical. Colour lives here, not in a CSS mask &#8212; a mask a browser
+     declines to apply would leave a coloured bar. -->
 <defs>
-  <linearGradient id="g" x1="56" x2="0" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#f83030" stop-opacity=".55"/>
-    <stop offset=".45" stop-color="#f83030" stop-opacity=".26"/>
+  <linearGradient id="b" x1="56" x2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#f83030" stop-opacity=".13"/>
+    <stop offset=".5" stop-color="#f83030" stop-opacity=".05"/>
+    <stop offset="1" stop-color="#f83030" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="e" x1="56" x2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#f83030" stop-opacity=".5"/>
+    <stop offset=".45" stop-color="#f83030" stop-opacity=".22"/>
     <stop offset="1" stop-color="#f83030" stop-opacity="0"/>
   </linearGradient>
 </defs>
-<path d="M28 -310c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0" stroke="url(#g)" stroke-width="1.4"/>
-<path d="M28 -240c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0" stroke="url(#g)" stroke-width="2.4"/>
+<path d="M56 -310H28c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0H56Z" fill="url(#b)"/>
+<path d="M28 -310c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0c18.7 66.7 18.7 133.3 0 200.0c-18.7 66.7 -18.7 133.3 0 200.0" stroke="url(#e)" stroke-width="1.3" fill="none"/>
+<path d="M56 -240H28c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0H56Z" fill="url(#b)"/>
+<path d="M28 -240c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0c26.7 40.0 26.7 80.0 0 120.0c-26.7 40.0 -26.7 80.0 0 120.0" stroke="url(#e)" stroke-width="2.2" fill="none"/>
 </svg>
