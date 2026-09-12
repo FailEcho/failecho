@@ -108,7 +108,9 @@
 
     body.innerHTML = rows
       .map(function (row) {
-        var rate = row.failure_rate_5m !== null ? row.failure_rate_5m : row.failure_rate_1h;
+        // No rate below the evidence threshold: the status already says so.
+        var rate = row.status === "INSUFFICIENT_DATA" ? null
+          : (row.failure_rate_5m !== null ? row.failure_rate_5m : row.failure_rate_1h);
         var tags = sourceTags(row);
         return (
           "<tr>" +

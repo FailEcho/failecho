@@ -149,7 +149,7 @@ def test_the_zero_is_shown_not_hidden():
 def test_empty_states_exist_for_every_live_section():
     """Empty must look deliberate, never broken."""
     assert "Public network is bootstrapping." in HTML
-    assert "No active incidents." in HTML
+    assert "Nothing reported in the last hour." in HTML
     assert 'show("incidents-table", rows.length > 0)' in JS
     assert "No recovery echo has enough real evidence yet." in JS
 
@@ -371,3 +371,12 @@ def test_status_legend_matches_the_backend_thresholds():
     assert "5–30%" in HTML
     assert "above 30%" in HTML
     assert "at least 10 observations" in HTML
+
+
+def test_a_rate_is_not_printed_when_the_status_says_there_is_no_evidence():
+    """One failed call must not render as "100.0% failure rate" next to
+    fineprint promising we do not guess below ten observations."""
+    assert 'row.status === "INSUFFICIENT_DATA" ? null' in JS
+    assert 'return rate === null || rate === undefined ? "—"' in JS
+    # And the table is named for what it lists: everything seen in the hour.
+    assert ">Live services</h3>" in HTML
