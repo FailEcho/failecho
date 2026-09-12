@@ -1,20 +1,23 @@
-# dev.to post — the advice-shaped one
+# dev.to post
 
-Voice: first person, casual, a few `:D` / `:3`. Emoticons stay sparse; four
-across the whole post reads as a person, twenty reads as noise.
+Shape: the problem, then the thing that fixes it. The advice-shaped version of
+this post is in git history if the pitch version does not land.
 
-Tags: `#ai` `#llm` `#python` `#opensource`
+Voice: first person, casual, a few `:D` / `:3`. Sparse. Four in the whole post
+reads as a person; twenty reads as noise.
+
+Tags: `#ai` `#llm` `#opensource` `#python`
 
 Title:
 
 ```
-Your agent retries the same failure forever, and the error message is why
+AI agents retry failures that can never succeed. I built a shared log so they stop.
 ```
 
 Backups:
 
 ```
-Four things I learned building a shared failure log for AI agents
+Your agent has hit this error before. It just doesn't know that.
 The retry is the default and it is usually wrong
 ```
 
@@ -22,147 +25,136 @@ The retry is the default and it is usually wrong
 
 ## Draft
 
-Every agent framework I have used has the same reflex. A tool call fails, the
-model reads the error, and it tries again. Sometimes with a small change,
-sometimes with the exact same arguments, sometimes four times in a row, and
-then it apologises to me about it :D
+## The problem
 
-I spent a while trying to fix this properly and ended up learning four things
-that I think generalise past whatever you are building. Full disclosure up
-front: I did end up building something around this, and it is at the bottom.
-The four things are the useful part and they stand on their own.
+You have seen this. Every agent framework does it:
 
-### 1. The error tells you what failed, not whether retrying helps
+```
+> create_issue
+  x 422 validation_error
 
-This is the whole problem in one line.
+> create_issue        (retry)
+  x 422 validation_error
+
+> create_issue        (retry, slightly different arguments)
+  x 422 validation_error
+```
+
+Three attempts, three identical failures, and then it apologises to me about
+it :D
+
+The reason it does this is not that the model is stupid. It is that the error
+message does not contain the information needed to make the decision.
 
 ```
 422 validation_error
 ```
 
-Is that a field that got renamed permanently, or a service having a bad ten
-minutes? The string is identical in both cases. In one, retrying is correct
-and will work in thirty seconds. In the other, you can retry until you run out
-of budget.
+Is that a field renamed permanently in the last release, or a service having
+a bad ten minutes? The string is byte-for-byte the same in both cases. In one,
+retrying is exactly right and works in thirty seconds. In the other, you can
+retry until your budget runs out, and the answer was "refresh the tool schema,
+the field is called `content` now".
 
-A model reading that error has to guess, and its prior is "retry" because that
-is what most of its training data does. It is not being stupid, it just does
-not have the one piece of information that separates the two cases: what
-happened to everyone else who hit this.
+The model has to guess, and its prior is retry, because that is what most code
+in its training data does.
 
-### 2. If you only log failures, your failure rate is a lie
+Here is the part that bothers me. **Somebody else already hit this.** Probably
+this week, probably on the same MCP server, and they already found out whether
+retrying works. That knowledge exists and there is nowhere for it to go, so
+every agent rediscovers it alone, at full price, forever.
 
-I built the first version to record failures. Obviously. It is a failure log.
+## What would actually fix it
 
-Then I looked at a service with 100 failures and realised I had no idea
-whether that was catastrophic or completely fine. 100 failures out of 200
-calls is an outage. 100 out of a million is Tuesday.
+Not a better prompt, and not a bigger model. The missing thing is not
+reasoning, it is an observation nobody has: *what happened to everyone else
+who hit this exact failure.*
 
-You need the denominator. Log the successes too, boring as they are. It is
-the difference between "this operation is broken" and "this operation is
-fine and you were unlucky twice".
+That needs three pieces:
 
-### 3. Normalise before you compare, or nothing will ever match
+- a stable id for "this exact failure", so two agents can tell they hit the
+  same thing
+- the outcome of what each of them tried next — not what they intended, what
+  actually worked
+- successes too, or the failure rate is meaningless. 100 failures out of 200
+  calls is an outage. 100 out of a million is Tuesday.
 
-Two agents hit the same bug and produce these:
+## So I built it
+
+**FailEcho** is a shared failure log for agents. One agent reports a tool
+failure and what it tried; the next agent to hit the same failure gets that
+instead of guessing.
+
+In Claude Code it is two lines:
 
 ```
-Repository 8823 rejected field body at 2026-09-11T14:02:11Z
-Repository 41902 rejected field body at 2026-09-12T09:41:55Z
+/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho
 ```
 
-Same bug. Different strings. Compare them raw and you have two unrelated
-incidents forever.
+That installs an MCP server and a hook, so failures get reported and looked up
+after every tool call without the model having to remember to do it. Any other
+MCP client points at `https://failecho.com/mcp`. There is a plain REST API if
+you do not want MCP at all.
 
-So before comparing anything, replace the parts that vary and keep the parts
-that mean something:
+What comes back looks like this:
 
-```python
-text = URL_RE.sub("<URL>", text)
-text = UUID_RE.sub("<UUID>", text)
-text = TIMESTAMP_RE.sub("<TS>", text)
-text = LONG_NUMBER_RE.sub("<N>", text)
+```
+Fingerprint:            6ed9ef705ff4037af2c977306b8b9f92
+Known failure:          YES
+Observed failures:      11
+Independent reporters:  6
+
+Recovery actions others reported:
+  refresh_schema        5/5 (100.0%) confidence 0.57 reporters 5
+  retry                 0/5 (0.0%)   confidence 0.00 reporters 5
+
+Best observed recovery: refresh_schema
+  Skipping retry: other agents already proved it does not work here.
 ```
 
-Both lines collapse to the same shape, and now they are one thing you can
-count. This is also a nice place to strip anything credential-shaped —
-`Bearer` tokens, JWTs, `AKIA...` keys — because you are already walking the
-string with regexes and you really do not want that stuff in a log :3
+Two things I would defend about that output. The confidence is a Wilson score
+lower bound over observed attempts — no model produces it, and you can
+recompute it from the counts shown. And when the evidence is thin it returns
+`INSUFFICIENT_DATA` and no recommendation, which is a real answer rather than a
+guess with a small number attached.
 
-Hash the normalised form together with the service and operation and you have
-a stable id for "this exact failure", which is the thing everything else hangs
-off.
+It sends metadata only: the service, the operation, an error class and code,
+how long the call took. Never prompts, tool arguments, tool results, headers,
+keys or anything from you. Raw error text is normalised server-side and the
+original thrown away. MIT, no account, no API key.
 
-### 4. Do not let a model score the confidence. Count it.
+## The honest part
 
-The tempting move is to ask an LLM "how likely is it that refreshing the
-schema fixes this". Do not. You will get a number that sounds calibrated and
-is not, and you will not be able to explain it to anyone including yourself.
+That example output is from the runnable demo, not from live traffic.
 
-Count instead. If an action was tried 5 times and worked 5 times, that is
-5/5 — but so is 117/124, and those are not equally trustworthy. A Wilson
-score lower bound folds sample size into the number for you:
+Right now the network is empty. Zero independent agents have reported
+anything; the counter is on the front page and it says zero, because a shared
+log with one participant is just a log :3
 
-```python
-def wilson_lower_bound(successes, attempts, z=1.96):
-    if attempts <= 0:
-        return 0.0
-    p = successes / attempts
-    z2 = z * z
-    centre = p + z2 / (2 * attempts)
-    margin = z * math.sqrt((p * (1 - p) + z2 / (4 * attempts)) / attempts)
-    return max(0.0, (centre - margin) / (1 + z2 / attempts))
-```
+So I am not going to tell you it will help you today. It will not. It needs
+about five to ten people running it for a week before any fingerprint has
+enough behind it to be worth reading.
 
-5/5 scores about 0.57. 117/124 scores about 0.89. Same ratio, honest ordering,
-ten floating point operations, no dependencies, and you can recompute it by
-hand when someone asks where the number came from.
+That is the actual ask. If you run agents against MCP servers, leave it on for
+a week and see what it catches. It runs after the tool call with a two second
+timeout, so the worst case when my server is down is that your agent waits two
+seconds, and `FAILECHO_DISABLED=1` turns it off entirely.
 
-And when there is not enough data, return that. Not a guess with a low
-number attached — an actual "I don't know". `INSUFFICIENT_DATA` is a real
-answer and agents handle it fine.
+I will publish whatever the network sees afterwards, including if the answer
+turns out to be "different people's failures barely overlap at all", which is
+genuinely the thing I most want to find out.
 
-### The one that still bites me
-
-Here is the unsolved one, in case you want to avoid my mistake.
-
-I let `service` be a free text field. So one agent reports `github`, another
-`github-mcp`, another `api.github.com`. Three names, three ids, zero overlap,
-and the whole thing quietly does nothing.
-
-I casefold and trim, which is not nearly enough. Aliasing is the real fix and
-I have not built it yet. If you are designing anything that compares
-observations across users, pin the naming convention *before* you have users,
-because afterwards you are migrating data instead of writing a paragraph.
-
-### The thing I built
-
-It is called FailEcho. Agents report failures and recovery outcomes as
-metadata, and other agents can ask what already worked before they retry. MCP
-endpoint, REST API, and a Claude Code plugin that does the reporting through a
-hook so nobody has to remember to.
-
-Being straight with you about the state of it: no independent agent has
-reported anything yet. The counter is at zero and the site says so on the
-front page, because a shared network with one participant is just a log :3
-
-So this is not a "check out my product" post. It is four things I learned that
-I think are true regardless, plus an open invitation: if you run agents
-against MCP servers and would leave a reporter on for a week, I would like
-about five to ten of you. I will publish whatever the network sees afterwards,
-including if the answer is "the overlap between different people's failures is
-basically nil", which is genuinely the thing I most want to find out.
-
-https://failecho.com — MIT, no account, no key.
+https://failecho.com
 
 ---
 
 ## Before publishing
 
-- Re-read section 4 against `app/core/intelligence.py`; if the constants moved,
-  the snippet is wrong and someone will run it.
-- The two example numbers (0.57 and 0.89) are computed from the function
-  above with z=1.96. Recheck if z changes.
-- Do not add a number of users. There are none.
-- Post in the morning UTC on a weekday. Reply to every comment for the first
-  few hours, same rule as HN.
+- The sample output must match what the demo actually prints. Run
+  `python examples/live_agent/run_demo.py` and copy from it rather than from
+  this file.
+- Do not add a user count, a star count, or a "trusted by". There are none.
+- Weekday morning UTC. Answer every comment for the first few hours.
+- Expect "so it does nothing yet?" as the top comment. The answer is yes, said
+  plainly, in one line, without arguing.
