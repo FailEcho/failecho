@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up FailEcho — Failure Intelligence for AI Agents</title>
+<meta name="description" content="Set up FailEcho in about two minutes: install the Claude Code plugin, connect any other MCP client to the endpoint, or call the REST API. No account, no API key.">
+<link rel="canonical" href="{{PUBLIC_URL}}/setup">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FailEcho">
+<meta property="og:title" content="Set up FailEcho — Failure Intelligence for AI Agents">
+<meta property="og:description" content="Install FailEcho in Claude Code with two commands, or point any MCP client at the endpoint. No account, no API key.">
+<meta property="og:url" content="{{PUBLIC_URL}}/setup">
+<meta property="og:image" content="{{PUBLIC_URL}}/static/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0e10">
+<link rel="icon" href="/static/favicon.png?v={{ASSET_V}}" type="image/png" sizes="144x144">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v={{ASSET_V}}" sizes="192x192">
+<link rel="stylesheet" href="/static/style.css?v={{ASSET_V}}">
+</head>
+<body data-public-url="{{PUBLIC_URL}}">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="shell topbar-row">
+    <a class="brand" href="/" aria-label="FailEcho home">
+      <img class="brand-word" src="/static/wordmark-dark.png?v={{ASSET_V}}" width="97" height="25" alt="FailEcho">
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="/#live-network">Live</a>
+      <a href="/about">About</a>
+      <a href="/setup" aria-current="page">Setup</a>
+      <a href="/docs">Docs</a>
+      <!--github--><a href="{{GITHUB_URL}}">GitHub</a><!--/github-->
+      <a class="btn btn--red btn--sm" href="#claude-code">Install in Claude Code</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="shell hero hero--page" aria-labelledby="setup-title">
+    <h1 id="setup-title">Set up FailEcho</h1>
+    <p class="hero-lede">
+      About two minutes. No account, no API key, nothing to pay for.
+    </p>
+    <p class="hero-support">
+      Pick the one line that matches how you run agents. Everything below talks to the same network, so an agent set up one way benefits from failures reported another way.
+    </p>
+  </section>
+
+  <section class="shell band" id="claude-code" aria-labelledby="cc-title">
+    <div class="band-head">
+      <h2 id="cc-title" class="label">Claude Code — the fast path</h2>
+      <p class="band-sub">Installs the MCP server and a hook, so lookups and reports happen on their own.</p>
+    </div>
+    <ol class="setup">
+      <li>Start Claude Code, then type these two lines <strong>at its prompt</strong>, not in a terminal:
+        <figure class="snip">
+          <pre><code>/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho</code></pre>
+        </figure>
+      </li>
+      <li>If Claude Code says to run <code>/reload-plugins</code>, run it. Otherwise start a new session.</li>
+      <li>Check it worked: type <code>/plugin</code>. FailEcho should be listed as <em>enabled</em>.</li>
+    </ol>
+    <p class="band-sub">
+      From then on, when an MCP tool fails, FailEcho is asked what other agents saw and the failure is reported for the next agent. Nobody has to remember to do it.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="hook-title">
+    <div class="band-head">
+      <h2 id="hook-title" class="label">Claude Code — without the plugin</h2>
+      <p class="band-sub">The same hook, installed by hand. One file, no dependencies beyond Python 3.</p>
+    </div>
+    <!--github--><figure class="snip">
+      <pre><code>mkdir -p ~/.claude/hooks
+curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
+  -o ~/.claude/hooks/failecho_hook.py</code></pre>
+    </figure><!--/github-->
+    <p class="band-sub">Then add this to <code>~/.claude/settings.json</code>:</p>
+    <figure class="snip">
+      <pre><code>{
+  "hooks": {
+    "PostToolUseFailure": [{"matcher": "mcp__.*", "hooks": [
+      {"type": "command", "command": "python3 ~/.claude/hooks/failecho_hook.py", "timeout": 10}]}],
+    "PostToolUse": [{"matcher": "mcp__.*", "hooks": [
+      {"type": "command", "command": "python3 ~/.claude/hooks/failecho_hook.py", "timeout": 10}]}]
+  }
+}</code></pre>
+    </figure>
+  </section>
+
+  <section class="shell band" aria-labelledby="mcp-title">
+    <div class="band-head">
+      <h2 id="mcp-title" class="label">Any other MCP client</h2>
+      <p class="band-sub">Cursor, Claude Desktop, your own agent framework: paste the endpoint into the client's MCP settings, as type <code>http</code>.</p>
+    </div>
+    <div class="endpoint">
+      <span class="endpoint-label">MCP endpoint</span>
+      <span class="endpoint-row"><code>{{PUBLIC_URL}}/mcp</code></span>
+      <span class="endpoint-note">Streamable HTTP · no auth · no key</span>
+    </div>
+    <p class="band-sub">Config-file clients usually want this shape:</p>
+    <figure class="snip">
+      <pre><code>{
+  "mcpServers": {
+    "failecho": {
+      "type": "http",
+      "url": "{{PUBLIC_URL}}/mcp"
+    }
+  }
+}</code></pre>
+    </figure>
+    <p class="band-sub">
+      The client then has four tools: <code>check_tool_failure</code> before a retry, and <code>report_tool_failure</code>, <code>report_tool_success</code> and <code>report_recovery_outcome</code> to contribute. Without the hook, your agent has to call them itself, so say so in its instructions.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="rest-title">
+    <div class="band-head">
+      <h2 id="rest-title" class="label">Your own code, no MCP</h2>
+      <p class="band-sub">One HTTP call. This one stores nothing and is never rate limited.</p>
+    </div>
+    <figure class="snip">
+      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"service": "api.github.com", "operation": "create_issue",
+       "error_type": "rate_limit", "error_code": "429"}'</code></pre>
+    </figure>
+    <p class="band-sub">
+      <a href="/docs">The API reference</a> covers reporting failures, successes and recovery outcomes.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="check-title">
+    <div class="band-head">
+      <h2 id="check-title" class="label">How to tell it is working</h2>
+    </div>
+    <ul class="yes-list">
+      <li>Ask your agent to check any failure. A signature nobody has reported returns <code>INSUFFICIENT_DATA</code> and a null recommendation. That is a real answer, and it proves the connection works.</li>
+      <li>Your reports appear in the counters at <a href="/v1/stats"><code>/v1/stats</code></a> within seconds, and on <a href="/#live-network">the live page</a>.</li>
+      <li>Every answer carries <code>evidence_sources</code>, so you can see whether independent agents saw the same failure or only FailEcho's own agents did.</li>
+    </ul>
+  </section>
+
+  <section class="shell band" aria-labelledby="sends-title">
+    <div class="band-head">
+      <h2 id="sends-title" class="label">What leaves your machine</h2>
+    </div>
+    <div class="two-col">
+      <div>
+        <h3 class="flow-name">Sent</h3>
+        <ul class="yes-list">
+          <li>the service and tool that failed</li>
+          <li>a coarse error class and code, such as <code>rate_limit</code> and <code>429</code></li>
+          <li>how long the call took</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="flow-name">Never sent</h3>
+        <ul class="no-list">
+          <li>prompts</li>
+          <li>tool arguments</li>
+          <li>tool results</li>
+          <li>file paths or session ids</li>
+          <li>API keys or secrets</li>
+        </ul>
+      </div>
+    </div>
+    <p class="band-sub">
+      The error text is only sent if you set <code>FAILECHO_HOOK_SEND_ERRORS=1</code>, and even then it is normalized and the raw string discarded. Servers the hook cannot name the way other users would, such as local scripts and private hosts, are skipped entirely. The full contract is on <a href="/about">the about page</a>.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="trouble-title">
+    <div class="band-head">
+      <h2 id="trouble-title" class="label">If nothing shows up</h2>
+    </div>
+    <dl class="tools">
+      <div>
+        <dt>The hook was installed mid-session</dt>
+        <dd>Claude Code reads hooks when a session starts. Start a new one.</dd>
+      </div>
+      <div>
+        <dt>Your MCP servers are local scripts</dt>
+        <dd>Those are skipped on purpose: their failures are nobody else's. Name one publicly with <code>FAILECHO_HOOK_SERVICE_NAMES='{"alias": "public-name"}'</code>.</dd>
+      </div>
+      <div>
+        <dt>Only Bash or web calls are failing</dt>
+        <dd>The hook covers MCP tools. Report other failures yourself through the API.</dd>
+      </div>
+      <div>
+        <dt>You want it off</dt>
+        <dd>Set <code>FAILECHO_DISABLED=1</code>, or run <code>/plugin uninstall failecho@failecho</code>. Nothing is stored about you either way.</dd>
+      </div>
+    </dl>
+  </section>
+</main>
+
+<footer class="shell">
+  <div class="foot-top">
+    <p class="foot-brand">
+      <img src="/static/wordmark-dark.png?v={{ASSET_V}}" width="93" height="24" alt="FailEcho">
+    </p>
+    <p class="foot-line">Before you retry, check the echo.</p>
+  </div>
+  <ul class="foot-links">
+    <li><a href="/about">About</a></li>
+    <li><a href="/setup">Setup</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="/openapi.json">OpenAPI</a></li>
+    <li><a href="/llms.txt">llms.txt</a></li>
+    <!--github--><li><a href="{{GITHUB_URL}}">GitHub</a></li><!--/github-->
+    <li><a href="mailto:contact@failecho.com">Contact</a></li>
+  </ul>
+  <p class="fineprint">
+    MIT · Security reports: <a href="mailto:security@failecho.com">security@failecho.com</a>
+  </p>
+</footer>
+</body>
+</html>

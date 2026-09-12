@@ -463,8 +463,8 @@ def test_sitemap_is_valid_xml_with_the_indexable_pages(client):
     root = ElementTree.fromstring(response.text)
     ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     locs = [el.text for el in root.findall(".//s:loc", ns)]
-    assert len(locs) == 4
-    for path in ("/", "/about", "/docs", "/llms.txt"):
+    assert len(locs) == 5
+    for path in ("/", "/about", "/setup", "/docs", "/llms.txt"):
         assert any(loc.endswith(path) for loc in locs), path
     # Real timestamps, not invented priorities.
     assert root.findall(".//s:lastmod", ns)
@@ -484,6 +484,7 @@ def test_sitemap_uses_the_public_origin(client):
         assert locs == [
             "https://failecho.com/",
             "https://failecho.com/about",
+            "https://failecho.com/setup",
             "https://failecho.com/docs",
             "https://failecho.com/llms.txt",
         ]
