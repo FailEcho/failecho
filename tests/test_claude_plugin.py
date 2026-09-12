@@ -112,3 +112,28 @@ def test_claude_code_itself_accepts_the_manifests(target):
         capture_output=True, text=True, timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_the_site_advertises_the_install_this_repository_actually_serves():
+    """The homepage, /about and /llms.txt name the marketplace and plugin that
+    .claude-plugin/marketplace.json and server.json actually define."""
+    marketplace = load(MARKETPLACE)
+    plugin = marketplace["plugins"][0]["name"]
+    repository = json.loads((ROOT / "server.json").read_text())["repository"]["url"]
+    slug = "/".join(repository.rstrip("/").split("/")[-2:])
+
+    install = f"/plugin install {plugin}@{marketplace['name']}"
+    add = f"/plugin marketplace add {slug}"
+
+    homepage = (ROOT / "app" / "web" / "static" / "index.html").read_text()
+    assert add in homepage and install in homepage
+    assert install in (ROOT / "app" / "web" / "static" / "about.html").read_text()
+
+    guide = (ROOT / "app" / "main.py").read_text()
+    assert add in guide and install in guide
+
+
+def test_llms_txt_offers_the_plugin_to_agents_that_read_it(client):
+    body = client.get("/llms.txt").text
+    assert "/plugin install failecho@failecho" in body
+    assert "Use FailEcho when a tool, API, or MCP operation fails" in body

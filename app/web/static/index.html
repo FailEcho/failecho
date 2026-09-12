@@ -368,13 +368,22 @@ Reporting recovery outcome...
       <h2 id="connect-title" class="label">Connect an Agent</h2>
     </div>
     <p class="band-intro">
-      FailEcho exposes a Model Context Protocol endpoint that AI agents can
-      query after tool failures. No account. No API key. Free during the public
-      MVP.
+      Claude Code installs in two commands. Every other client uses the same Model Context Protocol endpoint that AI agents can query after tool failures. No account. No API key. Free during the public MVP.
     </p>
 
+    <figure class="snip">
+      <figcaption>
+        <span>Claude Code</span>
+        <button class="btn btn--sm" type="button" data-copy-target="code-plugin"
+                aria-label="Copy the plugin install commands">Copy</button>
+      </figcaption>
+      <pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho</code></pre>
+      <p class="endpoint-note">Installs the MCP server and a hook: reporting and lookups happen without the model remembering to.</p>
+    </figure>
+
     <div class="endpoint">
-      <span class="endpoint-label">MCP endpoint</span>
+      <span class="endpoint-label">MCP endpoint — any other client</span>
       <span class="endpoint-row">
         <code id="mcp-endpoint">{{PUBLIC_URL}}/mcp</code>
         <button class="btn btn--sm" type="button" data-copy-target="mcp-endpoint"
@@ -434,13 +443,9 @@ Reporting recovery outcome...
         </figcaption>
         <pre><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
   -H "Content-Type: application/json" \
-  -d '{
-    "service": "github-mcp",
-    "operation": "create_issue",
-    "error_type": "validation_error",
-    "error_code": "422",
-    "error_message": "Repository 555812 was not found"
-  }'</code></pre>
+  -d '{"service": "github-mcp", "operation": "create_issue",
+       "error_type": "validation_error", "error_code": "422",
+       "error_message": "Repository 555812 was not found"}'</code></pre>
       </figure>
 
       <figure class="snip">
@@ -449,19 +454,13 @@ Reporting recovery outcome...
           <button class="btn btn--sm" type="button" data-copy-target="code-python"
                   aria-label="Copy Python client setup">Copy</button>
         </figcaption>
-        <pre><code id="code-python"># Not published to PyPI yet. The client is a zero-dependency directory
-# in the repository: clone it, then copy client/ into your project.
-
+        <pre><code id="code-python"># Not published to PyPI yet: copy client/ from the repository.
 import sys; sys.path.insert(0, "client")
 from failecho import FailEcho
 
 echo = FailEcho("{{PUBLIC_URL}}", reporter_id="my-agent-1")
-
 outcome = await echo.observe_tool_call(
-    service="github-mcp",
-    operation="create_issue",
-    call=lambda: github.create_issue(**args),
-)
+    service="github-mcp", operation="create_issue", call=make_issue)
 
 if outcome.failed and outcome.decision.actionable:
     do(outcome.decision.recommendation)   # your code decides, never FailEcho</code></pre>

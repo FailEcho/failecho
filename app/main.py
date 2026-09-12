@@ -195,6 +195,14 @@ OpenAPI:
 Docs:
 {base_url}/docs
 
+## Claude Code
+
+Two commands install the MCP server and a hook that reports tool failures
+automatically, so no model has to remember to call FailEcho:
+
+/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho
+
 ## MCP tools (preferred for agents)
 
 Stateless, no auth.
