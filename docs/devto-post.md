@@ -49,21 +49,18 @@ And the thing is, it wasn't being stupid. Look at what it had to work with:
 422 validation_error
 ```
 
-Go on, tell me from that string whether retrying is worth it. Is that a field
-that got renamed in last week's release, or a service having a bad ten
-minutes? It's the same string either way. In one case
-retrying is exactly right and it'll work in thirty seconds. In the other you
-can retry until your budget's gone, and the actual answer was "the field is
-called `content` now, refresh your tool schema".
+Tell me from that whether retrying is worth it. Renamed field, or a service
+having a bad ten minutes? Same string either way. One of those fixes itself in
+thirty seconds; the other eats your whole budget while the real answer was
+"the field is called `content` now".
 
 So it guesses. And it guesses retry, because that's what nearly all the code
 it ever read does.
 
-Here's the bit that actually bugs me though. **Somebody already hit this.**
-Probably this week, probably on the same MCP server, and they already found
-out whether retrying works. That knowledge exists. It's just sitting in
-someone else's terminal scrollback where nothing can reach it, so every agent
-pays full price to learn it again.
+Here's the bit that bugs me. **Somebody already hit this**, probably this
+week, on the same MCP server, and they already found out whether retrying
+works. That knowledge exists. It's in someone else's scrollback where nothing
+can reach it, so every agent pays full price to learn it again.
 
 ## What would actually fix it
 
@@ -95,17 +92,15 @@ gets told, instead of guessing.
 /plugin install failecho@failecho
 ```
 
-**2.** Start a new session. Claude Code only reads hooks when a session
-starts, so installing mid-session leaves you with a plugin that looks
-installed and does nothing. I've skipped this step myself and then spent ten
-minutes convinced my own thing was broken :D
+**2.** Start a new session. Claude Code reads hooks at session start, so
+installing mid-session leaves you with a plugin that looks installed and does
+nothing. I've done this and spent ten minutes sure my own thing was broken :D
 
 **3.** Check it took: type `/plugin`. FailEcho should be listed as *enabled*.
 
-That's it. From then on, whenever an MCP tool fails, the network gets asked
-what other agents saw, and your failure gets recorded for whoever's next. You
-don't have to remember anything, and the model isn't deciding whether to
-bother — it's a hook, it just runs after the call.
+That's it. From then on every MCP failure gets looked up and recorded
+automatically. You don't remember anything and the model doesn't decide
+anything — it's a hook, it just runs after the call.
 
 ### Any other MCP client
 
@@ -151,37 +146,38 @@ first try, which honestly surprised me :3
 
 ## What comes back
 
+Here's the real thing, right now, from the curl above:
 
-
-```
-Fingerprint:            6ed9ef705ff4037af2c977306b8b9f92
-Known failure:          YES
-Observed failures:      11
-Independent reporters:  6
-
-Recovery actions others reported:
-  refresh_schema        5/5 (100.0%) confidence 0.57 reporters 5
-  retry                 0/5 (0.0%)   confidence 0.00 reporters 5
-
-Best observed recovery: refresh_schema
-  Skipping retry: other agents already proved it does not work here.
+```json
+{
+  "known": false,
+  "status": "INSUFFICIENT_DATA",
+  "observations": { "total": 0, "unique_reporters": 0 },
+  "recovery_actions": [],
+  "recommendation": null,
+  "evidence_sources": []
+}
 ```
 
-Two things about that output I'd argue with anyone about.
+Yeah. Nothing. Nobody has reported that signature, so it says so instead of
+making something up. That's today's honest output and I'd rather show you it
+than a screenshot from my demo folder :3
 
-That confidence number is a Wilson score lower bound over the actual attempts.
-No model produced it. You can recompute it yourself from the counts printed
-right next to it, which I think should be table stakes for anything telling an
-agent what to do.
+Once a fingerprint has evidence behind it, the empty arrays fill in:
+`recovery_actions` gets one entry per action anyone tried, with attempts,
+successes and a confidence score, and `recommendation` names the best one.
 
-And when there isn't enough evidence, it says `INSUFFICIENT_DATA` and
-recommends nothing. Not a guess with a low number bolted on. "I don't know" is
-a real answer and agents handle it fine.
+Two things about that I'd argue with anyone about. The confidence is a Wilson
+score lower bound over the actual attempts — no model produced it, and you can
+recompute it from the counts printed next to it. And it only appears once five
+attempts and three separate reporters exist. Below that you get the empty
+answer above, because a recommendation from one person's single lucky retry is
+worse than nothing.
 
 On what leaves your machine: the service, the operation, an error class and
 code, how long the call took. That's it. No prompts, no tool arguments, no
-tool results, no headers, no keys, nothing of yours. Error text gets
-normalised server-side and the original thrown away. MIT, no account, no key.
+results, no headers, no keys. Error text is normalised server-side and the
+original thrown away. MIT, no account, no key.
 
 ## The honest part
 
@@ -192,18 +188,16 @@ The network is empty. Zero independent agents have reported anything to it.
 That counter is on the front page and it says zero, because a shared log with
 one person in it is just a log :3
 
-So I'm not going to sit here and tell you it'll help you today, because it
-won't. It needs something like five to ten people running it for a week before
-any single fingerprint has enough behind it to be worth reading.
+So I won't pretend it helps you today. It doesn't. It needs five to ten people
+running it for a week before any fingerprint has enough behind it to read.
 
-Which is the actual ask, really. If you run agents against MCP servers, leave
-this on for a week and see what it catches. It runs after the tool call with a
-two second timeout, so the worst thing that happens when my server falls over
-is your agent waits two seconds. `FAILECHO_DISABLED=1` kills it entirely.
+That's the ask. If you run agents against MCP servers, leave this on for a week
+and see what it catches. It runs after the call with a two second timeout, so
+the worst case when my server falls over is your agent waits two seconds.
+`FAILECHO_DISABLED=1` kills it entirely.
 
-And I'll publish whatever it sees afterwards — including if the answer turns
-out to be "turns out different people's failures barely overlap at all", which
-is honestly the thing I most want to know.
+I'll publish whatever it sees afterwards — including if the answer is "different
+people's failures barely overlap", which is honestly what I most want to know.
 
 ## Why it is worth being early
 
@@ -240,9 +234,11 @@ them — a made-up anecdote is the one thing in here that cannot be defended:**
 
 Then the rest:
 
-- The sample output must match what the demo actually prints. Run
-  `python examples/live_agent/run_demo.py` and copy from it rather than from
-  this file.
+- The sample output is a real production response. Re-run the curl before
+  publishing and paste what comes back, so it is true on the day.
+- Never show demo numbers as if they were the network. An "11 observations,
+  6 reporters" block next to "the network is empty" reads as either a lie or
+  an author who does not use his own product.
 - Do not add a user count, a star count, or a "trusted by". There are none.
 - Weekday morning UTC. Answer every comment for the first few hours.
 - Expect "so it does nothing yet?" as the top comment. The answer is yes, said
