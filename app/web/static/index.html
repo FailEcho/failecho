@@ -40,43 +40,6 @@
       "name": "FailEcho",
       "alternateName": "FailEcho — Failure Intelligence for AI Agents",
       "url": "{{PUBLIC_URL}}/"
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is FailEcho?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "FailEcho is a live cross-agent failure intelligence network for AI agents and autonomous software. Agents report tool failures, successful calls and recovery outcomes; other agents query that shared evidence before retrying."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What data does FailEcho collect?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Failure metadata only: service, operation, version, schema hash, outcome, error type and code, a normalized error message, latency, and an optional hashed reporter identifier. Never prompts, tool arguments, tool results, bodies or secrets."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does FailEcho use an LLM to generate recovery advice?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "No. Recovery intelligence is derived from outcomes agents actually observed and reported. Confidence is a Wilson score lower bound you can recompute from the counts returned alongside it, and thin evidence returns INSUFFICIENT_DATA rather than a guess."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Is FailEcho free?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. No account, no API key, and no payment during the public MVP."
-          }
-        }
-      ]
     }
   ]
 }
@@ -93,10 +56,10 @@
     <span class="stamp" id="demo-mode-badge" hidden>DEMO MODE</span>
     <nav class="nav" aria-label="Primary">
       <span class="navitem">
-        <a href="#live-network">Network</a>
+        <a href="/network">Network</a>
         <span class="navpanel">
-          <a href="#live-network"><b>Live network</b><span>What agents are hitting right now</span></a>
-          <a href="#demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
+          <a href="/network"><b>Live network</b><span>What agents are hitting right now</span></a>
+          <a href="/demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
           <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
         </span>
       </span>
@@ -110,7 +73,7 @@
       </span>
       <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
       <a class="nav-narrow" href="/setup">Setup</a>
-      <a class="btn btn--red btn--sm" href="#connect">Install in Claude Code</a>
+      <a class="btn btn--red btn--sm" href="/setup">Install in Claude Code</a>
     </nav>
   </div>
 </header>
@@ -125,10 +88,7 @@
 
 <main id="main">
 
-  <!-- HERO -->
-  <section class="shell hero" aria-labelledby="hero-title">
-    <div class="hero-grid">
-      <div class="hero-copy">
+  <section class="shell hero hero--center" aria-labelledby="hero-title">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
     <p class="hero-lede">
       Live failure and recovery intelligence for autonomous software.
@@ -138,429 +98,80 @@
       autonomous software. See whether other agents are hitting the same tool
       failure right now — and what actually worked, before you retry.
     </p>
+
+    <div class="install">
+      <div class="install-head">
+        <span>Claude Code</span>
+        <button class="btn btn--sm" type="button" data-copy-target="code-plugin"
+                aria-label="Copy the install commands">Copy</button>
+      </div>
+      <pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho</code></pre>
+    </div>
+    <p class="install-note">
+      Cursor, Claude Desktop, your own code — <a href="/setup">the setup guide</a>.
+      No account. No API key.
+    </p>
+
     <p class="hero-actions">
-      <a class="btn btn--red" href="#connect">Install in Claude Code</a>
-      <a class="btn" href="#demo">See it work</a>
+      <a class="btn btn--red" href="/setup">Install in Claude Code</a>
+      <a class="btn" href="/demo">See it work</a>
     </p>
     <p class="hero-tagline">Before you retry, check the echo.</p>
     <p class="hero-meta">MCP · REST · OpenAPI · No account required</p>
-      </div>
-      <div class="hero-visual" aria-hidden="true">
-        <svg class="rings" viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg">
-          <g fill="none" stroke="currentColor">
-            <circle class="ring ring-1" cx="210" cy="210" r="52"/>
-            <circle class="ring ring-2" cx="210" cy="210" r="92"/>
-            <circle class="ring ring-3" cx="210" cy="210" r="132"/>
-            <circle class="ring ring-4" cx="210" cy="210" r="172"/>
-            <circle class="ring ring-5" cx="210" cy="210" r="206"/>
-          </g>
-          <circle class="core" cx="210" cy="210" r="8"/>
-          <circle class="agent" cx="302" cy="210" r="5"/>
-          <circle class="agent agent--lit" cx="117" cy="117" r="5"/>
-          <circle class="agent" cx="210" cy="38" r="5"/>
-          <circle class="agent agent--lit" cx="102" cy="286" r="5"/>
-          <circle class="agent" cx="331" cy="331" r="5"/>
-        </svg>
-      </div>
-    </div>
   </section>
 
-  <!-- LIVE NETWORK -->
-  <section class="shell band" id="live-network" aria-labelledby="live-title">
+  <section class="shell band band--bleed" id="how" aria-labelledby="how-title">
     <div class="band-head">
-      <h2 id="live-title" class="label">Live Network</h2>
+      <h2 id="how-title" class="label">How FailEcho works</h2>
+    </div>
+    <ol class="flow">
+      <li>
+        <p class="flow-name">Fail</p>
+        <p class="flow-body">An agent hits a tool, API or MCP failure.</p>
+      </li>
+      <li>
+        <p class="flow-name">Report</p>
+        <p class="flow-body">It shares failure metadata. Never prompts or arguments.</p>
+      </li>
+      <li>
+        <p class="flow-name">Learn</p>
+        <p class="flow-body">FailEcho matches it to the same failure elsewhere.</p>
+      </li>
+      <li>
+        <p class="flow-name">Recover</p>
+        <p class="flow-body">The next agent asks before it retries.</p>
+      </li>
+    </ol>
+    <p class="statement">Agent B benefits from evidence it never generated itself.</p>
+    <p class="fineprint"><a href="/demo">Watch one failure go through it →</a></p>
+  </section>
+
+  <section class="shell band" id="live" aria-labelledby="live-title">
+    <div class="band-head">
+      <h2 id="live-title" class="label">Live right now</h2>
       <p class="band-meta">
         <span class="pulse" id="live-dot" aria-hidden="true"></span>
         <span id="updated" aria-live="polite">connecting…</span>
       </p>
     </div>
-
-    <div class="bootstrap" id="real-empty" hidden>
-      <p class="bootstrap-lead">Public network is bootstrapping.</p>
-      <p>
-        No real external telemetry has been reported today.
-        Be one of the first agents contributing to the network.
-      </p>
-      <p><a class="btn btn--red btn--sm" href="#connect">Connect an agent</a></p>
-    </div>
-
-    <div class="metrics" id="real-stats">
-      <div class="metric">
-        <span class="metric-value" id="stat-real-24h">—</span>
-        <span class="metric-label">Real observations today</span>
-      </div>
-      <div class="metric">
-        <span class="metric-value" id="stat-real-reporters">—</span>
-        <span class="metric-label">Independent reporters</span>
-      </div>
-      <div class="metric">
-        <span class="metric-value" id="stat-real-fingerprints">—</span>
-        <span class="metric-label">Known fingerprints</span>
-      </div>
-      <div class="metric">
-        <span class="metric-value" id="stat-real-incidents">—</span>
-        <span class="metric-label">Active incidents</span>
-      </div>
-    </div>
-
-    <div class="subband">
-      <h3 class="label label--quiet">Live services</h3>
-      <p class="muted" id="incidents-empty" hidden>Nothing reported in the last hour.</p>
-      <div class="table-wrap" id="incidents-table" tabindex="0" role="region"
-           aria-label="Live services" hidden>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Service</th>
-              <th scope="col">Operation</th>
-              <th scope="col">Status</th>
-              <th scope="col" class="num">Failure rate</th>
-              <th scope="col" class="num">Obs 5m</th>
-            </tr>
-          </thead>
-          <tbody id="services-body"></tbody>
-        </table>
-      </div>
-      <dl class="legend">
-        <div><dt><span class="status status--HEALTHY"><span class="status-mark" aria-hidden="true"></span>Healthy</span></dt><dd>under 5% failures</dd></div>
-        <div><dt><span class="status status--DEGRADED"><span class="status-mark" aria-hidden="true"></span>Degraded</span></dt><dd>5–30%</dd></div>
-        <div><dt><span class="status status--MAJOR"><span class="status-mark" aria-hidden="true"></span>Major</span></dt><dd>above 30%</dd></div>
-      </dl>
-      <p class="fineprint">
-        A status appears once a service has at least 10 observations in the
-        last hour. Below that, FailEcho reports insufficient data rather than
-        guessing.
-      </p>
-    </div>
-
-    <div class="subband" id="first-party-block" hidden>
-      <h3 class="label label--quiet">FailEcho's own agents</h3>
-      <div class="metrics metrics--quiet">
-        <div class="metric">
-          <span class="metric-value" id="stat-first-party">—</span>
-          <span class="metric-label">First-party observations</span>
-        </div>
-      </div>
-      <p class="fineprint">Real calls by our own agents while the network bootstraps, shown to agents as first-party evidence and never counted as adoption.</p>
-    </div>
-
-    <div class="subband" id="demo-stats-block" hidden>
-      <h3 class="label label--quiet">Demo data</h3>
-      <div class="metrics metrics--quiet">
-        <div class="metric">
-          <span class="metric-value" id="stat-demo-agent">—</span>
-          <span class="metric-label">Demo-agent observations</span>
-        </div>
-        <div class="metric">
-          <span class="metric-value" id="stat-synthetic">—</span>
-          <span class="metric-label">Synthetic observations</span>
-        </div>
-      </div>
-      <p class="fineprint">Never counted as real adoption, anywhere on this page.</p>
-    </div>
-  </section>
-
-  <!-- SEE IT HAPPEN -->
-  <section class="shell band band--bleed" id="demo" aria-labelledby="demo-title">
-    <div class="band-head">
-      <h2 id="demo-title" class="label">See It Happen</h2>
-    </div>
-    <p class="band-intro">
-      Five agents encounter the same tool failure and report what happened. The
-      sixth agent has never seen their executions — but it can use their
-      shared evidence.
+    <p class="livestrip">
+      <span><b id="stat-real-24h">—</b> observations from independent agents today</span>
+      <span><b id="stat-first-party">—</b> from FailEcho's own agents, never counted as adoption</span>
     </p>
-
-    <ol class="story">
-      <li>
-        <span class="story-step">1</span>
-        <div>
-          <p class="story-head">A tool call fails</p>
-          <p class="story-body"><code>github-mcp / create_issue</code></p>
-          <p class="story-body"><code class="t-red">422 validation_error</code></p>
-        </div>
-      </li>
-      <li>
-        <span class="story-step">2</span>
-        <div>
-          <p class="story-head">Other agents already tried</p>
-          <p class="story-body"><code>retry</code> <span class="t-dim">0 / 5 worked</span></p>
-          <p class="story-body"><code>refresh_schema</code> <span class="t-green">5 / 5 worked</span></p>
-        </div>
-      </li>
-      <li>
-        <span class="story-step">3</span>
-        <div>
-          <p class="story-head">FailEcho returns</p>
-          <p class="story-body">Best observed recovery:</p>
-          <p class="story-body"><code class="t-green">refresh_schema</code></p>
-        </div>
-      </li>
-      <li>
-        <span class="story-step">4</span>
-        <div>
-          <p class="story-head">Agent B skips the retry</p>
-          <p class="story-body">Applies <code>refresh_schema</code>.</p>
-          <p class="story-body"><span class="t-green">Tool call succeeds.</span></p>
-        </div>
-      </li>
-    </ol>
-
-    <p class="statement">Agent B recovered using evidence it never generated itself.</p>
-
-    <details class="disclosure">
-      <summary>View full demo output</summary>
-      <div class="terminal">
-        <div class="terminal-bar"><span>examples/live_agent/run_demo.py — agent b</span></div>
-<pre><code>Calling tool...
-<span class="t-red">x tool failed</span>
-
-  422 validation_error
-  Repository 987654 rejected field body: field "body" is no longer accepted, use "content"
-
-Reporting failure...
-+ accepted
-
-Checking shared failure intelligence...
-
-  Fingerprint:            6ed9ef705ff4037af2c977306b8b9f92
-  Known failure:          YES
-  Observed failures:      11
-  Independent reporters:  6
-  Service status:         <span class="t-red">MAJOR</span>
-
-  Recovery actions others reported:
-    <span class="t-green">refresh_schema        5/5 (100.0%) confidence 0.57 reporters 5</span>
-    <span class="t-dim">retry                 0/5 (0.0%) confidence 0.00 reporters 5</span>
-
-Best observed recovery:
-  refresh_schema
-
-  Skipping retry: other agents already proved it does not work here.
-
-Applying recovery: refresh_schema
-  Refreshed tool schema -> v3.0.0, field 'content'
-  Retrying tool call...
-  <span class="t-green">+ tool call succeeded</span>
-
-Reporting recovery outcome...
-<span class="t-green">+ accepted   (refresh_schema -> success)</span></code></pre>
-      </div>
-      <p class="fineprint">
-        Real output, reproducible with
-        <code>python examples/live_agent/run_demo.py</code>.
-      </p>
-    </details>
+    <p class="fineprint"><a href="/network">See the live network →</a></p>
   </section>
 
-  <!-- RECOVERY ECHOES -->
-  <section class="shell band" aria-labelledby="recovery-title">
-    <div class="band-head">
-      <h2 id="recovery-title" class="label">Recovery Echoes</h2>
-      <p class="band-sub">What agents tried — and what actually worked.</p>
-    </div>
-    <div id="recovery-list" aria-live="polite">
-      <p class="muted">Loading…</p>
-    </div>
-    <p class="fineprint">
-      Based on observed outcomes from independent agents. No model-generated advice.
-    </p>
-  </section>
-
-  <!-- HOW IT WORKS -->
-  <section class="shell band" id="how" aria-labelledby="how-title">
-    <div class="band-head">
-      <h2 id="how-title" class="label">How FailEcho Works</h2>
-    </div>
-    <ol class="flow">
-      <li>
-        <p class="flow-name">Fail</p>
-        <p class="flow-body">An agent encounters a tool, API, or MCP failure.</p>
-      </li>
-      <li>
-        <p class="flow-name">Report</p>
-        <p class="flow-body">It shares privacy-safe failure metadata.</p>
-      </li>
-      <li>
-        <p class="flow-name">Learn</p>
-        <p class="flow-body">FailEcho fingerprints matching failures and aggregates observed recovery outcomes.</p>
-      </li>
-      <li>
-        <p class="flow-name">Recover</p>
-        <p class="flow-body">Another agent checks the network before retrying.</p>
-      </li>
-    </ol>
-    <p class="flow-summary">
-      Agent A contributes the evidence. Agent B benefits from it.
-    </p>
-    <p class="statement">Agent B benefits from evidence it never generated itself.</p>
-    <p class="fineprint"><a href="/about">Learn more about FailEcho →</a></p>
-  </section>
-
-  <!-- CONNECT AN AGENT -->
-  <section class="shell band" id="connect" aria-labelledby="connect-title">
-    <div class="band-head">
-      <h2 id="connect-title" class="label">Connect an Agent</h2>
-    </div>
-    <p class="band-intro">
-      Two minutes, no account and no API key. Claude Code has a one-command install; every other client uses the same Model Context Protocol endpoint that AI agents can query after tool failures.
-    </p>
-
-    <h3 class="flow-name">Claude Code</h3>
-    <ol class="setup">
-      <li>Start Claude Code, and type these two lines at its prompt (not in a terminal):
-        <figure class="snip">
-          <figcaption>
-            <span>In Claude Code</span>
-            <button class="btn btn--sm" type="button" data-copy-target="code-plugin"
-                    aria-label="Copy the plugin install commands">Copy</button>
-          </figcaption>
-          <pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
-/plugin install failecho@failecho</code></pre>
-        </figure>
-      </li>
-      <li>If it says to run <code>/reload-plugins</code>, run it. Otherwise start a new session.</li>
-      <li>Check it: type <code>/plugin</code> and FailEcho should read <em>enabled</em>. That is all — from then on, a failing MCP tool is looked up here and reported for the next agent, without you or the model doing anything.</li>
-    </ol>
-
-    <p class="band-sub">Step by step, including every other client: <a href="/setup">the setup guide</a>.</p>
-
-    <h3 class="flow-name">Any other MCP client</h3>
-    <p class="endpoint-note">Paste this endpoint into your client's MCP settings, as type <code>http</code>. The ready-made config is below under For Developers.</p>
-
-    <div class="endpoint">
-      <span class="endpoint-label">MCP endpoint</span>
-      <span class="endpoint-row">
-        <code id="mcp-endpoint">{{PUBLIC_URL}}/mcp</code>
-        <button class="btn btn--sm" type="button" data-copy-target="mcp-endpoint"
-                aria-label="Copy MCP endpoint URL">Copy endpoint</button>
-      </span>
-      <span class="endpoint-note">Streamable HTTP</span>
-    </div>
-
-    <dl class="tools">
-      <div>
-        <dt><code>check_tool_failure</code></dt>
-      </div>
-      <div>
-        <dt><code>report_tool_failure</code></dt>
-      </div>
-      <div>
-        <dt><code>report_tool_success</code></dt>
-      </div>
-      <div>
-        <dt><code>report_recovery_outcome</code></dt>
-      </div>
-    </dl>
-  </section>
-
-  <!-- FOR DEVELOPERS -->
-  <section class="shell band band--bleed" aria-labelledby="dev-title">
-    <div class="band-head">
-      <h2 id="dev-title" class="label">For Developers</h2>
-    </div>
-
-    <div class="snips">
-      <figure class="snip">
-        <figcaption>
-          <span>MCP client config</span>
-          <button class="btn btn--sm" type="button" data-copy-target="code-mcp"
-                  aria-label="Copy MCP client configuration">Copy</button>
-        </figcaption>
-        <pre><code id="code-mcp">{
-  "mcpServers": {
-    "failecho": {
-      "type": "http",
-      "url": "{{PUBLIC_URL}}/mcp"
-    }
-  }
-}</code></pre>
-      </figure>
-
-      <figure class="snip">
-        <figcaption>
-          <span>REST</span>
-          <button class="btn btn--sm" type="button" data-copy-target="code-rest"
-                  aria-label="Copy REST example">Copy</button>
-        </figcaption>
-        <pre><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"service": "github-mcp", "operation": "create_issue",
-       "error_type": "validation_error", "error_code": "422",
-       "error_message": "Repository 555812 was not found"}'</code></pre>
-      </figure>
-
-      <figure class="snip">
-        <figcaption>
-          <span>Python client — not on PyPI yet</span>
-          <button class="btn btn--sm" type="button" data-copy-target="code-python"
-                  aria-label="Copy Python client setup">Copy</button>
-        </figcaption>
-        <pre><code id="code-python"># Not published to PyPI yet: copy client/ from the repository.
-import sys; sys.path.insert(0, "client")
-from failecho import FailEcho
-
-echo = FailEcho("{{PUBLIC_URL}}", reporter_id="my-agent-1")
-outcome = await echo.observe_tool_call(
-    service="github-mcp", operation="create_issue", call=make_issue)
-
-if outcome.failed and outcome.decision.actionable:
-    do(outcome.decision.recommendation)   # your code decides, never FailEcho</code></pre>
-      </figure>
-    </div>
-
-    <ul class="links">
-      <li><a href="/docs">API documentation</a><span><code>/docs</code></span></li>
-      <li><a href="/openapi.json">OpenAPI schema</a><span><code>/openapi.json</code></span></li>
-      <li><a href="/llms.txt">Machine-readable agent guide</a><span><code>/llms.txt</code></span></li>
-    </ul>
-  </section>
-
-  <!-- TRUST -->
-  <section class="shell band" aria-labelledby="trust-title">
+  <section class="shell band band--bleed" aria-labelledby="trust-title">
     <div class="band-head">
       <h2 id="trust-title" class="label">Built to be checked</h2>
     </div>
-    <div class="principles">
-      <div>
-        <h3>Privacy-safe</h3>
-        <p>No prompts. No secrets. No tool arguments or results. Raw error text is discarded after normalization, and reporter IDs are optional and hashed before storage.</p>
-      </div>
-      <div>
-        <h3>Evidence-based</h3>
-        <p>Recovery intelligence comes from observed outcomes, not generated advice. No model produces a recovery recommendation or a confidence score.</p>
-      </div>
-      <div>
-        <h3>Deterministic</h3>
-        <p>Confidence can be recomputed from the evidence the API returns. Thin evidence returns <code>INSUFFICIENT_DATA</code> rather than a guess.</p>
-      </div>
-    </div>
-    <p class="fineprint"><a href="/about">Learn how FailEcho handles data →</a></p>
-  </section>
-
-  <!-- FAQ -->
-  <section class="shell band" aria-labelledby="faq-title">
-    <div class="band-head">
-      <h2 id="faq-title" class="label">Questions</h2>
-    </div>
-    <dl class="faq">
-      <div>
-        <dt>What is FailEcho?</dt>
-        <dd>FailEcho is a live cross-agent failure intelligence network for AI agents and autonomous software. Agents report tool failures, successful calls and recovery outcomes; other agents query that shared evidence before retrying.</dd>
-      </div>
-      <div>
-        <dt>What data does FailEcho collect?</dt>
-        <dd>Failure metadata only: service, operation, version, schema hash, outcome, error type and code, a normalized error message, latency, and an optional hashed reporter identifier. Never prompts, tool arguments, tool results, bodies or secrets.</dd>
-      </div>
-      <div>
-        <dt>Does FailEcho use an LLM to generate recovery advice?</dt>
-        <dd>No. Recovery intelligence is derived from outcomes agents actually observed and reported. Confidence is a Wilson score lower bound you can recompute from the counts returned alongside it, and thin evidence returns INSUFFICIENT_DATA rather than a guess.</dd>
-      </div>
-      <div>
-        <dt>Is FailEcho free?</dt>
-        <dd>Yes. No account, no API key, and no payment during the public MVP.</dd>
-      </div>
-    </dl>
+    <p class="band-sub">
+      No prompts. No secrets. No tool arguments or results. Confidence is
+      arithmetic you can recompute, and thin evidence returns
+      <code>INSUFFICIENT_DATA</code> rather than a guess.
+    </p>
+    <p class="fineprint"><a href="/about">How FailEcho handles data →</a></p>
   </section>
 </main>
 
@@ -572,6 +183,8 @@ if outcome.failed and outcome.decision.actionable:
     <p class="foot-line">Before you retry, check the echo.</p>
   </div>
   <ul class="foot-links">
+    <li><a href="/network">Network</a></li>
+    <li><a href="/demo">Demo</a></li>
     <li><a href="/about">About</a></li>
     <li><a href="/setup">Setup</a></li>
     <li><a href="/docs">Docs</a></li>

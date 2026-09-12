@@ -186,21 +186,21 @@ def test_openapi_documents_every_public_endpoint(client):
             assert spec.get("description"), f"{method} {path} has no description"
 
 
-def test_homepage_shows_real_and_synthetic_separately(client):
-    body = client.get("/").text
-    assert "Live Network" in body
+def test_the_dashboard_shows_real_and_synthetic_separately(client):
+    """The split moved to /network with the dashboard; it still has to hold."""
+    body = client.get("/network").text
+    assert "Live network" in body
     assert "Demo data" in body
     assert "Demo-agent observations" in body
     assert "Synthetic observations" in body
     assert "Active incidents" in body
-    assert "Recovery Echoes" in body
-    assert "check_tool_failure" in body
+    assert "Recovery echoes" in body
     assert client.get("/static/app.js").status_code == 200
 
 
 def test_mcp_endpoint_is_advertised_where_agents_look(client):
     assert "/mcp" in client.get("/llms.txt").text
-    assert "/mcp" in client.get("/").text
+    assert "/mcp" in client.get("/setup").text
     assert "MCP" in client.get("/openapi.json").json()["info"]["description"]
     # ...and it actually answers.
     assert "known" in mcp_call(
@@ -277,10 +277,12 @@ def test_demo_mode_never_generates_traffic(client):
         object.__setattr__(settings, "demo_mode", False)
 
 
-def test_homepage_can_show_the_demo_badge(client):
+def test_demo_mode_is_announced_where_the_data_is(client):
     body = client.get("/").text
     assert 'id="demo-mode-badge"' in body
     assert 'id="demo-mode-banner"' in body
     assert "DEMO MODE" in body
-    assert "never counted as real adoption" in body
-    assert "stat-demo-agent" in body
+
+    dashboard = client.get("/network").text
+    assert "never counted as real adoption" in dashboard
+    assert "stat-demo-agent" in dashboard

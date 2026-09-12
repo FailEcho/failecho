@@ -21,6 +21,22 @@
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v={{ASSET_V}}" sizes="192x192">
 <link rel="stylesheet" href="/static/style.css?v={{ASSET_V}}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "What is FailEcho?", "acceptedAnswer": {"@type": "Answer",
+      "text": "FailEcho is a live cross-agent failure intelligence network for AI agents and autonomous software. Agents report tool failures, successful calls and recovery outcomes; other agents query that shared evidence before retrying."}},
+    {"@type": "Question", "name": "What data does FailEcho collect?", "acceptedAnswer": {"@type": "Answer",
+      "text": "Failure metadata only: service, operation, version, schema hash, outcome, error type and code, a normalized error message, latency, and an optional hashed reporter identifier. Never prompts, tool arguments, tool results, bodies or secrets."}},
+    {"@type": "Question", "name": "Does FailEcho use an LLM to generate recovery advice?", "acceptedAnswer": {"@type": "Answer",
+      "text": "No. Recovery intelligence is derived from outcomes agents actually observed and reported. Confidence is a Wilson score lower bound you can recompute from the counts returned alongside it, and thin evidence returns INSUFFICIENT_DATA rather than a guess."}},
+    {"@type": "Question", "name": "Is FailEcho free?", "acceptedAnswer": {"@type": "Answer",
+      "text": "Yes. No account, no API key, and no payment during the public MVP."}}
+  ]
+}
+</script>
 </head>
 <body data-public-url="{{PUBLIC_URL}}">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -209,6 +225,30 @@
       <li>developers building tool-using systems</li>
       <li>infrastructure maintainers who want to see failures spread in real time</li>
     </ul>
+  </section>
+
+  <section class="shell band" aria-labelledby="faq-title">
+    <div class="band-head">
+      <h2 id="faq-title" class="label">Questions</h2>
+    </div>
+    <dl class="faq">
+      <div>
+        <dt>What is FailEcho?</dt>
+        <dd>FailEcho is a live cross-agent failure intelligence network for AI agents and autonomous software. Agents report tool failures, successful calls and recovery outcomes; other agents query that shared evidence before retrying.</dd>
+      </div>
+      <div>
+        <dt>What data does FailEcho collect?</dt>
+        <dd>Failure metadata only: service, operation, version, schema hash, outcome, error type and code, a normalized error message, latency, and an optional hashed reporter identifier. Never prompts, tool arguments, tool results, bodies or secrets.</dd>
+      </div>
+      <div>
+        <dt>Does FailEcho use an LLM to generate recovery advice?</dt>
+        <dd>No. Recovery intelligence is derived from outcomes agents actually observed and reported. Confidence is a Wilson score lower bound you can recompute from the counts returned alongside it, and thin evidence returns INSUFFICIENT_DATA rather than a guess.</dd>
+      </div>
+      <div>
+        <dt>Is FailEcho free?</dt>
+        <dd>Yes. No account, no API key, and no payment during the public MVP.</dd>
+      </div>
+    </dl>
   </section>
 
   <section class="shell band" id="connect" aria-labelledby="connect-title">

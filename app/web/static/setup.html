@@ -191,6 +191,30 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </p>
   </section>
 
+  <section class="shell band" aria-labelledby="pyclient-title">
+    <div class="band-head">
+      <h2 id="pyclient-title" class="label">Python client</h2>
+      <p class="band-sub">A wrapper that reports and asks around one call. Not on PyPI yet.</p>
+    </div>
+    <figure class="snip">
+      <pre><code># Not published to PyPI yet: copy client/ from the repository.
+import sys; sys.path.insert(0, "client")
+from failecho import FailEcho
+
+echo = FailEcho("{{PUBLIC_URL}}", reporter_id="my-agent-1")
+outcome = await echo.observe_tool_call(
+    service="github-mcp", operation="create_issue", call=make_issue)
+
+if outcome.failed and outcome.decision.actionable:
+    do(outcome.decision.recommendation)   # your code decides, never FailEcho</code></pre>
+    </figure>
+    <ul class="links">
+      <li><a href="/docs">API documentation</a><span><code>/docs</code></span></li>
+      <li><a href="/openapi.json">OpenAPI schema</a><span><code>/openapi.json</code></span></li>
+      <li><a href="/llms.txt">Machine-readable agent guide</a><span><code>/llms.txt</code></span></li>
+    </ul>
+  </section>
+
   <section class="shell band" aria-labelledby="trouble-title">
     <div class="band-head">
       <h2 id="trouble-title" class="label">If nothing shows up</h2>

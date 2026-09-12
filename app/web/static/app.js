@@ -244,15 +244,17 @@
   }
 
   function refresh() {
-    return Promise.all([
-      getJSON("/v1/stats"),
-      getJSON("/v1/services?limit=" + SERVICE_ROWS),
-      getJSON("/v1/recovery-intelligence?limit=3"),
-    ])
-      .then(function (results) {
-        renderStats(results[0]);
-        renderServices(results[1]);
-        renderRecovery(results[2]);
+    // Each page asks only for what it shows: the homepage carries two numbers,
+    // /network carries the tables.
+    var wants = [getJSON("/v1/stats").then(renderStats)];
+    if (el("services-body")) {
+      wants.push(getJSON("/v1/services?limit=" + SERVICE_ROWS).then(renderServices));
+    }
+    if (el("recovery-list")) {
+      wants.push(getJSON("/v1/recovery-intelligence?limit=3").then(renderRecovery));
+    }
+    return Promise.all(wants)
+      .then(function () {
         var dot = el("live-dot");
         if (dot) dot.style.background = "var(--red)";
       })

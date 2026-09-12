@@ -1,16 +1,17 @@
-"""The public homepage: structure, honesty, accessibility and weight.
+"""The homepage: brief, installable at a glance, and honest about the zeros.
 
-The frontend is three static files with no build step, so these tests read
-them directly. They guard the things a launch page can silently lose: the
-real-vs-demo split, the empty states, the MCP endpoint, and the promise that
-no framework crept in.
+The front page used to carry nine sections and do the job of five pages. It
+now says what FailEcho is, shows the install, and sends people to /network,
+/demo, /setup and /about. These tests hold it to that shape -- a page that
+grows back into a brochure is a regression, not an improvement.
+
+The guarantees that moved (dashboard, story, snippets) are tested where they
+now live: test_network_page.py, test_demo_page.py, test_setup_page.py.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 STATIC = Path(__file__).resolve().parents[1] / "app" / "web" / "static"
 HTML = (STATIC / "index.html").read_text()
@@ -19,7 +20,7 @@ JS = (STATIC / "app.js").read_text()
 
 
 # ---------------------------------------------------------------------------
-# structure
+# what the front page must say
 # ---------------------------------------------------------------------------
 
 
@@ -35,179 +36,49 @@ def test_hero_states_the_product_immediately(client):
     assert "MCP · REST · OpenAPI · No account required" in body
 
 
-@pytest.mark.parametrize(
-    "heading",
-    [
-        "Live Network",
-        "See It Happen",
-        "Recovery Echoes",
-        "How FailEcho Works",
-        "Connect an Agent",
-        "For Developers",
-        "Built to be checked",
-        "Questions",
-    ],
-)
-def test_every_launch_section_is_present(heading):
-    assert f">{heading}</h2>" in HTML
+def test_the_install_is_visible_without_scrolling(client):
+    """The point of the rewrite: install in one look, not after a tour."""
+    body = client.get("/").text
+    hero = body[body.index('class="shell hero'):body.index("</section>")]
+    assert "/plugin marketplace add FailEcho/failecho" in hero
+    assert "/plugin install failecho@failecho" in hero
+    assert 'data-copy-target="code-plugin"' in hero
+    assert 'href="/setup"' in hero, "every other client needs somewhere to go"
 
 
-def test_network_effect_statement_is_on_the_page():
+def test_the_front_page_stays_brief():
+    """It is a front page, not the manual. Nine sections was the old mistake."""
+    assert HTML.count("<h2") <= 4, "more than four sections means it is growing back"
+    assert len(HTML) < 12_000
+
+
+def test_it_routes_to_the_pages_that_hold_the_detail(client):
+    body = client.get("/").text
+    for href in ('href="/network"', 'href="/demo"', 'href="/setup"', 'href="/about"',
+                 'href="/docs"', 'href="/llms.txt"'):
+        assert href in body, href
+
+
+def test_the_loop_is_stated_in_four_steps():
+    for step in ("Fail", "Report", "Learn", "Recover"):
+        assert f'class="flow-name">{step}<' in HTML
     assert "Agent B benefits from evidence it never generated itself." in HTML
 
 
-def test_mcp_endpoint_and_four_tools_are_prominent():
-    assert 'id="mcp-endpoint"' in HTML
-    for tool in (
-        "check_tool_failure",
-        "report_tool_failure",
-        "report_tool_success",
-        "report_recovery_outcome",
-    ):
-        assert f"<code>{tool}</code>" in HTML
-    # ...and the endpoint is a rendered token, never a hardcoded localhost.
-    assert "{{PUBLIC_URL}}/mcp" in HTML
-    assert "localhost" not in HTML
-    assert "publicOrigin()" in JS
+def test_the_live_line_separates_external_from_our_own(client):
+    """Two numbers, and the second says plainly that it is not adoption."""
+    body = client.get("/").text
+    assert 'id="stat-real-24h"' in body and 'id="stat-first-party"' in body
+    assert "observations from independent agents today" in body
+    assert "never counted as adoption" in body
+    assert 'href="/network"' in body
 
 
-def test_the_page_says_how_to_set_it_up_not_just_what_to_paste():
-    """The owner could not work out setup from his own site: the snippets never
-    said where to type them or how to tell it worked."""
-    assert "type these two lines at its prompt (not in a terminal)" in HTML
-    assert "/reload-plugins" in HTML
-    assert "<code>/plugin</code> and FailEcho should read <em>enabled</em>" in HTML
-    assert "Paste this endpoint into your client's MCP settings" in HTML
-
-
-def test_every_integration_path_is_copyable():
-    for snippet_id in ("code-plugin", "code-mcp", "code-rest", "code-python"):
-        assert f'id="{snippet_id}"' in HTML
-        assert f'data-copy-target="{snippet_id}"' in HTML
-    assert 'data-copy-target="mcp-endpoint"' in HTML
-    # The fastest path first: two commands, no config file to edit.
-    assert "/plugin install failecho@failecho" in HTML
-    for link in ("/docs", "/openapi.json", "/llms.txt"):
-        assert f'href="{link}"' in HTML
-
-
-def test_trust_section_keeps_the_load_bearing_promises():
-    """Compressed to three principles, but the specific claims must survive."""
-    for principle in ("Privacy-safe", "Evidence-based", "Deterministic"):
-        assert f"<h3>{principle}</h3>" in HTML
-    assert "No prompts. No secrets. No tool arguments or results." in HTML
-    assert "Raw error text is discarded after normalization" in HTML
-    assert "reporter IDs are optional and hashed before storage" in HTML
-    assert "No model produces a recovery recommendation or a confidence score." in HTML
-    assert "INSUFFICIENT_DATA" in HTML
-    # The full privacy contract now lives on /about, and is linked.
-    assert 'href="/about"' in HTML
-
-
-# ---------------------------------------------------------------------------
-# honesty: real vs demo, and empty states
-# ---------------------------------------------------------------------------
-
-
-def test_real_and_demo_counters_are_separate_elements():
-    for element_id in (
-        "stat-real-24h",
-        "stat-real-reporters",
-        "stat-real-fingerprints",
-        "stat-real-incidents",
-        "stat-demo-agent",
-        "stat-synthetic",
-    ):
-        assert f'id="{element_id}"' in HTML
-    # Demo counters read demo fields; real counters read real fields. No sums.
-    assert "stats.real_observations_24h" in JS
-    assert "stats.demo_agent_observations" in JS
-    assert "+ stats.synthetic_observations" not in JS
-
-
-def test_hidden_elements_actually_hide():
-    """Regression: `.banner { display: flex }` beat the UA [hidden] rule, and a
-    production instance rendered the DEMO MODE banner with demo mode off."""
-    assert "[hidden] { display: none !important; }" in CSS
-    for element in ("demo-mode-banner", "demo-mode-badge", "real-empty",
-                    "demo-stats-block"):
-        assert f'id="{element}"' in HTML and "hidden" in HTML
-
-
-def test_the_zero_is_shown_not_hidden():
-    """Empty must read as bootstrapping, never as broken -- and never as fake."""
-    assert "Public network is bootstrapping." in HTML
-    assert "No real external telemetry has been reported today." in HTML
-    assert "Be one of the first agents contributing to the network." in HTML
-    assert 'show("real-empty", stats.real_observations_24h === 0)' in JS
-    # The metric elements remain, so the real zeros are still rendered.
-    for element in ("stat-real-24h", "stat-real-reporters",
-                    "stat-real-fingerprints", "stat-real-incidents"):
-        assert f'id="{element}"' in HTML
-
-
-def test_empty_states_exist_for_every_live_section():
-    """Empty must look deliberate, never broken."""
-    assert "Public network is bootstrapping." in HTML
-    assert "Nothing reported in the last hour." in HTML
-    assert 'show("incidents-table", rows.length > 0)' in JS
-    assert "No recovery echo has enough real evidence yet." in JS
-
-
-def test_recovery_echo_shows_the_whole_evidence_basis():
-    """Action alone is not evidence: attempts, rate, confidence, reporters."""
-    for field in (
-        "entry.action",
-        "entry.successes",
-        "entry.attempts",
-        "entry.success_rate",
-        "entry.confidence",
-        "entry.unique_reporters",
-    ):
-        assert field in JS
-    assert "Recovery echo" in JS
-    assert "Wilson lower bound" in JS
-    assert "No model-generated advice." in HTML
-
-
-def test_demo_rows_are_badged(client):
-    assert 'class="tag">DEMO<' in JS
-    # Rows and recovery echoes are both tagged from their own provenance.
-    assert "item.demo_data" in JS
-    assert "sourceTags(row)" in JS
-    assert "sourceTags(entry)" in JS
-
-
-def test_first_party_rows_are_badged_and_counted_apart():
-    assert 'class="tag">FIRST-PARTY<' in JS
-    assert "item.first_party_data" in JS
-    assert 'id="first-party-block"' in HTML
-    assert 'id="stat-first-party"' in HTML
-    assert "never counted as adoption" in HTML
-
-
-def test_demo_badge_data_is_actually_served(client):
-    """The frontend can only badge demo rows if the API says which are demo."""
-    from tests.conftest import insert_observation
-
-    for _ in range(12):
-        insert_observation(source="synthetic", fingerprint="f" * 32)
-    row = client.get("/v1/services").json()[0]
-    assert row["demo_data"] is True
-
-    stats = client.get("/v1/stats").json()
-    assert stats["real_active_failures"] == 0
-    assert stats["active_failures"] >= 0
-
-
-def test_real_active_incidents_counts_real_rows_only(client):
-    from tests.conftest import insert_observation, observe
-
-    insert_observation(source="synthetic", fingerprint="f" * 32, minutes_ago=0)
-    observe(client)  # real
-    stats = client.get("/v1/stats").json()
-    assert stats["real_active_failures"] == 1
-    assert stats["active_failures"] == 2
+def test_the_trust_claims_survive_the_trim(client):
+    body = client.get("/").text
+    assert "No prompts. No secrets. No tool arguments or results." in body
+    assert "INSUFFICIENT_DATA" in body
+    assert 'href="/about"' in body
 
 
 # ---------------------------------------------------------------------------
@@ -217,24 +88,18 @@ def test_real_active_incidents_counts_real_rows_only(client):
 
 def test_semantic_landmarks_and_labels():
     assert '<html lang="en">' in HTML
-    assert "<main id=\"main\">" in HTML
+    assert '<main id="main">' in HTML
     assert "<header" in HTML and "<footer" in HTML
-    assert HTML.count("aria-labelledby=") >= 7
+    assert HTML.count("aria-labelledby=") >= 4
     assert 'class="skip-link"' in HTML
-    assert 'scope="col"' in HTML
 
 
 def test_interactive_elements_are_real_buttons_with_labels():
-    assert HTML.count('type="button"') == 5, "endpoint + four snippets"
-    assert HTML.count("data-copy-target=") == 5
-    assert HTML.count("aria-label=") >= 5
+    """One button on the front page now: copy the install."""
+    assert HTML.count('type="button"') == 1
+    assert HTML.count("data-copy-target=") == 1
+    assert HTML.count("aria-label=") >= 2
     assert ":focus-visible" in CSS
-
-
-def test_status_is_never_communicated_by_colour_alone():
-    # Status renders a word plus a distinct shape: filled, half, hollow, dashed.
-    assert "status.replace(/_/g" in JS
-    assert 'class="status-mark" aria-hidden="true"' in JS
 
 
 def test_live_regions_announce_updates():
@@ -248,13 +113,26 @@ def test_reduced_motion_is_respected():
 
 
 def test_palette_is_committed_and_explicit():
-    """One deliberate dark palette, painted explicitly rather than inherited."""
     assert 'name="color-scheme" content="dark"' in HTML
     assert 'name="theme-color"' in HTML
     assert "--bg:" in CSS and "background: var(--bg)" in CSS
-    # Brand red is an accent, not the page: it must not paint a background
-    # anywhere except the primary action and the demo banner tint.
     assert CSS.count("background: var(--red-deep)") <= 1
+
+
+def test_hidden_elements_actually_hide():
+    """Regression: a class that sets `display` outranks the UA [hidden] rule."""
+    assert "[hidden] { display: none !important; }" in CSS
+    for element in ("demo-mode-banner", "demo-mode-badge"):
+        assert f'id="{element}"' in HTML and "hidden" in HTML
+
+
+def test_one_h1_stating_the_problem():
+    assert HTML.count("<h1") == 1
+    assert 'id="hero-title"' in HTML
+    heading = HTML[HTML.index("<h1"):HTML.index("</h1>")]
+    assert "same failure twice." in heading
+    assert "<title>FailEcho" in HTML
+    assert "FailEcho is a shared failure intelligence network for AI agents" in HTML
 
 
 # ---------------------------------------------------------------------------
@@ -262,56 +140,22 @@ def test_palette_is_committed_and_explicit():
 # ---------------------------------------------------------------------------
 
 
-def test_one_h1_stating_the_problem():
-    """One heading. It names the problem; the brand is in the title, the header
-    wordmark and the entity sentence, so the h1 does not have to repeat it."""
-    assert HTML.count("<h1") == 1
-    assert 'id="hero-title"' in HTML
-    heading = HTML[HTML.index("<h1") : HTML.index("</h1>")]
-    assert "same failure twice." in heading
-    # The brand still has to be unmissable for a crawler.
-    assert "<title>FailEcho" in HTML
-    assert "FailEcho is a shared failure intelligence network for AI agents" in HTML
-
-
 def test_no_framework_no_cdn_no_webfont():
     combined = HTML + CSS + JS
-    for forbidden in (
-        "react",
-        "vue",
-        "svelte",
-        "tailwind",
-        "cdn.",
-        "unpkg",
-        "jsdelivr",
-        "googleapis",
-        "@font-face",
-        "analytics",
-    ):
+    for forbidden in ("react", "vue", "svelte", "tailwind", "cdn.", "unpkg",
+                      "jsdelivr", "googleapis", "@font-face", "analytics"):
         assert forbidden not in combined.lower(), f"{forbidden} must not appear"
-    # One behaviour script plus the JSON-LD block, which is data, not code.
     assert HTML.count("<script") == 2
     assert HTML.count('<script type="application/ld+json">') == 1
 
 
 def test_static_assets_stay_small():
     """A status page has no excuse to be heavy on a small VPS."""
-    assert len(HTML) < 30_000  # includes the demo story, FAQ and JSON-LD
-    # 26,000 -> 28,000 for the 2026-09-12 redesign: the hover nav panels, the
-    # hero echo and the full-bleed bands are new surface, not decoration on
-    # top of old rules. Dead selectors were dropped first.
     assert len(CSS) < 28_000
     assert len(JS) < 12_000
-    # 55,000 -> 56,000 when the plugin install joined the page, -> 57,000 when
-    # the services table gained a cap. Both times I trimmed first and both
-    # times the last few dozen bytes came out of explanatory comments, which
-    # is a bad trade. per_visit below is the number that matters, and it has
-    # barely moved: ~80KB against 120,000.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 62_000
+    # The front page is a third of what it was; the budget follows it down.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 48_000
 
-    # Brand images are raster (the supplied masters are PNG). What a visitor
-    # actually downloads is the markup, the mark and ONE wordmark variant --
-    # the other variant and the social card are never fetched by the page.
     per_visit = (
         sum(len(x) for x in (HTML, CSS, JS))
         + (STATIC / "logo.png").stat().st_size
@@ -321,75 +165,29 @@ def test_static_assets_stay_small():
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
+def test_mobile_layout_rules_exist():
+    assert "max-width: 480px" in CSS
+    assert "overflow-x: auto" in CSS
+
+
 def test_polling_is_conservative():
     assert "var REFRESH_MS = 30000;" in JS
 
 
-def test_mobile_layout_rules_exist():
-    assert "max-width: 480px" in CSS
-    assert "overflow-x: auto" in CSS  # tables and code blocks scroll, page does not
-
-
 def test_polling_pauses_when_the_tab_is_hidden():
-    """A forgotten tab used to poll three endpoints forever, inflating both
-    the origin load and our own traffic numbers."""
     assert 'addEventListener("visibilitychange"' in JS
     assert "document.hidden" in JS
     assert "clearInterval" in JS
 
 
-def test_python_example_does_not_advertise_a_package_that_is_not_published():
-    """The client is not on PyPI, so the page must not imply pip install."""
-    snippet = HTML[HTML.index('id="code-python"') : HTML.index("</code></pre>", HTML.index('id="code-python"'))]
-    assert "pip install failecho" not in snippet
-    assert "Not published to PyPI yet" in snippet
-    assert 'sys.path.insert(0, "client")' in snippet, "the setup that actually works"
+def test_each_page_fetches_only_what_it_shows():
+    """The homepage carries two numbers; only /network needs the tables."""
+    assert 'if (el("services-body"))' in JS
+    assert 'if (el("recovery-list"))' in JS
 
 
-def test_no_unsubstituted_tokens_reach_the_page(client):
-    """Regression: {{GITHUB_URL}} sat in a code comment outside the block that
-    strips it, so an unconfigured instance would have shipped the raw token."""
-    body = client.get("/").text
-    for token in ("{{PUBLIC_URL}}", "{{ASSET_V}}", "{{GITHUB_URL}}"):
-        assert token not in body, token
-
-
-def test_demo_output_is_behind_a_disclosure():
-    """The proof stays available; it just no longer dominates the page."""
-    assert "<details class=\"disclosure\">" in HTML
-    assert "View full demo output" in HTML
-    assert "6ed9ef705ff4037af2c977306b8b9f92" in HTML, "the real fingerprint"
-
-
-def test_the_demo_story_states_the_payoff():
-    assert "Agent B recovered using evidence it never generated itself." in HTML
-    assert "Agent B benefits from evidence it never generated itself." in HTML
-
-
-def test_status_legend_matches_the_backend_thresholds():
-    from app.core.config import settings
-
-    assert settings.healthy_max_failure_rate == 0.05
-    assert settings.degraded_max_failure_rate == 0.30
-    assert settings.min_observations_for_status == 10
-    assert "under 5% failures" in HTML
-    assert "5–30%" in HTML
-    assert "above 30%" in HTML
-    assert "at least 10 observations" in HTML
-
-
-def test_a_rate_is_not_printed_when_the_status_says_there_is_no_evidence():
-    """One failed call must not render as "100.0% failure rate" next to
-    fineprint promising we do not guess below ten observations."""
-    assert 'row.status === "INSUFFICIENT_DATA" ? null' in JS
-    assert 'return rate === null || rate === undefined ? "—"' in JS
-    # And the table is named for what it lists: everything seen in the hour.
-    assert ">Live services</h3>" in HTML
-
-
-def test_the_services_table_is_capped():
-    """Unbounded, it would grow to the API's 100-row default and swallow the page."""
-    assert "var SERVICE_ROWS = 8;" in JS
-    assert 'getJSON("/v1/services?limit=" + SERVICE_ROWS)' in JS
-    assert "Showing the ' + SERVICE_ROWS +" in JS
-    assert 'href="/v1/services"' in JS
+def test_no_unsubstituted_tokens_reach_any_page(client):
+    for page in ("/", "/network", "/demo", "/about", "/setup"):
+        body = client.get(page).text
+        for token in ("{{PUBLIC_URL}}", "{{ASSET_V}}", "{{GITHUB_URL}}"):
+            assert token not in body, f"{token} on {page}"

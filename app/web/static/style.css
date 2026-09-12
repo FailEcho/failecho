@@ -66,8 +66,8 @@ a:hover { color: var(--red); }
 
 /* Full-width surface, content still on the measure. No wrapper divs. */
 .band--bleed {
-  margin-inline: calc(50% - 50vw);
-  padding-inline: calc(50vw - 50% + var(--gutter));
+  max-width: none;
+  padding-inline: max(var(--gutter), calc(50% - var(--max) / 2 + var(--gutter)));
   background: var(--surface);
 }
 
@@ -209,30 +209,6 @@ a:hover { color: var(--red); }
 
 /* ---- hero -------------------------------------------------------------- */
 .hero { padding-block: 96px 80px; }
-.hero { position: relative; }
-.hero-grid { position: relative; }
-.hero-copy { position: relative; z-index: 1; max-width: 50rem; }
-.hero-visual {
-  position: absolute; z-index: 0; pointer-events: none;
-  right: max(-110px, -8vw); top: 50%; transform: translateY(-50%);
-  width: min(52vw, 560px); color: #3d4859;
-  background: radial-gradient(circle at 50% 50%, rgba(248, 48, 48, 0.09), transparent 60%);
-  border-radius: 50%;
-}
-@media (max-width: 900px) {
-  .hero-visual { position: static; transform: none; width: min(78vw, 340px);
-    margin: 32px auto 0; opacity: 0.8; }
-  .hero-copy { max-width: none; }
-}
-.rings { display: block; width: 100%; height: auto; overflow: visible; }
-.rings circle { transform-origin: 210px 210px; }
-.rings .ring { stroke-width: 1; }
-.rings .ring-1 { opacity: 0.85; } .rings .ring-2 { opacity: 0.6; }
-.rings .ring-3 { opacity: 0.4; }  .rings .ring-4 { opacity: 0.26; }
-.rings .ring-5 { opacity: 0.15; }
-.rings .core { fill: var(--red); stroke: none; }
-.rings .agent { fill: var(--ink-3); stroke: none; }
-.rings .agent--lit { fill: var(--healthy); }
 /* One reveal, on load: the failure point, then the echo reaching outward. */
 @media (prefers-reduced-motion: no-preference) {
   .rings .ring { animation: echo 900ms cubic-bezier(.2,.7,.3,1) backwards; }
@@ -240,8 +216,6 @@ a:hover { color: var(--red); }
   .rings .ring-4 { animation-delay: 270ms; } .rings .ring-5 { animation-delay: 360ms; }
   .rings .agent { animation: lit 500ms ease backwards 620ms; }
 }
-@keyframes echo { from { transform: scale(.55); opacity: 0; } }
-@keyframes lit  { from { opacity: 0; } }
 
 h1 {
   margin: 0 0 24px;
@@ -724,4 +698,47 @@ footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
   .nav-narrow { display: inline-flex; }
   .nav .btn { margin-left: auto; flex: 0 0 auto; padding: 7px 11px; font-size: 12px; }
   .brand-word { width: 78px; height: auto; }
+}
+
+/* ---- centred hero, install card as the anchor --------------------------- */
+.hero--center { text-align: center; padding-block: 104px 88px; }
+.hero--center h1 { margin-inline: auto; max-width: 900px; }
+.hero--center .hero-lede { margin-inline: auto; max-width: 54ch; color: var(--ink); }
+.hero--center .hero-support { margin-inline: auto; max-width: 60ch; }
+.hero--center .hero-actions { justify-content: center; }
+.hero--center .hero-tagline {
+  display: inline-block; border-left: 0; padding-left: 0;
+  border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px;
+}
+
+.install {
+  margin: 34px auto 12px; max-width: 620px; text-align: left;
+  background: var(--surface); border: 1px solid var(--line-2);
+  border-radius: var(--r); overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+.install-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px 10px 18px;
+  background: var(--surface-2); border-bottom: 1px solid var(--line);
+  font-size: 12.5px; color: var(--ink-2);
+}
+.install pre { margin: 0; padding: 18px; overflow-x: auto; }
+.install code { font-family: var(--mono); font-size: 14px; line-height: 1.9; }
+.install-note { margin: 0 0 30px; font-size: 14px; color: var(--ink-2); }
+
+.livestrip {
+  display: flex; flex-wrap: wrap; gap: 12px 48px;
+  margin: 0 0 18px; font-size: 16px; color: var(--ink-2);
+}
+.livestrip b {
+  font-size: clamp(28px, 4vw, 38px); font-weight: 600; color: var(--ink);
+  letter-spacing: -0.02em; margin-right: 10px; font-variant-numeric: tabular-nums;
+}
+.livestrip span { display: flex; align-items: baseline; }
+
+@media (max-width: 640px) {
+  .hero--center { padding-block: 72px 64px; }
+  .livestrip { gap: 16px; }
+  .livestrip span { flex-basis: 100%; }
 }

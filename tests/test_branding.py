@@ -195,9 +195,8 @@ def test_page_metadata_is_complete(client):
 def test_public_url_defaults_to_the_requesting_origin(client):
     """Unconfigured: the page and llms.txt describe wherever they are served."""
     assert settings.base_url() == "http://localhost:8000"
-    body = client.get("/").text
-    assert "http://testserver/mcp" in body
-    assert "{{PUBLIC_URL}}" not in body
+    assert "{{PUBLIC_URL}}" not in client.get("/").text
+    assert "http://testserver/mcp" in client.get("/setup").text
     assert "http://testserver/mcp" in client.get("/llms.txt").text
 
 
@@ -207,9 +206,10 @@ def test_configured_public_url_wins_everywhere(client):
         assert public_base_url() == "https://failecho.com"
         body = client.get("/").text
         assert 'href="https://failecho.com/"' in body       # canonical
-        assert "https://failecho.com/mcp" in body           # endpoint + config
-        assert "https://failecho.com/v1/query" in body      # curl example
         assert "testserver" not in body
+        setup = client.get("/setup").text                   # endpoint + curl
+        assert "https://failecho.com/mcp" in setup
+        assert "https://failecho.com/v1/query" in setup
         assert "https://failecho.com/mcp" in client.get("/llms.txt").text
     finally:
         object.__setattr__(settings, "public_url", "http://localhost:8000")
@@ -342,13 +342,13 @@ def test_production_config_leaks_no_localhost(client):
     """With FIN_PUBLIC_URL set, nothing public may still say localhost."""
     object.__setattr__(settings, "public_url", "https://failecho.com")
     try:
-        for path in ("/", "/llms.txt", "/robots.txt"):
+        for path in ("/", "/network", "/demo", "/setup", "/llms.txt", "/robots.txt"):
             body = client.get(path).text
             assert "localhost" not in body, f"{path} leaks localhost"
             assert "127.0.0.1" not in body, f"{path} leaks a loopback address"
             assert "testserver" not in body, f"{path} leaks the request origin"
 
-        page = client.get("/").text
+        page = client.get("/setup").text
         for url in (
             "https://failecho.com/",
             "https://failecho.com/mcp",
@@ -373,7 +373,7 @@ def test_local_default_stays_local(client):
 
     assert settings.base_url() == "http://localhost:8000"
     body = client.get("/").text
-    assert "http://testserver/mcp" in body
+    assert "http://testserver/mcp" in client.get("/setup").text
     # Mailto addresses are fixed and allowed; production URLs are not.
     assert not re.search(r"(?<!@)\bfailecho\.com\b", body)
 
@@ -435,7 +435,9 @@ def test_brand_entity_sentence_is_visible_html(client):
         in body
     )
     assert "Live failure and recovery intelligence for autonomous software." in body
-    assert "Model Context Protocol endpoint that AI agents can" in body
+    # The protocol is named on the front page, and spelled out on /about.
+    assert "MCP" in body
+    assert "Model Context Protocol (MCP)" in client.get("/about").text
 
 
 def test_no_noindex_anywhere(client):
@@ -463,8 +465,8 @@ def test_sitemap_is_valid_xml_with_the_indexable_pages(client):
     root = ElementTree.fromstring(response.text)
     ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     locs = [el.text for el in root.findall(".//s:loc", ns)]
-    assert len(locs) == 5
-    for path in ("/", "/about", "/setup", "/docs", "/llms.txt"):
+    assert len(locs) == 7
+    for path in ("/", "/network", "/demo", "/about", "/setup", "/docs", "/llms.txt"):
         assert any(loc.endswith(path) for loc in locs), path
     # Real timestamps, not invented priorities.
     assert root.findall(".//s:lastmod", ns)
@@ -483,6 +485,8 @@ def test_sitemap_uses_the_public_origin(client):
         locs = [el.text for el in root.findall(".//s:loc", ns)]
         assert locs == [
             "https://failecho.com/",
+            "https://failecho.com/network",
+            "https://failecho.com/demo",
             "https://failecho.com/about",
             "https://failecho.com/setup",
             "https://failecho.com/docs",
@@ -505,7 +509,8 @@ def test_structured_data_is_valid_and_honest(client):
     data = json.loads(blocks[0])
 
     nodes = {node["@type"]: node for node in data["@graph"]}
-    assert set(nodes) == {"SoftwareApplication", "WebSite", "FAQPage"}
+    # The FAQ moved to /about, and its schema went with it.
+    assert set(nodes) == {"SoftwareApplication", "WebSite"}
     app_node = nodes["SoftwareApplication"]
     assert app_node["name"] == "FailEcho"
     assert app_node["isAccessibleForFree"] is True
@@ -524,12 +529,14 @@ def test_faq_schema_matches_the_visible_faq(client):
     import json
     import re
 
-    body = client.get("/").text
+    body = client.get("/about").text
     data = json.loads(
         re.search(r'<script type="application/ld\+json">(.*?)</script>', body, re.S)
         .group(1)
     )
-    faq = next(n for n in data["@graph"] if n["@type"] == "FAQPage")
+    faq = data if data.get("@type") == "FAQPage" else next(
+        n for n in data["@graph"] if n["@type"] == "FAQPage"
+    )
     assert len(faq["mainEntity"]) == 4, "trimmed to the questions that matter"
     for question in faq["mainEntity"]:
         assert f"<dt>{question['name']}</dt>" in body, question["name"]

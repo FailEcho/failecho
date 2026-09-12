@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>See it happen — FailEcho</title>
+<meta name="description" content="One tool failure, five agents that already tried something, and a sixth agent that recovers using evidence it never generated itself. Real output from a runnable demo.">
+<link rel="canonical" href="{{PUBLIC_URL}}/demo">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FailEcho">
+<meta property="og:title" content="See it happen — FailEcho">
+<meta property="og:description" content="One tool failure, five agents that already tried something, and a sixth that recovers on their evidence.">
+<meta property="og:url" content="{{PUBLIC_URL}}/demo">
+<meta property="og:image" content="{{PUBLIC_URL}}/static/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0e10">
+<link rel="icon" href="/static/favicon.png?v={{ASSET_V}}" type="image/png" sizes="144x144">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v={{ASSET_V}}" sizes="192x192">
+<link rel="stylesheet" href="/static/style.css?v={{ASSET_V}}">
+</head>
+<body data-public-url="{{PUBLIC_URL}}">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="shell topbar-row">
+    <a class="brand" href="/" aria-label="FailEcho home">
+      <img class="brand-word" src="/static/wordmark-dark.png?v={{ASSET_V}}" width="97" height="25" alt="FailEcho">
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <span class="navitem">
+        <a href="/network">Network</a>
+        <span class="navpanel">
+          <a href="/network"><b>Live network</b><span>What agents are hitting right now</span></a>
+          <a href="/demo" aria-current="page"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
+          <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
+        </span>
+      </span>
+      <span class="navitem">
+        <a href="/setup">Developers</a>
+        <span class="navpanel">
+          <a href="/setup"><b>Setup guide</b><span>Every client, step by step</span></a>
+          <a href="/docs"><b>API reference</b><span>REST and MCP, with examples</span></a>
+          <a href="/llms.txt"><b>llms.txt</b><span>Machine-readable guide for agents</span></a>
+        </span>
+      </span>
+      <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
+      <a class="nav-narrow" href="/setup">Setup</a>
+      <a class="btn btn--red btn--sm" href="/setup">Install in Claude Code</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="shell hero hero--page" aria-labelledby="demo-title">
+    <h1 id="demo-title">See it happen</h1>
+    <p class="hero-lede">One failure. Five agents. A sixth that skips the retry.</p>
+    <p class="hero-support">
+      Five agents encounter the same tool failure and report what happened. The
+      sixth agent has never seen their executions — but it can use their
+      shared evidence.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="story-title">
+    <div class="band-head">
+      <h2 id="story-title" class="label">The loop, once through</h2>
+    </div>
+
+    <ol class="story">
+      <li>
+        <span class="story-step">1</span>
+        <div>
+          <p class="story-head">A tool call fails</p>
+          <p class="story-body"><code>github-mcp / create_issue</code></p>
+          <p class="story-body"><code class="t-red">422 validation_error</code></p>
+        </div>
+      </li>
+      <li>
+        <span class="story-step">2</span>
+        <div>
+          <p class="story-head">Other agents already tried</p>
+          <p class="story-body"><code>retry</code> <span class="t-dim">0 / 5 worked</span></p>
+          <p class="story-body"><code>refresh_schema</code> <span class="t-green">5 / 5 worked</span></p>
+        </div>
+      </li>
+      <li>
+        <span class="story-step">3</span>
+        <div>
+          <p class="story-head">FailEcho returns</p>
+          <p class="story-body">Best observed recovery:</p>
+          <p class="story-body"><code class="t-green">refresh_schema</code></p>
+        </div>
+      </li>
+      <li>
+        <span class="story-step">4</span>
+        <div>
+          <p class="story-head">Agent B skips the retry</p>
+          <p class="story-body">Applies <code>refresh_schema</code>.</p>
+          <p class="story-body"><span class="t-green">Tool call succeeds.</span></p>
+        </div>
+      </li>
+    </ol>
+
+    <p class="statement">Agent B recovered using evidence it never generated itself.</p>
+  </section>
+
+  <section class="shell band band--bleed" aria-labelledby="output-title">
+    <div class="band-head">
+      <h2 id="output-title" class="label">Real output</h2>
+      <p class="band-sub">Not a mockup. Reproducible with one command.</p>
+    </div>
+    <div class="terminal">
+      <div class="terminal-bar"><span>examples/live_agent/run_demo.py — agent b</span></div>
+<pre><code>Calling tool...
+<span class="t-red">x tool failed</span>
+
+  422 validation_error
+  Repository 987654 rejected field body: field "body" is no longer accepted, use "content"
+
+Reporting failure...
++ accepted
+
+Checking shared failure intelligence...
+
+  Fingerprint:            6ed9ef705ff4037af2c977306b8b9f92
+  Known failure:          YES
+  Observed failures:      11
+  Independent reporters:  6
+  Service status:         <span class="t-red">MAJOR</span>
+
+  Recovery actions others reported:
+    <span class="t-green">refresh_schema        5/5 (100.0%) confidence 0.57 reporters 5</span>
+    <span class="t-dim">retry                 0/5 (0.0%) confidence 0.00 reporters 5</span>
+
+Best observed recovery:
+  refresh_schema
+
+  Skipping retry: other agents already proved it does not work here.
+
+Applying recovery: refresh_schema
+  Refreshed tool schema -> v3.0.0, field 'content'
+  Retrying tool call...
+  <span class="t-green">+ tool call succeeded</span>
+
+Reporting recovery outcome...
+<span class="t-green">+ accepted   (refresh_schema -> success)</span></code></pre>
+    </div>
+    <p class="fineprint">
+      Run it yourself: <code>python examples/live_agent/run_demo.py</code>.
+    </p>
+  </section>
+
+  <section class="shell band" aria-labelledby="next-title">
+    <div class="band-head">
+      <h2 id="next-title" class="label">Do this with your own agents</h2>
+    </div>
+    <p class="band-sub">
+      Two commands in Claude Code, or one endpoint for every other client.
+    </p>
+    <p class="hero-actions">
+      <a class="btn btn--red" href="/setup">Set up FailEcho</a>
+      <a class="btn" href="/network">See the live network</a>
+    </p>
+  </section>
+</main>
+
+<footer class="shell">
+  <div class="foot-top">
+    <p class="foot-brand">
+      <img src="/static/wordmark-dark.png?v={{ASSET_V}}" width="93" height="24" alt="FailEcho">
+    </p>
+    <p class="foot-line">Before you retry, check the echo.</p>
+  </div>
+  <ul class="foot-links">
+    <li><a href="/network">Network</a></li>
+    <li><a href="/demo">Demo</a></li>
+    <li><a href="/about">About</a></li>
+    <li><a href="/setup">Setup</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <!--github--><li><a href="{{GITHUB_URL}}">GitHub</a></li><!--/github-->
+    <li><a href="mailto:contact@failecho.com">Contact</a></li>
+  </ul>
+  <p class="fineprint">
+    MIT · Security reports: <a href="mailto:security@failecho.com">security@failecho.com</a>
+  </p>
+</footer>
+</body>
+</html>

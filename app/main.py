@@ -283,7 +283,7 @@ Sitemap: {base_url}/sitemap.xml
 #: Pages worth indexing. Deliberately short: the API endpoints are for
 #: machines, not for search results, and listing them would only dilute the
 #: three surfaces that actually explain what FailEcho is.
-SITEMAP_PAGES = ("/", "/about", "/setup", "/docs", "/llms.txt")
+SITEMAP_PAGES = ("/", "/network", "/demo", "/about", "/setup", "/docs", "/llms.txt")
 
 
 #: Injected into the Swagger page. Swagger UI ships no description, no
@@ -439,6 +439,18 @@ async def homepage(request: Request) -> HTMLResponse:
 async def about(request: Request) -> HTMLResponse:
     """What FailEcho is, for humans and for search engines."""
     return HTMLResponse(render_page("about.html", public_base_url(request)))
+
+
+@app.get("/network", include_in_schema=False)
+async def network(request: Request) -> HTMLResponse:
+    """The live dashboard, off the front page so it cannot dominate it."""
+    return HTMLResponse(render_page("network.html", public_base_url(request)))
+
+
+@app.get("/demo", include_in_schema=False)
+async def demo(request: Request) -> HTMLResponse:
+    """One failure going through the loop, with the real terminal output."""
+    return HTMLResponse(render_page("demo.html", public_base_url(request)))
 
 
 @app.get("/setup", include_in_schema=False)
