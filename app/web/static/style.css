@@ -705,6 +705,16 @@ footer.shell {
   color: var(--ink); border-bottom-color: var(--red);
 }
 .install-panel { position: relative; min-height: 150px; }
+
+/* Copy controls added by the script sit over the top-right of their box. */
+.has-copy { position: relative; }
+.has-copy > pre { padding-right: 82px; }
+.copy-btn { position: absolute; top: 10px; right: 10px; z-index: 1; }
+.terminal.has-copy > .copy-btn { top: 6px; }
+@media (max-width: 560px) {
+  .has-copy > pre { padding-right: 18px; padding-top: 48px; }
+  .copy-btn { left: 12px; right: auto; }
+}
 .install-copy { position: absolute; top: 12px; right: 12px; }
 .install pre { margin: 0; padding: 18px 76px 6px 18px; overflow-x: auto; }
 .install code { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; }

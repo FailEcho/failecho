@@ -49,5 +49,9 @@ def test_it_leads_somewhere():
 
 
 def test_the_page_needs_no_javascript():
-    """Static proof: nothing here depends on a script running."""
-    assert "<script" not in DEMO
+    """Static proof: nothing here depends on a script running. The one script
+    adds a copy button to the terminal box and nothing else."""
+    assert DEMO.count("<script") == 1
+    assert "app.js" in DEMO
+    assert "<script>" not in DEMO, "no inline script"
+    assert "refresh_schema" in DEMO, "the output is in the markup, not fetched"

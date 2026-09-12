@@ -102,9 +102,14 @@ def test_the_commands_match_what_this_repository_publishes():
     assert f"/plugin install {marketplace['plugins'][0]['name']}@{marketplace['name']}" in SETUP
 
 
-def test_the_page_stays_script_free():
-    """No polling, no framework: setup instructions are text."""
-    assert "<script" not in SETUP
+def test_the_page_is_complete_without_javascript():
+    """The instructions are text. The only script adds copy buttons to the
+    code boxes, and the page reads the same if it never runs."""
+    assert SETUP.count("<script") == 1
+    assert "app.js" in SETUP
+    assert "<script>" not in SETUP, "no inline script"
+    for snippet in ("/plugin marketplace add", "mcpServers", "curl -X POST"):
+        assert snippet in SETUP, snippet
 
 
 def test_the_directory_listings_are_named_without_claiming_use(client):

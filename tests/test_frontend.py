@@ -207,9 +207,19 @@ def test_polling_pauses_when_the_tab_is_hidden():
 
 
 def test_each_page_fetches_only_what_it_shows():
-    """The homepage carries two numbers; only /network needs the tables."""
+    """The homepage carries two numbers; only /network needs the tables; and
+    /setup and /demo load the script for copy buttons alone, so they must not
+    call the API at all."""
     assert 'if (el("services-body"))' in JS
     assert 'if (el("recovery-list"))' in JS
+    assert 'if (el("stat-real-24h")) wants.push' in JS
+
+
+def test_every_code_box_gets_a_copy_button():
+    """Built by the script, so a page carries its code and not a dead button."""
+    assert 'document.querySelectorAll("pre > code")' in JS
+    assert 'box.querySelector("[data-copy-target]")' in JS, "hand-written ones win"
+    assert ".copy-btn {" in CSS and ".has-copy > pre {" in CSS
 
 
 def test_no_unsubstituted_tokens_reach_any_page(client):

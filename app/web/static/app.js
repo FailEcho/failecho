@@ -224,29 +224,11 @@
     });
   }
 
-  // The endpoint an agent should use: the configured public URL when this
-  // instance has one (FIN_PUBLIC_URL, rendered into data-public-url), else
-  // whatever origin this page was served from. Never a hardcoded localhost.
-  function publicOrigin() {
-    var declared = document.body.getAttribute("data-public-url");
-    if (declared && declared.indexOf("{{") === -1) return declared.replace(/\/$/, "");
-    return window.location.origin;
-  }
-
-  function showEndpoints() {
-    var origin = publicOrigin();
-    // Only needed when the page is served from an origin the server did not know.
-    ["mcp-endpoint", "code-mcp", "code-rest", "code-python"].forEach(function (id) {
-      var node = el(id);
-      if (!node) return;
-      node.textContent = node.textContent.split("{{PUBLIC_URL}}").join(origin);
-    });
-  }
-
   function refresh() {
     // Each page asks only for what it shows: the homepage carries two numbers,
     // /network carries the tables.
-    var wants = [getJSON("/v1/stats").then(renderStats)];
+    var wants = [];
+    if (el("stat-real-24h")) wants.push(getJSON("/v1/stats").then(renderStats));
     if (el("services-body")) {
       wants.push(getJSON("/v1/services?limit=" + SERVICE_ROWS).then(renderServices));
     }
@@ -290,6 +272,29 @@
     }
   });
 
+  // -- a copy control on every code box ------------------------------------
+  // Built here rather than written into each page: the pages carry the code,
+  // and a button that only works with a script running has no business being
+  // in the markup. Boxes that already ship their own button are left alone.
+  function addCopyButtons() {
+    var blocks = document.querySelectorAll("pre > code");
+    Array.prototype.forEach.call(blocks, function (code, i) {
+      var box = code.parentNode.parentNode;
+      if (!box || box.querySelector("[data-copy-target]")) return;
+      if (!code.id) code.id = "code-block-" + i;
+
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn--sm copy-btn";
+      button.textContent = "Copy";
+      button.setAttribute("data-copy-target", code.id);
+      button.setAttribute("aria-label", "Copy this code");
+
+      box.classList.add("has-copy");
+      box.insertBefore(button, box.firstChild);
+    });
+  }
+
   // -- install tabs ------------------------------------------------------
   // Three ways in, one card. Without JS the first panel is the visible one and
   // /setup carries the rest, so nothing here is load-bearing.
@@ -320,9 +325,11 @@
     }
   }
 
-  showEndpoints();
+  addCopyButtons();
   wireCopyButtons();
   wireTabs();
-  refresh();
-  if (!document.hidden) startPolling();
+  if (el("stat-real-24h")) {
+    refresh();
+    if (!document.hidden) startPolling();
+  }
 })();
