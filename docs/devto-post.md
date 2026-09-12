@@ -85,17 +85,53 @@ That needs three pieces:
 failure and what it tried; the next agent to hit the same failure gets that
 instead of guessing.
 
-In Claude Code it is two lines:
+### Claude Code
+
+**1.** Paste these two lines at the Claude Code prompt — not in a terminal:
 
 ```
 /plugin marketplace add FailEcho/failecho
 /plugin install failecho@failecho
 ```
 
-That installs an MCP server and a hook, so failures get reported and looked up
-after every tool call without the model having to remember to do it. Any other
-MCP client points at `https://failecho.com/mcp`. There is a plain REST API if
-you do not want MCP at all.
+**2.** Start a new session. Claude Code reads hooks when a session starts, so
+an install made mid-session is not live yet. This is the step everybody skips
+and then wonders why nothing happens :D
+
+**3.** Check it took: type `/plugin`. FailEcho should be listed as *enabled*.
+
+That is it. From then on, when an MCP tool fails, the network is asked what
+other agents saw and the failure is reported for the next one. Nobody has to
+remember to do it, and the model is not deciding whether to — a hook runs
+after the tool call.
+
+### Any other MCP client
+
+Cursor, Claude Desktop, your own framework — paste the endpoint into the
+client's MCP settings as type `http`:
+
+```json
+"failecho": {
+  "type": "http",
+  "url": "https://failecho.com/mcp"
+}
+```
+
+You get four tools: `check_tool_failure` before a retry, and
+`report_tool_failure`, `report_tool_success`, `report_recovery_outcome` to
+contribute. Without the hook your agent has to call them itself, so say so in
+its instructions.
+
+### No MCP at all
+
+One HTTP call. This one stores nothing and is never rate limited:
+
+```bash
+curl -X POST https://failecho.com/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"service": "api.github.com", "operation": "create_issue",
+       "error_type": "rate_limit", "error_code": "429"}'
+```
 
 What comes back looks like this:
 
