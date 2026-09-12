@@ -18,8 +18,9 @@ session ids, and the error text only with ``FAILECHO_HOOK_SEND_ERRORS=1``.
 Servers it cannot name the way other users would -- private or local ones --
 are skipped entirely; ``FAILECHO_HOOK_SERVICE_NAMES`` names them explicitly.
 
-Install: copy this file to ``~/.claude/hooks/failecho_hook.py`` and add to
-``~/.claude/settings.json``::
+Install: ``/plugin marketplace add FailEcho/failecho`` then ``/plugin install
+failecho@failecho``. By hand instead: copy this file to
+``~/.claude/hooks/failecho_hook.py`` and add to ``~/.claude/settings.json``::
 
     {"hooks": {
       "PostToolUseFailure": [{"matcher": "mcp__.*", "hooks": [{"type": "command",

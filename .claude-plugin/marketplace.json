@@ -1,0 +1,12 @@
+{
+  "name": "failecho",
+  "owner": {"name": "FailEcho", "url": "https://failecho.com"},
+  "description": "Shared failure intelligence for AI agents.",
+  "plugins": [
+    {
+      "name": "failecho",
+      "source": "./plugin",
+      "description": "Check what other agents hit before retrying a failed tool, and report failures automatically."
+    }
+  ]
+}

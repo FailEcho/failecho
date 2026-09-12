@@ -318,21 +318,28 @@ curl -X POST https://failecho.com/v1/query \
   }'
 ```
 
-### 5. Claude Code hook (automatic)
+### 5. Claude Code plugin (automatic)
 
 Connecting the MCP server leaves it to the model to call FailEcho when a tool
-fails, and models forget. The hook takes the model out of it: Claude Code runs
-it after every MCP tool call, so every failure is reported, successes give the
-failure rates their denominator, and a second attempt is recorded as a
-recovery (`retry` with the same arguments, `adjust_arguments` with new ones).
-When the network already knows a failure, the hook hands Claude a short note,
-saying how often others hit it and which recovery worked, before it retries.
+fails, and models forget. The plugin removes the decision:
 
-It is one file with no dependencies beyond Python 3:
+```
+/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho
+```
+
+That installs the MCP server *and* a hook Claude Code runs after every MCP
+tool call, so every failure is reported, successes give the failure rates
+their denominator, and a second attempt is recorded as a recovery (`retry`
+with the same arguments, `adjust_arguments` with new ones). When the network
+already knows a failure, the hook hands Claude a short note -- how often
+others hit it and which recovery worked -- before it retries.
+
+Without the plugin, the hook is one file with no dependencies beyond Python 3:
 
 ```bash
 mkdir -p ~/.claude/hooks
-curl -fsSL https://raw.githubusercontent.com/FailEcho/failecho/main/client/failecho/integrations/claude_code_hook.py \
+curl -fsSL https://raw.githubusercontent.com/FailEcho/failecho/main/plugin/hooks/failecho_hook.py \
   -o ~/.claude/hooks/failecho_hook.py
 ```
 

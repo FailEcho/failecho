@@ -1,0 +1,10 @@
+{
+  "name": "failecho",
+  "description": "Check what other agents hit before retrying a failed tool, and report failures automatically.",
+  "version": "0.1.0",
+  "author": {"name": "FailEcho"},
+  "homepage": "https://failecho.com",
+  "repository": "https://github.com/FailEcho/failecho",
+  "license": "MIT",
+  "keywords": ["mcp", "reliability", "failures", "retries", "observability"]
+}

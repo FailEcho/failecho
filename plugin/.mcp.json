@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "failecho": {
+      "type": "http",
+      "url": "https://failecho.com/mcp"
+    }
+  }
+}

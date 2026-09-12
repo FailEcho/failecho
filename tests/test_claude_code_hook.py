@@ -21,7 +21,7 @@ import pytest
 from tests.live_server import free_port, running_failecho
 
 ROOT = Path(__file__).resolve().parents[1]
-HOOK = ROOT / "client" / "failecho" / "integrations" / "claude_code_hook.py"
+HOOK = ROOT / "plugin" / "hooks" / "failecho_hook.py"
 
 _spec = importlib.util.spec_from_file_location("claude_code_hook", HOOK)
 hook = importlib.util.module_from_spec(_spec)
