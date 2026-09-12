@@ -112,3 +112,11 @@ def test_brand_spelling_is_consistent():
     for wrong in ("Fail Echo", "FAILECHO", "failEcho"):
         assert wrong not in ABOUT, wrong
     assert ABOUT.count("AI agents") >= 3
+
+
+def test_the_privacy_section_has_a_linkable_anchor(client):
+    """It is the URL given to directories as the privacy policy, so it is a
+    stable address rather than a heading id that could be renamed."""
+    body = client.get("/about").text
+    assert 'id="privacy"' in body
+    assert "Privacy by design" in body
