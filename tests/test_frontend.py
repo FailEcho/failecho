@@ -299,10 +299,12 @@ def test_static_assets_stay_small():
     assert len(HTML) < 30_000  # includes the demo story, FAQ and JSON-LD
     assert len(CSS) < 26_000
     assert len(JS) < 12_000
-    # Raised from 55,000 when the Claude Code plugin install joined the page:
-    # the fastest path onto the network earns its bytes. The number that
-    # actually matters is per_visit below, which barely moved.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 56_000
+    # 55,000 -> 56,000 when the plugin install joined the page, -> 57,000 when
+    # the services table gained a cap. Both times I trimmed first and both
+    # times the last few dozen bytes came out of explanatory comments, which
+    # is a bad trade. per_visit below is the number that matters, and it has
+    # barely moved: ~80KB against 120,000.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 57_000
 
     # Brand images are raster (the supplied masters are PNG). What a visitor
     # actually downloads is the markup, the mark and ONE wordmark variant --
@@ -380,3 +382,11 @@ def test_a_rate_is_not_printed_when_the_status_says_there_is_no_evidence():
     assert 'return rate === null || rate === undefined ? "—"' in JS
     # And the table is named for what it lists: everything seen in the hour.
     assert ">Live services</h3>" in HTML
+
+
+def test_the_services_table_is_capped():
+    """Unbounded, it would grow to the API's 100-row default and swallow the page."""
+    assert "var SERVICE_ROWS = 8;" in JS
+    assert 'getJSON("/v1/services?limit=" + SERVICE_ROWS)' in JS
+    assert "Showing the ' + SERVICE_ROWS +" in JS
+    assert 'href="/v1/services"' in JS

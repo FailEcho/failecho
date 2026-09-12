@@ -5,6 +5,8 @@
   "use strict";
 
   var REFRESH_MS = 30000;
+  // A summary, not a log: /v1/services holds the rest.
+  var SERVICE_ROWS = 8;
 
   var fmt = new Intl.NumberFormat("en-US");
 
@@ -55,11 +57,10 @@
     setText("stat-real-fingerprints", number(stats.real_failure_fingerprints));
     setText("stat-real-incidents", number(stats.real_active_failures));
 
-    // The zeros stay visible -- an empty network is the honest state -- but a
-    // bootstrapping network is framed as an invitation, not a fault.
+    // Zeros stay visible: an empty network is the honest state.
     show("real-empty", stats.real_observations_24h === 0);
 
-    // FailEcho's own agents: real evidence, labelled, never adoption.
+    // Our own agents: labelled, never adoption.
     show("first-party-block", stats.first_party_observations > 0);
     setText("stat-first-party", number(stats.first_party_observations || 0));
 
@@ -85,8 +86,7 @@
     );
   }
 
-  // Where a row's evidence came from, so demo and first-party data can never
-  // pass for independent agents.
+  // Provenance tags: demo and first-party never pass for independent agents.
   function sourceTags(item) {
     return (
       (item.demo_data ? '<span class="tag">DEMO</span>' : "") +
@@ -98,7 +98,7 @@
     var body = el("services-body");
     if (!body) return;
 
-    // An empty table is a broken-looking table. Say it in a sentence instead.
+    // An empty table looks broken; say it in a sentence.
     show("incidents-table", rows.length > 0);
     show("incidents-empty", rows.length === 0);
     if (!rows.length) {
@@ -123,6 +123,12 @@
         );
       })
       .join("");
+
+    if (rows.length >= SERVICE_ROWS) {
+      body.innerHTML +=
+        '<tr><td colspan="5" class="muted">Showing the ' + SERVICE_ROWS +
+        ' worst. The rest are in <a href="/v1/services">/v1/services</a>.</td></tr>';
+    }
   }
 
   // -- recovery intelligence --------------------------------------------
@@ -229,8 +235,7 @@
 
   function showEndpoints() {
     var origin = publicOrigin();
-    // The server renders {{PUBLIC_URL}} into the page; this only has to fix
-    // things up when the page is opened on an origin the server did not know.
+    // Only needed when the page is served from an origin the server did not know.
     ["mcp-endpoint", "code-mcp", "code-rest", "code-python"].forEach(function (id) {
       var node = el(id);
       if (!node) return;
@@ -241,7 +246,7 @@
   function refresh() {
     return Promise.all([
       getJSON("/v1/stats"),
-      getJSON("/v1/services"),
+      getJSON("/v1/services?limit=" + SERVICE_ROWS),
       getJSON("/v1/recovery-intelligence?limit=3"),
     ])
       .then(function (results) {
