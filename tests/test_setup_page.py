@@ -105,3 +105,16 @@ def test_the_commands_match_what_this_repository_publishes():
 def test_the_page_stays_script_free():
     """No polling, no framework: setup instructions are text."""
     assert "<script" not in SETUP
+
+
+def test_the_directory_listings_are_named_without_claiming_use(client):
+    """Being in a directory is a fact. It is not adoption, and the page says so."""
+    body = client.get("/setup").text
+    for url in ("registry.modelcontextprotocol.io", "glama.ai", "smithery.ai"):
+        assert url in body, url
+    assert "com.failecho/failecho" in body
+    assert "not a measure of use" in body
+    # no third-party badge images: those are a request per visit, and a
+    # tracking vector, on a site that carries no trackers at all
+    assert "img.shields.io" not in body
+    assert "badge" not in body.lower()
