@@ -32,7 +32,7 @@
 
   --gutter: 24px;
   --max: 1200px;
-  --band: 96px;
+  --band: 120px;
   --r: 12px;
 }
 
@@ -174,7 +174,7 @@ a:hover { color: var(--red); }
   background: transparent;
   color: var(--ink);
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: 999px;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .btn:hover { background: var(--surface-2); border-color: var(--ink-3); }
@@ -188,7 +188,7 @@ a:hover { color: var(--red); }
 }
 .btn--red:hover { background: var(--red); border-color: var(--red); color: #fff; }
 
-.btn--sm { padding: 8px 14px; font-size: 13px; border-radius: 8px; }
+.btn--sm { padding: 8px 15px; font-size: 13px; }
 
 
 /* ---- demo banner ------------------------------------------------------- */
@@ -703,44 +703,159 @@ footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
 }
 
 /* ---- centred hero, install card as the anchor --------------------------- */
-.hero--center { text-align: center; padding-block: 104px 88px; }
+.hero--center { text-align: center; padding-block: 120px 96px; }
 .hero--center h1 { margin-inline: auto; max-width: 900px; }
 .hero--center .hero-lede { margin-inline: auto; max-width: 54ch; color: var(--ink); }
-.hero--center .hero-support { margin-inline: auto; max-width: 60ch; }
+.hero--center .hero-support { margin-inline: auto; max-width: 62ch; text-align: left; }
 .hero--center .hero-actions { justify-content: center; }
 .hero--center .hero-tagline {
   display: inline-block; border-left: 0; padding-left: 0;
   border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px;
 }
 
+/* ---- install card, one tab per way in ---------------------------------- */
 .install {
-  margin: 34px auto 12px; max-width: 620px; text-align: left;
+  margin: 34px auto 12px; max-width: 660px; text-align: left;
   background: var(--surface); border: 1px solid var(--line-2);
   border-radius: var(--r); overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
-.install-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 12px 10px 18px;
+.install-tabs {
+  display: flex; overflow-x: auto; scrollbar-width: none;
   background: var(--surface-2); border-bottom: 1px solid var(--line);
-  font-size: 12.5px; color: var(--ink-2);
 }
-.install pre { margin: 0; padding: 18px; overflow-x: auto; }
-.install code { font-family: var(--mono); font-size: 14px; line-height: 1.9; }
-.install-note { margin: 0 0 30px; font-size: 14px; color: var(--ink-2); }
+.install-tabs::-webkit-scrollbar { display: none; }
+.install-tabs button {
+  flex: none; appearance: none; cursor: pointer; white-space: nowrap;
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink-3);
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  padding: 12px 16px 10px;
+}
+.install-tabs button:hover { color: var(--ink-2); }
+.install-tabs button[aria-selected="true"] {
+  color: var(--ink); border-bottom-color: var(--red);
+}
+.install-panel { position: relative; min-height: 150px; }
+.install-copy { position: absolute; top: 12px; right: 12px; }
+.install pre { margin: 0; padding: 18px 76px 6px 18px; overflow-x: auto; }
+.install code { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; }
+.install-foot {
+  margin: 0; padding: 10px 18px 16px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+.install-note { margin: 0 0 34px; font-size: 14px; color: var(--ink-2); }
 
-.livestrip {
-  display: flex; flex-wrap: wrap; gap: 12px 48px;
-  margin: 0 0 18px; font-size: 16px; color: var(--ink-2);
+/* ---- centred bands ----------------------------------------------------- */
+.band--center { text-align: center; }
+.band--center .band-head { display: block; margin-bottom: 40px; }
+.band--center .label {
+  font-family: var(--serif); font-weight: 400;
+  font-size: clamp(26px, 3.4vw, 40px); letter-spacing: -0.015em;
+  text-transform: none; color: var(--ink);
 }
-.livestrip b {
-  font-size: clamp(28px, 4vw, 38px); font-weight: 600; color: var(--ink);
-  letter-spacing: -0.02em; margin-right: 10px; font-variant-numeric: tabular-nums;
+.band--center .band-sub {
+  margin: 18px auto 0; max-width: 62ch; text-align: left; font-size: 16.5px;
+  line-height: 1.65;
 }
-.livestrip span { display: flex; align-items: baseline; }
+.band--center .band-meta { margin: 14px auto 0; }
+.band--center .statement {
+  margin: 44px auto 0; max-width: 26ch; text-align: center;
+  padding-left: 0; border-left: 0;
+}
+.band--center .fineprint { margin: 26px auto 0; }
+
+/* ---- the loop ---------------------------------------------------------- */
+/* The product is a cycle, not a funnel: evidence leaves an agent, and comes
+   back to a different one. The return path is the whole point, so it is drawn
+   rather than described. */
+.loop { display: inline-block; margin: 8px 0 0; }
+.loop-track {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; gap: 44px;
+}
+.loop-node {
+  flex: none; width: 196px; height: 196px; border-radius: 50%;
+  border: 1px dashed var(--line-2); background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; padding: 10px 20px; text-align: center;
+}
+.loop-node:first-child { border-color: var(--red-deep); }
+.loop-n {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+  letter-spacing: 0.08em;
+}
+.loop-node .flow-name {
+  font-family: var(--sans); font-size: 16.5px; font-weight: 550; color: var(--ink);
+}
+.loop-node span:last-child {
+  font-size: 12.5px; line-height: 1.4; color: var(--ink-2); min-height: 2.8em;
+}
+.loop-track li + li { position: relative; }
+.loop-track li + li::before {
+  content: ""; position: absolute; top: 50%; right: 100%;
+  width: 30px; margin-right: 7px;
+  border-top: 1px dashed var(--line-2);
+}
+.loop-track li + li::after {
+  content: ""; position: absolute; top: 50%; right: 100%;
+  width: 5px; height: 5px; margin: -3px 6px 0 0;
+  border-top: 1px solid var(--ink-3); border-right: 1px solid var(--ink-3);
+  transform: rotate(45deg);
+}
+.loop-return {
+  position: relative; margin: 0 auto; height: 46px;
+  width: calc(100% - 196px);
+  border: 1px dashed var(--line-2); border-top: 0;
+  border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+  margin-bottom: 30px;
+}
+.loop-return::after {
+  content: ""; position: absolute; left: -4px; top: -1px;
+  width: 6px; height: 6px;
+  border-top: 1px solid var(--ink-3); border-left: 1px solid var(--ink-3);
+  transform: rotate(45deg);
+}
+.loop-return span {
+  position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  padding-top: 10px; white-space: nowrap;
+  font-size: 13px; color: var(--ink-3);
+}
+
+/* ---- stat cards -------------------------------------------------------- */
+.statcards {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px; text-align: left;
+}
+.statcard {
+  background: var(--surface); border-radius: var(--r);
+  padding: 30px 32px 34px;
+}
+.statcard-label { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.statcard-value {
+  margin: 20px 0 14px;
+  font-size: clamp(44px, 6vw, 68px); font-weight: 500; line-height: 1;
+  letter-spacing: -0.03em; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.statcard-body { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--ink-2); }
+
+@media (max-width: 960px) {
+  .loop { display: block; }
+  .loop-track { flex-wrap: wrap; gap: 28px 44px; }
+  .loop-track li + li::before, .loop-track li + li::after { display: none; }
+  .loop-return { height: auto; width: auto; border: 0; margin: 6px 0 0; }
+  .loop-return::after { display: none; }
+  .loop-return span {
+    position: static; transform: none; display: block; padding: 0;
+    text-align: center; white-space: normal;
+  }
+  .loop-node { width: 176px; height: 176px; }
+}
 
 @media (max-width: 640px) {
-  .hero--center { padding-block: 72px 64px; }
-  .livestrip { gap: 16px; }
-  .livestrip span { flex-basis: 100%; }
+  .hero--center { padding-block: 76px 66px; }
+  .statcards { grid-template-columns: minmax(0, 1fr); }
+  .install-panel { min-height: 0; }
+  .install pre { padding-right: 18px; padding-top: 46px; }
+  .install-copy { top: 10px; left: 12px; right: auto; }
 }

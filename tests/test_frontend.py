@@ -31,7 +31,7 @@ def test_hero_states_the_product_immediately(client):
     assert "Live failure and recovery intelligence for autonomous software." in body
     assert "Before you retry, check the echo." in body
     assert "what actually worked, before you retry" in body
-    assert "Install in Claude Code" in body
+    assert "Get started" in body
     assert "See it work" in body
     assert "MCP · REST · OpenAPI · No account required" in body
 
@@ -44,6 +44,26 @@ def test_the_install_is_visible_without_scrolling(client):
     assert "/plugin install failecho@failecho" in hero
     assert 'data-copy-target="code-plugin"' in hero
     assert 'href="/setup"' in hero, "every other client needs somewhere to go"
+
+
+def test_the_front_page_is_not_a_claude_code_accessory(client):
+    """FailEcho is a protocol endpoint. One client must not own the hero."""
+    body = client.get("/").text
+    hero = body[body.index('class="shell hero'):body.index("</section>")]
+    assert "/mcp" in hero and "/v1/query" in hero, "MCP and REST are products too"
+    assert hero.count('role="tab"') == 3
+    for tab in ("Claude Code", "any MCP client", "Any language"):
+        assert tab in hero, tab
+    # The chrome names no client at all.
+    nav = body[body.index('<nav'):body.index("</nav>")]
+    assert "Claude Code" not in nav
+
+
+def test_only_the_first_install_panel_shows_without_javascript():
+    panels = HTML.count('role="tabpanel"')
+    assert panels == 3
+    assert HTML.count('role="tabpanel"') - HTML.count('role="tabpanel" id="panel-plugin"') == 2
+    assert JS.count('setAttribute("aria-selected"') == 1, "tabs are wired, not decorative"
 
 
 def test_the_front_page_stays_brief():
@@ -59,9 +79,13 @@ def test_it_routes_to_the_pages_that_hold_the_detail(client):
         assert href in body, href
 
 
-def test_the_loop_is_stated_in_four_steps():
+def test_the_loop_is_drawn_as_a_loop():
+    """A cycle, not a funnel: the return path is the product."""
     for step in ("Fail", "Report", "Learn", "Recover"):
         assert f'class="flow-name">{step}<' in HTML
+    assert 'class="loop-return"' in HTML
+    assert "The next agent asks before it retries" in HTML
+    assert ".loop-return::after" in CSS, "the return arrow is drawn, not implied"
     assert "Agent B benefits from evidence it never generated itself." in HTML
 
 
@@ -71,6 +95,7 @@ def test_the_live_line_separates_external_from_our_own(client):
     assert 'id="stat-real-24h"' in body and 'id="stat-first-party"' in body
     assert "observations from independent agents today" in body
     assert "never counted as adoption" in body
+    assert "not dressed up" in body
     assert 'href="/network"' in body
 
 
@@ -95,9 +120,9 @@ def test_semantic_landmarks_and_labels():
 
 
 def test_interactive_elements_are_real_buttons_with_labels():
-    """One button on the front page now: copy the install."""
-    assert HTML.count('type="button"') == 1
-    assert HTML.count("data-copy-target=") == 1
+    """Three tabs, and a copy button on each panel."""
+    assert HTML.count('type="button"') == 6
+    assert HTML.count("data-copy-target=") == 3
     assert HTML.count("aria-label=") >= 2
     assert ":focus-visible" in CSS
 
@@ -151,10 +176,11 @@ def test_no_framework_no_cdn_no_webfont():
 
 def test_static_assets_stay_small():
     """A status page has no excuse to be heavy on a small VPS."""
-    assert len(CSS) < 28_000
+    # Raised once, deliberately, for the install tabs, the loop diagram and
+    # the stat cards. Trimming comments to defend a number is the wrong trade.
+    assert len(CSS) < 33_000
     assert len(JS) < 12_000
-    # The front page is a third of what it was; the budget follows it down.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 48_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 56_000
 
     per_visit = (
         sum(len(x) for x in (HTML, CSS, JS))

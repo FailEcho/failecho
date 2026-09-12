@@ -73,7 +73,7 @@
       </span>
       <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
       <a class="nav-narrow" href="/setup">Setup</a>
-      <a class="btn btn--red btn--sm" href="/setup">Install in Claude Code</a>
+      <a class="btn btn--red btn--sm" href="/setup">Get started</a>
     </nav>
   </div>
 </header>
@@ -95,74 +95,125 @@
     </p>
     <p class="hero-support">
       FailEcho is a shared failure intelligence network for AI agents and
-      autonomous software. See whether other agents are hitting the same tool
-      failure right now — and what actually worked, before you retry.
+      autonomous software — an MCP endpoint and a REST API. Ask whether other
+      agents are hitting the same tool failure right now, and
+      what actually worked, before you retry.
     </p>
 
     <div class="install">
-      <div class="install-head">
-        <span>Claude Code</span>
-        <button class="btn btn--sm" type="button" data-copy-target="code-plugin"
-                aria-label="Copy the install commands">Copy</button>
+      <div class="install-tabs" role="tablist" aria-label="Ways to connect">
+        <button type="button" role="tab" id="tab-plugin" aria-controls="panel-plugin"
+                aria-selected="true">Claude Code</button>
+        <button type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp"
+                aria-selected="false">Cursor, Desktop, any MCP client</button>
+        <button type="button" role="tab" id="tab-rest" aria-controls="panel-rest"
+                aria-selected="false">Any language</button>
       </div>
-      <pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
+
+      <div class="install-panel" role="tabpanel" id="panel-plugin" aria-labelledby="tab-plugin">
+        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-plugin"
+                aria-label="Copy the Claude Code install">Copy</button>
+<pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
 /plugin install failecho@failecho</code></pre>
+        <p class="install-foot">Reports MCP failures for you, through a hook.</p>
+      </div>
+
+      <div class="install-panel" role="tabpanel" id="panel-mcp" aria-labelledby="tab-mcp" hidden>
+        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-mcp"
+                aria-label="Copy the MCP server config">Copy</button>
+<pre><code id="code-mcp">"failecho": {
+  "type": "http",
+  "url": "{{PUBLIC_URL}}/mcp"
+}</code></pre>
+        <p class="install-foot">Streamable HTTP. Four tools, no auth, no key.</p>
+      </div>
+
+      <div class="install-panel" role="tabpanel" id="panel-rest" aria-labelledby="tab-rest" hidden>
+        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-rest"
+                aria-label="Copy the REST query">Copy</button>
+<pre><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"service": "api.example.com", "operation": "create_issue",
+       "error_type": "rate_limit", "error_code": "429"}'</code></pre>
+        <p class="install-foot">One call. Stores nothing, never rate limited.</p>
+      </div>
     </div>
     <p class="install-note">
-      Any Model Context Protocol (MCP) client works: Cursor, Claude Desktop, or
-      your own code — <a href="/setup">the setup guide</a>. No account. No API key.
+      Any Model Context Protocol (MCP) client works. No account, no API key —
+      <a href="/setup">every client, step by step</a>.
     </p>
 
     <p class="hero-actions">
-      <a class="btn btn--red" href="/setup">Install in Claude Code</a>
+      <a class="btn btn--red" href="/setup">Get started</a>
       <a class="btn" href="/demo">See it work</a>
     </p>
     <p class="hero-tagline">Before you retry, check the echo.</p>
     <p class="hero-meta">MCP · REST · OpenAPI · No account required</p>
   </section>
 
-  <section class="shell band band--bleed" id="how" aria-labelledby="how-title">
+  <section class="shell band band--center band--bleed" id="how" aria-labelledby="how-title">
     <div class="band-head">
-      <h2 id="how-title" class="label">How FailEcho works</h2>
+      <h2 id="how-title" class="label">One failure teaches every agent</h2>
+      <p class="band-sub">
+        Evidence goes in when an agent fails, and comes back out to the next
+        agent that hits the same thing. The loop closes on its own.
+      </p>
     </div>
-    <ol class="flow">
-      <li>
-        <p class="flow-name">Fail</p>
-        <p class="flow-body">An agent hits a tool, API or MCP failure.</p>
-      </li>
-      <li>
-        <p class="flow-name">Report</p>
-        <p class="flow-body">It shares failure metadata. Never prompts or arguments.</p>
-      </li>
-      <li>
-        <p class="flow-name">Learn</p>
-        <p class="flow-body">FailEcho matches it to the same failure elsewhere.</p>
-      </li>
-      <li>
-        <p class="flow-name">Recover</p>
-        <p class="flow-body">The next agent asks before it retries.</p>
-      </li>
-    </ol>
+
+    <div class="loop">
+      <ol class="loop-track">
+        <li class="loop-node">
+          <span class="loop-n">01</span>
+          <b class="flow-name">Fail</b>
+          <span>A tool or API call fails</span>
+        </li>
+        <li class="loop-node">
+          <span class="loop-n">02</span>
+          <b class="flow-name">Report</b>
+          <span>Metadata only, never prompts</span>
+        </li>
+        <li class="loop-node">
+          <span class="loop-n">03</span>
+          <b class="flow-name">Learn</b>
+          <span>Matched to the same failure elsewhere</span>
+        </li>
+        <li class="loop-node">
+          <span class="loop-n">04</span>
+          <b class="flow-name">Recover</b>
+          <span>What worked, and for how many</span>
+        </li>
+      </ol>
+      <p class="loop-return"><span>The next agent asks before it retries</span></p>
+    </div>
+
     <p class="statement">Agent B benefits from evidence it never generated itself.</p>
-    <p class="fineprint"><a href="/demo">Watch one failure go through it →</a></p>
+    <p class="fineprint"><a href="/demo">Watch one failure go through it &rarr;</a></p>
   </section>
 
-  <section class="shell band" id="live" aria-labelledby="live-title">
+  <section class="shell band band--center" id="live" aria-labelledby="live-title">
     <div class="band-head">
-      <h2 id="live-title" class="label">Live right now</h2>
+      <h2 id="live-title" class="label">What the network holds today</h2>
       <p class="band-meta">
         <span class="pulse" id="live-dot" aria-hidden="true"></span>
         <span id="updated" aria-live="polite">connecting…</span>
       </p>
     </div>
-    <p class="livestrip">
-      <span><b id="stat-real-24h">—</b> observations from independent agents today</span>
-      <span><b id="stat-first-party">—</b> from FailEcho's own agents, never counted as adoption</span>
-    </p>
-    <p class="fineprint"><a href="/network">See the live network →</a></p>
+    <div class="statcards">
+      <div class="statcard">
+        <p class="statcard-label">Independent agents</p>
+        <p class="statcard-value" id="stat-real-24h">—</p>
+        <p class="statcard-body">observations from independent agents today. The network is new, and this number is not dressed up.</p>
+      </div>
+      <div class="statcard">
+        <p class="statcard-label">Our own agents</p>
+        <p class="statcard-value" id="stat-first-party">—</p>
+        <p class="statcard-body">real calls from FailEcho's own agents, labelled at the source and never counted as adoption.</p>
+      </div>
+    </div>
+    <p class="fineprint"><a href="/network">See the live network &rarr;</a></p>
   </section>
 
-  <section class="shell band band--bleed" aria-labelledby="trust-title">
+  <section class="shell band band--center band--bleed" aria-labelledby="trust-title">
     <div class="band-head">
       <h2 id="trust-title" class="label">Built to be checked</h2>
     </div>
@@ -171,7 +222,7 @@
       arithmetic you can recompute, and thin evidence returns
       <code>INSUFFICIENT_DATA</code> rather than a guess.
     </p>
-    <p class="fineprint"><a href="/about">How FailEcho handles data →</a></p>
+    <p class="fineprint"><a href="/about">How FailEcho handles data &rarr;</a></p>
   </section>
 </main>
 
