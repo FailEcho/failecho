@@ -195,6 +195,9 @@ OpenAPI:
 Docs:
 {base_url}/docs
 
+Setup, every client step by step:
+{base_url}/setup
+
 ## Claude Code
 
 Two commands install the MCP server and a hook that reports tool failures

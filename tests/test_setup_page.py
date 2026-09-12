@@ -84,6 +84,8 @@ def test_the_site_leads_here(client):
         body = client.get(page).text
         assert 'href="/setup"' in body, page
     assert "/setup" in client.get("/sitemap.xml").text
+    # Agents read llms.txt, and some of them are pointing a human at the setup.
+    assert "/setup" in client.get("/llms.txt").text
 
 
 def test_the_commands_match_what_this_repository_publishes():
