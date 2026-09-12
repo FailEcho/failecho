@@ -133,7 +133,23 @@ curl -X POST https://failecho.com/v1/query \
        "error_type": "rate_limit", "error_code": "429"}'
 ```
 
-What comes back looks like this:
+### Or make the agent do it
+
+If your setup is none of the above, or you would rather not read a setup page
+at all, hand it to the agent. There is an `llms.txt` written for exactly this,
+so paste this at whatever you are running:
+
+```
+Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
+```
+
+It contains the endpoint, the four tools with when to call each, the install
+commands, and the privacy rules about what must never be sent. Agents get this
+right on the first try more often than people expect :3
+
+## What comes back
+
+
 
 ```
 Fingerprint:            6ed9ef705ff4037af2c977306b8b9f92
