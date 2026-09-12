@@ -474,6 +474,18 @@ async def setup(request: Request) -> HTMLResponse:
     return HTMLResponse(render_page("setup.html", public_base_url(request)))
 
 
+@app.get("/.well-known/glama.json", include_in_schema=False)
+async def glama_claim() -> FileResponse:
+    """Ownership proof for the Glama connector listing.
+
+    The claim token is meant to be fetched publicly from this origin, so it
+    lives in a served file rather than in code or in the environment.
+    """
+    return FileResponse(
+        STATIC_DIR / "well-known" / "glama.json", media_type="application/json"
+    )
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon() -> FileResponse:
     """Browsers still ask for /favicon.ico; hand them the PNG mark."""

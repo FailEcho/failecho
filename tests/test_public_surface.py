@@ -286,3 +286,18 @@ def test_demo_mode_is_announced_where_the_data_is(client):
     dashboard = client.get("/network").text
     assert "never counted as real adoption" in dashboard
     assert "stat-demo-agent" in dashboard
+
+
+def test_the_glama_connector_claim_is_served_as_json(client):
+    """Glama fetches this from our origin to prove we control the domain.
+
+    It must be valid JSON on a 2xx, so a redirect, an HTML error page or a
+    stray byte breaks the listing rather than the site, which is exactly the
+    kind of break nobody notices.
+    """
+    response = client.get("/.well-known/glama.json")
+    assert response.status_code == 200
+    assert "application/json" in response.headers["content-type"]
+    body = response.json()
+    assert body["$schema"] == "https://glama.ai/mcp/schemas/connector.json"
+    assert body["claim"].startswith("glama_claim_")
