@@ -6,6 +6,7 @@
 
 :root {
   --bg:        #090b10;   /* blue-graphite, not neutral black */
+  --bg-deep:   #04060a;   /* header and footer sit below the page */
   --surface:   #10141b;
   --surface-2: #161b24;
   --line:      #1e2430;
@@ -108,7 +109,7 @@ a:hover { color: var(--red); }
 /* ---- top bar ----------------------------------------------------------- */
 .topbar {
   position: sticky; top: 0; z-index: 10;
-  background: rgba(9, 11, 16, 0.72);
+  background: rgba(4, 6, 10, 0.88);
   border-bottom: 1px solid var(--line);
   backdrop-filter: saturate(160%) blur(14px);
 }
@@ -521,7 +522,14 @@ code { font-family: var(--mono); }
 .principles code { font-size: 12.5px; color: var(--ink); }
 
 /* ---- footer ------------------------------------------------------------ */
-footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
+footer.shell {
+  max-width: none;
+  padding-inline: max(var(--gutter), calc(50% - var(--max) / 2 + var(--gutter)));
+  padding-block: 52px 68px;
+  margin-top: 72px;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--line-2);
+}
 .foot-top { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
 .foot-brand { margin: 0; }
 .foot-brand img { display: block; width: auto; height: 22px; }
@@ -860,29 +868,28 @@ footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
   .install-copy { top: 10px; left: 12px; right: auto; }
 }
 
-/* ---- the echo, at the edges -------------------------------------------- */
-/* A waveform running top to bottom in the margins: the same signal on both
-   sides, which is what the section is about. Decoration only, so it is
-   dropped entirely when the window is too narrow to hold it clear of the
-   text. */
-.band--wave { background: none; position: relative; }
-.band--wave > * { position: relative; z-index: 1; }
-.band--wave::before, .band--wave::after {
+/* ---- the echo, in the margins ------------------------------------------ */
+/* One signal running the height of the page, mirrored on both sides. It is
+   painted behind everything, so the full-bleed bands cover it and it shows
+   only where the page is at its darkest -- which is the point: the echo is
+   what is underneath. Dropped below 1300px rather than crowding the text. */
+body { position: relative; }
+
+body::before, body::after {
   content: none;
-  position: absolute; top: 0; bottom: 0; width: 44px;
-  background-image: url("/static/wave.svg");
-  background-repeat: repeat-y;
-  background-size: 44px 560px;
-  opacity: 0.85;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
+  position: absolute; top: 0; bottom: 0; z-index: -1;
+  width: 44px;
+  background-color: var(--red);
+  opacity: 0.3;
+  -webkit-mask: url("/static/wave.svg") repeat-y left top / 44px 560px;
+  mask: url("/static/wave.svg") repeat-y left top / 44px 560px;
 }
+
 @media (min-width: 1300px) {
-  .band--wave::before, .band--wave::after { content: ""; }
-  .band--wave::before { left: 0; }
-  .band--wave::after { right: 0; transform: scaleX(-1); }
+  body::before, body::after { content: ""; }
+  body::before { left: 0; }
+  body::after { right: 0; transform: scaleX(-1); }
 }
-@media (prefers-reduced-motion: reduce) { .band--wave::before, .band--wave::after { opacity: 0.6; } }
 
 /* A CTA closing a band sits under its heading, not against it. */
 .band .hero-actions { margin-top: 4px; }
