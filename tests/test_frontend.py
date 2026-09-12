@@ -30,7 +30,7 @@ def test_hero_states_the_product_immediately(client):
     assert "Live failure and recovery intelligence for autonomous software." in body
     assert "Before you retry, check the echo." in body
     assert "what actually worked, before you retry" in body
-    assert "Connect MCP" in body
+    assert "Install in Claude Code" in body
     assert "See it work" in body
     assert "MCP · REST · OpenAPI · No account required" in body
 
@@ -69,6 +69,15 @@ def test_mcp_endpoint_and_four_tools_are_prominent():
     assert "{{PUBLIC_URL}}/mcp" in HTML
     assert "localhost" not in HTML
     assert "publicOrigin()" in JS
+
+
+def test_the_page_says_how_to_set_it_up_not_just_what_to_paste():
+    """The owner could not work out setup from his own site: the snippets never
+    said where to type them or how to tell it worked."""
+    assert "type these two lines at its prompt (not in a terminal)" in HTML
+    assert "/reload-plugins" in HTML
+    assert "<code>/plugin</code> and FailEcho should read <em>enabled</em>" in HTML
+    assert "Paste this endpoint into your client's MCP settings" in HTML
 
 
 def test_every_integration_path_is_copyable():

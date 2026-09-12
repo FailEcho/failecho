@@ -123,7 +123,7 @@
       failure right now — and what actually worked, before you retry.
     </p>
     <p class="hero-actions">
-      <a class="btn btn--red" href="#connect">Connect MCP</a>
+      <a class="btn btn--red" href="#connect">Install in Claude Code</a>
       <a class="btn" href="#demo">See it work</a>
     </p>
     <p class="hero-tagline">Before you retry, check the echo.</p>
@@ -368,22 +368,31 @@ Reporting recovery outcome...
       <h2 id="connect-title" class="label">Connect an Agent</h2>
     </div>
     <p class="band-intro">
-      Claude Code installs in two commands. Every other client uses the same Model Context Protocol endpoint that AI agents can query after tool failures. No account. No API key. Free during the public MVP.
+      Two minutes, no account and no API key. Claude Code has a one-command install; every other client uses the same Model Context Protocol endpoint that AI agents can query after tool failures.
     </p>
 
-    <figure class="snip">
-      <figcaption>
-        <span>Claude Code</span>
-        <button class="btn btn--sm" type="button" data-copy-target="code-plugin"
-                aria-label="Copy the plugin install commands">Copy</button>
-      </figcaption>
-      <pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
+    <h3 class="flow-name">Claude Code</h3>
+    <ol class="setup">
+      <li>Start Claude Code, and type these two lines at its prompt (not in a terminal):
+        <figure class="snip">
+          <figcaption>
+            <span>In Claude Code</span>
+            <button class="btn btn--sm" type="button" data-copy-target="code-plugin"
+                    aria-label="Copy the plugin install commands">Copy</button>
+          </figcaption>
+          <pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
 /plugin install failecho@failecho</code></pre>
-      <p class="endpoint-note">Installs the MCP server and a hook: reporting and lookups happen without the model remembering to.</p>
-    </figure>
+        </figure>
+      </li>
+      <li>If it says to run <code>/reload-plugins</code>, run it. Otherwise start a new session.</li>
+      <li>Check it: type <code>/plugin</code> and FailEcho should read <em>enabled</em>. That is all — from then on, a failing MCP tool is looked up here and reported for the next agent, without you or the model doing anything.</li>
+    </ol>
+
+    <h3 class="flow-name">Any other MCP client</h3>
+    <p class="endpoint-note">Paste this endpoint into your client's MCP settings, as type <code>http</code>. The ready-made config is below under For Developers.</p>
 
     <div class="endpoint">
-      <span class="endpoint-label">MCP endpoint — any other client</span>
+      <span class="endpoint-label">MCP endpoint</span>
       <span class="endpoint-row">
         <code id="mcp-endpoint">{{PUBLIC_URL}}/mcp</code>
         <button class="btn btn--sm" type="button" data-copy-target="mcp-endpoint"
@@ -395,19 +404,19 @@ Reporting recovery outcome...
     <dl class="tools">
       <div>
         <dt><code>check_tool_failure</code></dt>
-        <dd>Check shared evidence after a tool, API or MCP failure — before retrying.</dd>
+        <dd>Ask what others saw, before retrying.</dd>
       </div>
       <div>
         <dt><code>report_tool_failure</code></dt>
-        <dd>Share privacy-safe failure metadata with the network.</dd>
+        <dd>Contribute a failure, metadata only.</dd>
       </div>
       <div>
         <dt><code>report_tool_success</code></dt>
-        <dd>Report successful operations so health rates have a denominator.</dd>
+        <dd>Contribute a success, so rates have a denominator.</dd>
       </div>
       <div>
         <dt><code>report_recovery_outcome</code></dt>
-        <dd>Report whether a recovery action actually worked.</dd>
+        <dd>Say whether a recovery actually worked.</dd>
       </div>
     </dl>
   </section>
