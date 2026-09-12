@@ -190,6 +190,18 @@ service + operation + version + schema_hash + failure fingerprint.
 MCP (Model Context Protocol, Streamable HTTP):
 {base_url}/mcp
 
+Config-file clients (Cursor, Claude Desktop, most frameworks) want this
+shape, so you can add it yourself without reading the setup page:
+
+{{
+  "mcpServers": {{
+    "failecho": {{
+      "type": "http",
+      "url": "{base_url}/mcp"
+    }}
+  }}
+}}
+
 OpenAPI:
 {base_url}/openapi.json
 

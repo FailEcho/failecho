@@ -301,3 +301,16 @@ def test_the_glama_connector_claim_is_served_as_json(client):
     body = response.json()
     assert body["$schema"] == "https://glama.ai/mcp/schemas/connector.json"
     assert body["claim"].startswith("glama_claim_")
+
+
+def test_llms_txt_carries_the_config_block_agents_need(client):
+    """An agent told to set itself up should not have to guess key names.
+
+    llms.txt gave the endpoint and the transport but not the mcpServers
+    shape, so configuring a client meant a second fetch of /setup, or a
+    guess at whether the key is "type", "transport" or "kind".
+    """
+    body = client.get("/llms.txt").text
+    assert '"mcpServers"' in body
+    assert '"type": "http"' in body
+    assert "/mcp" in body
