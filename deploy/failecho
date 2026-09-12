@@ -1,0 +1,45 @@
+#!/bin/sh
+# Small operator helper: failecho status | logs | restart | deploy | backup
+set -eu
+case "${1:-status}" in
+  status)
+    systemctl --no-pager --lines=0 status failecho | head -6
+    echo
+    printf 'app:     '; curl -s --max-time 3 http://127.0.0.1:8000/health || echo unreachable
+    printf '\ncaddy:   %s\n' "$(systemctl is-active caddy)"
+    # This box's own resolver does not see the zone; ask a public one.
+    printf 'dns:     %s\n' "$(dig +short failecho.com @1.1.1.1 2>/dev/null | head -1 || echo 'not resolving')"
+    printf 'cert:    '
+    EXP=$(echo | openssl s_client -connect 127.0.0.1:443 -servername failecho.com 2>/dev/null \
+          | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+    if [ -n "${EXP:-}" ]; then echo "valid until $EXP"; else echo 'not issued yet'; fi
+    printf 'https:   %s\n' "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+          --resolve failecho.com:443:127.0.0.1 https://failecho.com/health)"
+    printf 'memory:  %.1f MB\n' "$(systemctl show failecho -p MemoryCurrent --value | awk '{print $1/1048576}')"
+    printf 'db:      %s\n' "$(du -h /srv/failecho/data/failure_network.db | cut -f1)"
+    ;;
+  usage)   /srv/failecho/.venv/bin/python /srv/failecho/scripts/usage_report.py ;;
+  logs)    journalctl -u failecho -n "${2:-50}" --no-pager ;;
+  restart) systemctl restart failecho && echo restarted ;;
+  backup)  systemctl start failecho-backup.service && ls -lh /srv/failecho/backups | tail -3 ;;
+  deploy)
+    rsync -a --delete --exclude='.venv' --exclude='data' --exclude='backups' \
+      --exclude='__pycache__' --exclude='.pytest_cache' /root/agentwebsite/ /srv/failecho/
+    chown -R failecho:failecho /srv/failecho
+    /srv/failecho/.venv/bin/pip install --quiet -r /srv/failecho/requirements.txt
+    systemctl restart failecho
+    # Wait for the restart rather than guessing at it: a single sleep once
+    # reported a healthy deploy as a silent failure.
+    for _ in $(seq 1 40); do
+      sleep 0.5
+      if curl -sf http://127.0.0.1:8000/health >/dev/null; then
+        echo "deployed: $(curl -s http://127.0.0.1:8000/health)"
+        exit 0
+      fi
+    done
+    echo 'DEPLOY UNHEALTHY: /health did not answer within 20s' >&2
+    systemctl --no-pager --lines=20 status failecho >&2 || true
+    exit 1
+    ;;
+  *) echo "usage: failecho [status|usage|logs [n]|restart|backup|deploy]" ; exit 1 ;;
+esac
