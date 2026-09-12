@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly FailEcho database backup
+
+[Service]
+Type=oneshot
+User=failecho
+Group=failecho
+ExecStart=/usr/local/bin/failecho-backup.sh
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/failecho/data /srv/failecho/backups

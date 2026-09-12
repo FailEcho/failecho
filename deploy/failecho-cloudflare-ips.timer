@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly refresh of the Cloudflare IP allowlist
+
+[Timer]
+OnCalendar=Sun 04:10
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

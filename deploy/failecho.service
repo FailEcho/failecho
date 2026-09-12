@@ -1,0 +1,43 @@
+# FailEcho -- live failure intelligence for autonomous software.
+[Unit]
+Description=FailEcho
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho
+
+# One worker: SQLite serialises writes anyway, and the in-process rate limiter
+# and MCP session manager are per-process.
+ExecStart=/srv/failecho/.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers \
+    --forwarded-allow-ips '127.0.0.1' --no-server-header
+
+Environment="FIN_DATABASE_URL=sqlite+aiosqlite:////srv/failecho/data/failure_network.db"
+Environment="FIN_PUBLIC_URL=https://failecho.com"
+Environment="FIN_TRUST_PROXY=1"
+Environment="FIN_ALLOWED_ORIGINS=*"
+Environment="FIN_RETENTION_HOURS=48"
+Environment="FIN_RATE_LIMIT_WRITES_PER_MINUTE=120"
+Environment="FIN_DEMO_MODE=0"
+Environment="FIN_GITHUB_URL=https://github.com/FailEcho/failecho"
+
+# FIN_REPORTER_SALT lives here, generated ONCE. Regenerating it would reset
+# every reporter hash and every unique-reporter count.
+EnvironmentFile=/etc/failecho.env
+
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/failecho/data
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target

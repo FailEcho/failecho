@@ -1,0 +1,14 @@
+[Unit]
+Description=Prune raw observations of FailEcho
+
+[Service]
+Type=oneshot
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho
+Environment="FIN_DATABASE_URL=sqlite+aiosqlite:////srv/failecho/data/failure_network.db"
+Environment="FIN_RETENTION_HOURS=48"
+ExecStart=/srv/failecho/.venv/bin/python /srv/failecho/scripts/prune.py
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/failecho/data

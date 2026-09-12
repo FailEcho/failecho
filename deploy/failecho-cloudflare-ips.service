@@ -1,0 +1,8 @@
+[Unit]
+Description=Refresh the Cloudflare IP allowlist on the origin firewall
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/failecho-cloudflare-ips.sh
