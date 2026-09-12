@@ -72,7 +72,7 @@
         </span>
       </span>
       <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
-      <a class="nav-narrow" href="/setup">Setup</a>
+      <a class="nav-narrow" href="/network">Network</a>
       <a class="btn btn--red btn--sm" href="/setup">Get started</a>
     </nav>
   </div>
@@ -87,6 +87,7 @@
 </div>
 
 <main id="main">
+<noscript><p class="shell fineprint">Live figures require JavaScript. Read <a href="/v1/stats">the current network data</a> directly; a dash means the figure has not loaded.</p></noscript>
 
   <section class="shell hero hero--center" aria-labelledby="hero-title">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
@@ -216,12 +217,12 @@
   <section class="shell band band--center band--bleed" aria-labelledby="trust-title">
     <div class="band-head">
       <h2 id="trust-title" class="label">Built to be checked</h2>
-    </div>
     <p class="band-sub">
       No prompts. No secrets. No tool arguments or results. Confidence is
       arithmetic you can recompute, and thin evidence returns
       <code>INSUFFICIENT_DATA</code> rather than a guess.
     </p>
+    </div>
     <p class="fineprint"><a href="/about">How FailEcho handles data &rarr;</a></p>
   </section>
 </main>

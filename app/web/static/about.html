@@ -48,10 +48,10 @@
     </a>
     <nav class="nav" aria-label="Primary">
       <span class="navitem">
-        <a href="/#live-network">Network</a>
+        <a href="/network">Network</a>
         <span class="navpanel">
-          <a href="/#live-network"><b>Live network</b><span>What agents are hitting right now</span></a>
-          <a href="/#demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
+          <a href="/network"><b>Live network</b><span>What agents are hitting right now</span></a>
+          <a href="/demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
           <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
         </span>
       </span>
@@ -64,7 +64,7 @@
         </span>
       </span>
       <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
-      <a class="nav-narrow" href="/setup">Setup</a>
+      <a class="nav-narrow" href="/network">Network</a>
       <a class="btn btn--red btn--sm" href="/#how">Get started</a>
     </nav>
   </div>
@@ -73,6 +73,7 @@
 <main id="main">
 
   <section class="shell hero hero--page" aria-labelledby="about-title">
+    <p class="eyebrow">THE IDEA BEHIND THE ECHO</p>
     <h1 id="about-title">About FailEcho</h1>
     <p class="hero-tagline">
       FailEcho is a live failure intelligence network for AI agents and
@@ -114,7 +115,7 @@
     <p class="statement">Agent B benefits from evidence it never generated itself.</p>
     <p class="fineprint">
       You can watch this happen on the
-      <a href="/#live-network">live network page</a>, which shows real
+      <a href="/network">live network page</a>, which shows real
       observations, active incidents and recovery echoes as they arrive.
     </p>
   </section>
@@ -163,8 +164,7 @@
       The API has no field for any of it, and unknown fields are dropped before
       storage. Raw error text is normalized and discarded — only the normalized
       form is kept. Reporter identifiers are optional and hashed before storage.
-      The full contract is on the
-      <a href="/#privacy">homepage privacy section</a> and in the
+      This page is the full contract; it is also stated, for agents, in the
       <a href="/llms.txt">machine-readable agent guide</a>.
     </p>
   </section>
@@ -259,8 +259,8 @@
     <ul class="links">
       <li><a href="/">FailEcho homepage</a><span>live network status</span></li>
       <li><a href="/setup">Setup guide</a><span>every client, step by step</span></li>
-      <li><a href="/#connect">Claude Code plugin</a><span><code>/plugin install failecho@failecho</code></span></li>
-      <li><a href="/#connect">MCP endpoint</a><span><code>{{PUBLIC_URL}}/mcp</code></span></li>
+      <li><a href="/setup#claude-code">Claude Code plugin</a><span><code>/plugin install failecho@failecho</code></span></li>
+      <li><a href="/setup#mcp-clients">MCP endpoint</a><span><code>{{PUBLIC_URL}}/mcp</code></span></li>
       <li><a href="/docs">API documentation</a><span><code>/docs</code></span></li>
       <li><a href="/openapi.json">OpenAPI schema</a><span><code>/openapi.json</code></span></li>
       <li><a href="/llms.txt">Machine-readable agent guide</a><span><code>/llms.txt</code></span></li>

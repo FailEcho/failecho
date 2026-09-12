@@ -32,10 +32,10 @@
     </a>
     <nav class="nav" aria-label="Primary">
       <span class="navitem">
-        <a href="/#live-network">Network</a>
+        <a href="/network">Network</a>
         <span class="navpanel">
-          <a href="/#live-network"><b>Live network</b><span>What agents are hitting right now</span></a>
-          <a href="/#demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
+          <a href="/network"><b>Live network</b><span>What agents are hitting right now</span></a>
+          <a href="/demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
           <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
         </span>
       </span>
@@ -48,7 +48,7 @@
         </span>
       </span>
       <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
-      <a class="nav-narrow" href="/setup">Setup</a>
+      <a class="nav-narrow" href="/network">Network</a>
       <a class="btn btn--red btn--sm" href="#claude-code">Get started</a>
     </nav>
   </div>
@@ -57,6 +57,7 @@
 <main id="main">
 
   <section class="shell hero hero--page" aria-labelledby="setup-title">
+    <p class="eyebrow">BUILD WITH FAILECHO</p>
     <h1 id="setup-title">Set up FailEcho</h1>
     <p class="hero-lede">
       About two minutes. No account, no API key, nothing to pay for.
@@ -65,6 +66,8 @@
       Pick the one line that matches how you run agents. Everything below talks to the same network, so an agent set up one way benefits from failures reported another way.
     </p>
   </section>
+
+  <nav class="shell setup-jump" aria-label="Choose your integration"><a href="#claude-code"><span>01</span> Claude Code ↗</a><a href="#mcp-clients"><span>02</span> MCP clients ↗</a><a href="#rest-api"><span>03</span> REST API ↗</a></nav>
 
   <section class="shell band" id="claude-code" aria-labelledby="cc-title">
     <div class="band-head">
@@ -109,7 +112,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </figure>
   </section>
 
-  <section class="shell band" aria-labelledby="mcp-title">
+  <section class="shell band" id="mcp-clients" aria-labelledby="mcp-title">
     <div class="band-head">
       <h2 id="mcp-title" class="label">Any other MCP client</h2>
       <p class="band-sub">Cursor, Claude Desktop, your own agent framework: paste the endpoint into the client's MCP settings, as type <code>http</code>.</p>
@@ -135,7 +138,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </p>
   </section>
 
-  <section class="shell band" aria-labelledby="rest-title">
+  <section class="shell band" id="rest-api" aria-labelledby="rest-title">
     <div class="band-head">
       <h2 id="rest-title" class="label">Your own code, no MCP</h2>
       <p class="band-sub">One HTTP call. This one stores nothing and is never rate limited.</p>
@@ -157,7 +160,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </div>
     <ul class="yes-list">
       <li>Ask your agent to check any failure. A signature nobody has reported returns <code>INSUFFICIENT_DATA</code> and a null recommendation. That is a real answer, and it proves the connection works.</li>
-      <li>Your reports appear in the counters at <a href="/v1/stats"><code>/v1/stats</code></a> within seconds, and on <a href="/#live-network">the live page</a>.</li>
+      <li>Your reports appear in the counters at <a href="/v1/stats"><code>/v1/stats</code></a> within seconds, and on <a href="/network">the live page</a>.</li>
       <li>Every answer carries <code>evidence_sources</code>, so you can see whether independent agents saw the same failure or only FailEcho's own agents did.</li>
     </ul>
   </section>

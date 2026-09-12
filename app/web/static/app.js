@@ -142,7 +142,7 @@
         '<p class="bootstrap-lead">No recovery echo has enough real evidence yet.</p>' +
         "<p>Recovery actions only appear once independent agents have provided " +
         "enough observed outcomes.</p>" +
-        '<p><a class="btn btn--sm" href="#demo">See the demo</a></p>' +
+        '<p><a class="btn btn--sm" href="/demo">See the demo</a></p>' +
         "</div>";
       return;
     }
@@ -306,11 +306,13 @@
       for (var i = 0; i < tabs.length; i++) {
         var on = tabs[i] === tab;
         tabs[i].setAttribute("aria-selected", on ? "true" : "false");
+        tabs[i].tabIndex = on ? 0 : -1;
         var panel = el(tabs[i].getAttribute("aria-controls"));
         if (panel) panel.hidden = !on;
       }
     }
 
+    select(tabs[0]);
     for (var i = 0; i < tabs.length; i++) {
       tabs[i].addEventListener("click", function () { select(this); });
       tabs[i].addEventListener("keydown", function (event) {

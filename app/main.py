@@ -27,6 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
+    JSONResponse,
     PlainTextResponse,
     Response,
 )
@@ -423,6 +424,20 @@ def render_page(filename: str, base_url: str) -> str:
             end = html.index("<!--/github-->") + len("<!--/github-->")
             html = html[:start] + html[end:]
     return html
+
+
+@app.exception_handler(404)
+async def not_found(request: Request, exc: Exception) -> Response:
+    """A browser that mistypes a URL should not be handed a JSON error.
+
+    API clients still get JSON: the split is on what the caller asked for, so
+    /v1/* and every agent keeps the shape it expects.
+    """
+    if "text/html" in request.headers.get("accept", ""):
+        return HTMLResponse(
+            render_page("404.html", public_base_url(request)), status_code=404
+        )
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
 def render_homepage(base_url: str) -> str:

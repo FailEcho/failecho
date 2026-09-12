@@ -242,3 +242,55 @@ def test_no_unsubstituted_tokens_reach_any_page(client):
         body = client.get(page).text
         for token in ("{{PUBLIC_URL}}", "{{ASSET_V}}", "{{GITHUB_URL}}"):
             assert token not in body, f"{token} on {page}"
+
+
+# ---------------------------------------------------------------------------
+# the pages a visitor reaches by mistake
+# ---------------------------------------------------------------------------
+
+
+def test_a_mistyped_url_gets_a_page_not_a_json_error(client):
+    """A wrong link in a comment thread is a first impression too."""
+    page = client.get("/typo", headers={"accept": "text/html"})
+    assert page.status_code == 404
+    assert "text/html" in page.headers["content-type"]
+    assert "No page at that address" in page.text
+    assert 'content="noindex"' in page.text
+    for href in ('href="/network"', 'href="/demo"', 'href="/setup"', 'href="/docs"'):
+        assert href in page.text, href
+
+
+def test_api_clients_still_get_json_from_a_404(client):
+    """The split is on what the caller asked for, so agents are unaffected."""
+    body = client.get("/v1/typo", headers={"accept": "application/json"})
+    assert body.status_code == 404
+    assert body.json() == {"detail": "Not Found"}
+
+
+def test_no_page_links_to_a_fragment_that_does_not_exist():
+    """Splitting the homepage stranded /#live-network, /#demo and /#privacy.
+
+    An HTTP link check cannot see this: /#gone answers 200 like any other /.
+    Same-page links are checked against that page; /#x against the homepage.
+    """
+    import re
+
+    pages = {p.name: p.read_text() for p in STATIC.glob("*.html")}
+
+    def ids_of(html):
+        return set(re.findall(r'id="([^"]+)"', html))
+
+    home_ids = ids_of(pages["index.html"])
+    for name, html in pages.items():
+        own = ids_of(html)
+        for href in re.findall(r'href="#([^"]+)"', html):
+            assert href in own, f"{name} links to #{href}, which it does not define"
+        for href in re.findall(r'href="/#([^"]+)"', html):
+            assert href in home_ids, f"{name} links to /#{href}; the homepage has no such id"
+        # cross-page fragments: /setup#mcp-clients and friends
+        for page, frag in re.findall(r'href="/([a-z-]+)#([^"]+)"', html):
+            target = pages.get(f"{page}.html")
+            assert target is not None, f"{name} links into /{page}, which is not a page"
+            assert frag in ids_of(target), f"{name} links to /{page}#{frag}, which does not exist"
+
+    assert "/#" not in JS, "the script must not build a link into a homepage anchor"
