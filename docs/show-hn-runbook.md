@@ -128,6 +128,18 @@ afterwards, whatever it turns out to be.
 These come up in roughly this order. Answer briefly, concede real limits, and
 never argue.
 
+**"The agent already has the error message. Why does it need a network?"**
+The premise-level objection, and the one to answer best. The error text says
+what failed. It does not say whether retrying works: `422 validation_error`
+reads the same whether a field was renamed permanently or the service is
+having a bad ten minutes, and the model guesses retry in both. What the
+network adds is the outcome distribution — 0/5 retries worked, 5/5 schema
+refreshes did — which no single agent can derive from its own view. Concede
+the real limit: for a well-documented public API the model often does already
+know the fix. The value concentrates in what it cannot know — a breakage from
+this week, an undocumented change, and which of several plausible fixes
+actually worked.
+
 **"This is Sentry / Rollbar / Datadog with extra steps."**
 Those are per-tenant: your errors, your dashboard, read by a human afterwards.
 FailEcho is cross-tenant, and the consumer is the agent at the decision point,
@@ -156,6 +168,26 @@ which is why it's one of the two questions in the post. The overlap that
 plausibly exists is on shared surfaces: GitHub, Stripe, Slack, OpenAI, AWS
 APIs, and popular MCP servers. Internal services obviously won't overlap.
 
+**"`service` is free text. Three people will name the same server three ways
+and never match."**
+True, and the weakest joint in the design. `_canon` in
+`app/core/fingerprint.py` is strip plus casefold and nothing else, so
+`github`, `github-mcp` and `api.github.com` are three different fingerprints.
+Two things reduce it in practice: the Claude Code hook derives the name from
+the server's own `serverInfo.name`, or its public package name, so hook users
+converge without thinking about it, and the docs pin the convention. A REST
+caller can still type anything. Aliasing is the obvious fix and it is not
+built. Do not argue this one — conceding it earns more credibility than any
+other answer in the thread, because it shows you have read your own code.
+
+**"You run a hook on every tool call that phones home. What does that cost me,
+and what happens when your box is down?"**
+It runs *after* the tool call, never in front of it, so it is not in the path
+of the call. Two-second client timeout: if FailEcho is unreachable the agent
+loses one 2 s timeout and carries on, and Claude Code caps the hook at 10 s
+regardless. Failure path only, apart from a counter POST on success.
+`FAILECHO_DISABLED=1` turns it off without uninstalling anything.
+
 **"I could poison it with fake recoveries."**
 Yes, partially. Current floor: one reporter contributes at most 5 attempts per
 hour to the same fingerprint+action, confidence is discounted below 3 distinct
@@ -165,12 +197,28 @@ there is no auth today, and that reputation is the obvious next thing if the
 network gets real traffic worth attacking.
 
 **"SQLite on one box will melt on the front page."**
-Measured on the production box (one process, 500 MB VPS): the homepage and
-its live data serve ~210–270 req/s with zero failures at 50 concurrent
-connections, and Cloudflare caches in front of that. The agent query path does
+Measured on the production box (one process, 500 MB VPS, 100 MB resident):
+the homepage and its live data serve 287 req/s with zero failures at 50
+concurrent connections, p50 108 ms, and Cloudflare caches in front of that. The agent query path does
 ~60 req/s, about 5 million queries a day. At 200 concurrent nothing fails;
 latency climbs to a few seconds. Writes are rate limited per client by design.
 Say the number, not an adjective.
+
+**"Who are you?" / "What is the business model?" / "Will you publish the
+data?"**
+Three factual questions about you rather than about the code, and improvising
+them reads as evasion. Decide all three before Tuesday and write them here:
+
+- Who is behind it: ______________________________________________
+- Whether it is ever monetised: __________________________________
+- Whether the aggregate dataset gets published: __________________
+
+Two notes. Anything that sounds like a company that does not exist will be
+checked and will cost more than the plain answer would have. And "no plans to
+monetise" is an ordinary, well-received answer on HN — what damages you is
+inventing a pricing tier live in the thread. On the data question, yes is a
+strong answer for a network asking strangers to seed it, and it is also the
+answer that makes the volunteer ask in the post credible.
 
 **"Why MCP?"**
 Because it's how an agent already reaches a tool, so integration is a URL
