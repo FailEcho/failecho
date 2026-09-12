@@ -14,7 +14,8 @@ WorkingDirectory=/srv/failecho
 # and MCP session manager are per-process.
 ExecStart=/srv/failecho/.venv/bin/python -m uvicorn app.main:app \
     --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers \
-    --forwarded-allow-ips '127.0.0.1' --no-server-header
+    --forwarded-allow-ips '127.0.0.1' --no-server-header \
+    --timeout-graceful-shutdown 5
 
 Environment="FIN_DATABASE_URL=sqlite+aiosqlite:////srv/failecho/data/failure_network.db"
 Environment="FIN_PUBLIC_URL=https://failecho.com"
@@ -31,6 +32,8 @@ EnvironmentFile=/etc/failecho.env
 
 Restart=always
 RestartSec=2
+TimeoutStopSec=15
+KillMode=mixed
 
 NoNewPrivileges=true
 PrivateTmp=true

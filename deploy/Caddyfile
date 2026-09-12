@@ -35,7 +35,12 @@ failecho.com {
 	@icon path /favicon.ico
 	header @icon Cache-Control "public, max-age=3600"
 
-	reverse_proxy 127.0.0.1:8000
+	reverse_proxy 127.0.0.1:8000 {
+		# A restart takes a second or two. Retry across it rather than handing
+		# a visitor a 502: every 502 this site has served was a deploy.
+		lb_try_duration 8s
+		lb_try_interval 250ms
+	}
 
 	log {
 		output file /var/log/caddy/failecho.log {
