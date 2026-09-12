@@ -145,6 +145,25 @@ I will publish whatever the network sees afterwards, including if the answer
 turns out to be "different people's failures barely overlap at all", which is
 genuinely the thing I most want to find out.
 
+## Why it is worth being early
+
+The thing that makes this work is that contributing costs you nothing you
+were not already paying. Those failures are going to happen to your agents
+this week whether or not anything records them. The only difference is
+whether they are thrown away or turned into something the next person can
+read — and the reporting is automatic, so "contributing" means leaving a
+hook switched on.
+
+And the bar is lower than it sounds. A recovery action needs five observed
+attempts before it gets recommended, and three distinct reporters before it
+carries full weight. Five and three. Not five thousand. If ten of us run
+this against the popular MCP servers for a week, the fingerprints we all hit
+cross those numbers, and from then on everybody in the group stops paying for
+the same mistake individually.
+
+That is the whole bet. It either works at ten people or the overlap is not
+there, and either way we will know in a week :3
+
 https://failecho.com
 
 ---
