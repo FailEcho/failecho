@@ -27,7 +27,7 @@ The retry is the default and it is usually wrong
 
 ## The problem
 
-You have seen this. Every agent framework does it:
+I lost about forty minutes last week watching this happen:
 
 ```
 > create_issue
@@ -40,50 +40,51 @@ You have seen this. Every agent framework does it:
   x 422 validation_error
 ```
 
-Three attempts, three identical failures, and then it apologises to me about
-it :D
+Three attempts. Three identical failures. Then it apologised to me, which
+somehow made it worse :D
 
-The reason it does this is not that the model is stupid. It is that the error
-message does not contain the information needed to make the decision.
+And the thing is, it wasn't being stupid. Look at what it had to work with:
 
 ```
 422 validation_error
 ```
 
-Is that a field renamed permanently in the last release, or a service having
-a bad ten minutes? The string is byte-for-byte the same in both cases. In one,
-retrying is exactly right and works in thirty seconds. In the other, you can
-retry until your budget runs out, and the answer was "refresh the tool schema,
-the field is called `content` now".
+Go on, tell me from that string whether retrying is worth it. Is that a field
+that got renamed in last week's release, or a service having a bad ten
+minutes? It's the same string either way. In one case
+retrying is exactly right and it'll work in thirty seconds. In the other you
+can retry until your budget's gone, and the actual answer was "the field is
+called `content` now, refresh your tool schema".
 
-The model has to guess, and its prior is retry, because that is what most code
-in its training data does.
+So it guesses. And it guesses retry, because that's what nearly all the code
+it ever read does.
 
-Here is the part that bothers me. **Somebody else already hit this.** Probably
-this week, probably on the same MCP server, and they already found out whether
-retrying works. That knowledge exists and there is nowhere for it to go, so
-every agent rediscovers it alone, at full price, forever.
+Here's the bit that actually bugs me though. **Somebody already hit this.**
+Probably this week, probably on the same MCP server, and they already found
+out whether retrying works. That knowledge exists. It's just sitting in
+someone else's terminal scrollback where nothing can reach it, so every agent
+pays full price to learn it again.
 
 ## What would actually fix it
 
-Not a better prompt, and not a bigger model. The missing thing is not
-reasoning, it is an observation nobody has: *what happened to everyone else
-who hit this exact failure.*
+Not a better prompt. Not a bigger model either — this isn't a reasoning
+problem. What's missing is a fact nobody has: *what happened to everyone else
+who hit this exact thing.*
 
-That needs three pieces:
+You need three pieces to get there:
 
 - a stable id for "this exact failure", so two agents can tell they hit the
   same thing
 - the outcome of what each of them tried next — not what they intended, what
   actually worked
-- successes too, or the failure rate is meaningless. 100 failures out of 200
-  calls is an outage. 100 out of a million is Tuesday.
+- successes too, or your failure rate means nothing. 100 failures out of 200
+  calls is an outage. 100 out of a million is a Tuesday.
 
 ## So I built it
 
-**FailEcho** is a shared failure log for agents. One agent reports a tool
-failure and what it tried; the next agent to hit the same failure gets that
-instead of guessing.
+So I built **FailEcho**. It's a shared failure log for agents: one agent
+reports a failure and what it tried, and the next agent to hit the same thing
+gets told, instead of guessing.
 
 ### Claude Code
 
@@ -94,16 +95,17 @@ instead of guessing.
 /plugin install failecho@failecho
 ```
 
-**2.** Start a new session. Claude Code reads hooks when a session starts, so
-an install made mid-session is not live yet. This is the step everybody skips
-and then wonders why nothing happens :D
+**2.** Start a new session. Claude Code only reads hooks when a session
+starts, so installing mid-session leaves you with a plugin that looks
+installed and does nothing. I've skipped this step myself and then spent ten
+minutes convinced my own thing was broken :D
 
 **3.** Check it took: type `/plugin`. FailEcho should be listed as *enabled*.
 
-That is it. From then on, when an MCP tool fails, the network is asked what
-other agents saw and the failure is reported for the next one. Nobody has to
-remember to do it, and the model is not deciding whether to — a hook runs
-after the tool call.
+That's it. From then on, whenever an MCP tool fails, the network gets asked
+what other agents saw, and your failure gets recorded for whoever's next. You
+don't have to remember anything, and the model isn't deciding whether to
+bother — it's a hook, it just runs after the call.
 
 ### Any other MCP client
 
@@ -117,10 +119,10 @@ client's MCP settings as type `http`:
 }
 ```
 
-You get four tools: `check_tool_failure` before a retry, and
-`report_tool_failure`, `report_tool_success`, `report_recovery_outcome` to
-contribute. Without the hook your agent has to call them itself, so say so in
-its instructions.
+That gives you four tools: `check_tool_failure` before a retry, plus
+`report_tool_failure`, `report_tool_success` and `report_recovery_outcome` for
+contributing. Without the hook your agent has to call these itself, so put a
+line about it in your system prompt or it won't bother.
 
 ### No MCP at all
 
@@ -135,17 +137,17 @@ curl -X POST https://failecho.com/v1/query \
 
 ### Or make the agent do it
 
-If your setup is none of the above, or you would rather not read a setup page
-at all, hand it to the agent. There is an `llms.txt` written for exactly this,
-so paste this at whatever you are running:
+None of the above? Can't be bothered reading a setup page? Fair. Hand it to
+the agent — there's an `llms.txt` sitting there for exactly this. Paste this
+at whatever you're running:
 
 ```
 Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
 ```
 
-It contains the endpoint, the four tools with when to call each, the install
-commands, and the privacy rules about what must never be sent. Agents get this
-right on the first try more often than people expect :3
+It has the endpoint, the config block, all four tools with when to call each,
+and the rules about what must never be sent. I tried it and the agent got it
+first try, which honestly surprised me :3
 
 ## What comes back
 
@@ -165,62 +167,78 @@ Best observed recovery: refresh_schema
   Skipping retry: other agents already proved it does not work here.
 ```
 
-Two things I would defend about that output. The confidence is a Wilson score
-lower bound over observed attempts — no model produces it, and you can
-recompute it from the counts shown. And when the evidence is thin it returns
-`INSUFFICIENT_DATA` and no recommendation, which is a real answer rather than a
-guess with a small number attached.
+Two things about that output I'd argue with anyone about.
 
-It sends metadata only: the service, the operation, an error class and code,
-how long the call took. Never prompts, tool arguments, tool results, headers,
-keys or anything from you. Raw error text is normalised server-side and the
-original thrown away. MIT, no account, no API key.
+That confidence number is a Wilson score lower bound over the actual attempts.
+No model produced it. You can recompute it yourself from the counts printed
+right next to it, which I think should be table stakes for anything telling an
+agent what to do.
+
+And when there isn't enough evidence, it says `INSUFFICIENT_DATA` and
+recommends nothing. Not a guess with a low number bolted on. "I don't know" is
+a real answer and agents handle it fine.
+
+On what leaves your machine: the service, the operation, an error class and
+code, how long the call took. That's it. No prompts, no tool arguments, no
+tool results, no headers, no keys, nothing of yours. Error text gets
+normalised server-side and the original thrown away. MIT, no account, no key.
 
 ## The honest part
 
-That example output is from the runnable demo, not from live traffic.
+Before you install anything: that example output above is from the runnable
+demo. It is not live traffic.
 
-Right now the network is empty. Zero independent agents have reported
-anything; the counter is on the front page and it says zero, because a shared
-log with one participant is just a log :3
+The network is empty. Zero independent agents have reported anything to it.
+That counter is on the front page and it says zero, because a shared log with
+one person in it is just a log :3
 
-So I am not going to tell you it will help you today. It will not. It needs
-about five to ten people running it for a week before any fingerprint has
-enough behind it to be worth reading.
+So I'm not going to sit here and tell you it'll help you today, because it
+won't. It needs something like five to ten people running it for a week before
+any single fingerprint has enough behind it to be worth reading.
 
-That is the actual ask. If you run agents against MCP servers, leave it on for
-a week and see what it catches. It runs after the tool call with a two second
-timeout, so the worst case when my server is down is that your agent waits two
-seconds, and `FAILECHO_DISABLED=1` turns it off entirely.
+Which is the actual ask, really. If you run agents against MCP servers, leave
+this on for a week and see what it catches. It runs after the tool call with a
+two second timeout, so the worst thing that happens when my server falls over
+is your agent waits two seconds. `FAILECHO_DISABLED=1` kills it entirely.
 
-I will publish whatever the network sees afterwards, including if the answer
-turns out to be "different people's failures barely overlap at all", which is
-genuinely the thing I most want to find out.
+And I'll publish whatever it sees afterwards — including if the answer turns
+out to be "turns out different people's failures barely overlap at all", which
+is honestly the thing I most want to know.
 
 ## Why it is worth being early
 
-The thing that makes this work is that contributing costs you nothing you
-were not already paying. Those failures are going to happen to your agents
-this week whether or not anything records them. The only difference is
-whether they are thrown away or turned into something the next person can
-read — and the reporting is automatic, so "contributing" means leaving a
-hook switched on.
+Here's the part I like. Contributing costs you nothing you weren't already
+paying. Those failures are happening to your agents this week regardless. The
+only question is whether they evaporate or turn into something the next person
+can read — and since the hook does the reporting, "contributing" means leaving
+a switch on and forgetting about it.
 
-And the bar is lower than it sounds. A recovery action needs five observed
-attempts before it gets recommended, and three distinct reporters before it
-carries full weight. Five and three. Not five thousand. If ten of us run
-this against the popular MCP servers for a week, the fingerprints we all hit
-cross those numbers, and from then on everybody in the group stops paying for
-the same mistake individually.
+And the bar is way lower than it sounds. An action needs five observed
+attempts before it gets recommended, and three separate reporters before it
+carries full weight. Five and three. Not five thousand. If ten of us point
+this at the popular MCP servers for a week, the failures we all share cross
+those numbers, and after that none of us is paying for the same mistake
+alone anymore.
 
-That is the whole bet. It either works at ten people or the overlap is not
-there, and either way we will know in a week :3
+That's the whole bet. Either it works at ten people or the overlap isn't
+there, and either way we find out in a week :3
 
 https://failecho.com
 
 ---
 
 ## Before publishing
+
+**Two lines are written as things you personally did. Make them true or change
+them — a made-up anecdote is the one thing in here that cannot be defended:**
+
+- "I lost about forty minutes last week watching this happen" — the opening.
+  Use a real number from a real session, or cut the number and say "watching
+  this happen".
+- "I tried it and the agent got it first try" — about pasting the llms.txt
+  line. Paste it at your own agent once, then it is true.
+
+Then the rest:
 
 - The sample output must match what the demo actually prints. Run
   `python examples/live_agent/run_demo.py` and copy from it rather than from
