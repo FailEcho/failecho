@@ -66,9 +66,13 @@ def test_the_data_promise_travels_with_the_instructions(client):
 def test_it_answers_the_obvious_failures(client):
     body = client.get("/setup").text
     assert "If nothing shows up" in body
-    assert "Start a new one." in body            # hooks load at session start
+    # The four causes, by what each one tells the reader to do -- not by the
+    # sentence it is currently phrased in.
+    assert "Start a new session" in body          # hooks load at session start
     assert "FAILECHO_HOOK_SERVICE_NAMES" in body  # local servers are skipped
+    assert "/v1/observe" in body                  # non-MCP failures go direct
     assert "FAILECHO_DISABLED=1" in body          # and how to stop entirely
+    assert "nothing is stored about you" in body
 
 
 def test_page_metadata_and_no_stray_tokens(client):

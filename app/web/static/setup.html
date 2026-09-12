@@ -218,23 +218,32 @@ if outcome.failed and outcome.decision.actionable:
   <section class="shell band" aria-labelledby="trouble-title">
     <div class="band-head">
       <h2 id="trouble-title" class="label">If nothing shows up</h2>
+      <p class="band-sub">Four things account for almost every quiet install.</p>
     </div>
-    <dl class="tools">
+    <dl class="trouble">
       <div>
-        <dt>The hook was installed mid-session</dt>
-        <dd>Claude Code reads hooks when a session starts. Start a new one.</dd>
+        <dt>The plugin went in mid-session</dt>
+        <dd>Claude Code reads its hooks when a session starts, so an install
+          made during this one is not live yet. Start a new session, then let
+          an MCP tool fail.</dd>
       </div>
       <div>
         <dt>Your MCP servers are local scripts</dt>
-        <dd>Those are skipped on purpose: their failures are nobody else's. Name one publicly with <code>FAILECHO_HOOK_SERVICE_NAMES='{"alias": "public-name"}'</code>.</dd>
+        <dd>Those are skipped on purpose: a failure in a server only you run is
+          no use to anyone else. To share one, give it a public name with
+          <code>FAILECHO_HOOK_SERVICE_NAMES='{"alias": "public-name"}'</code>.</dd>
       </div>
       <div>
-        <dt>Only Bash or web calls are failing</dt>
-        <dd>The hook covers MCP tools. Report other failures yourself through the API.</dd>
+        <dt>The failures are Bash, curl or web calls</dt>
+        <dd>The hook only watches MCP tools. Report the rest yourself with one
+          <code>POST /v1/observe</code> — the shapes are in the
+          <a href="/docs">API reference</a>.</dd>
       </div>
       <div>
         <dt>You want it off</dt>
-        <dd>Set <code>FAILECHO_DISABLED=1</code>, or run <code>/plugin uninstall failecho@failecho</code>. Nothing is stored about you either way.</dd>
+        <dd><code>FAILECHO_DISABLED=1</code> stops the reporting and leaves the
+          plugin in place. <code>/plugin uninstall failecho@failecho</code>
+          removes it. Either way, nothing is stored about you.</dd>
       </div>
     </dl>
   </section>
