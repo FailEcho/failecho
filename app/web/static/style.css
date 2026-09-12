@@ -672,7 +672,20 @@ footer.shell {
 }
 
 /* ---- centred hero, install card as the anchor --------------------------- */
-.hero--center { text-align: center; padding-block: 120px 96px; }
+/* The artwork sits behind the hero, isolated so it cannot reach the bands
+   below, and quiet enough that the headline keeps its contrast. */
+.hero--center {
+  text-align: center; padding-block: 120px 96px;
+  position: relative; isolation: isolate; overflow: hidden;
+}
+.hero--center::before {
+  content: "";
+  position: absolute; z-index: -1; pointer-events: none;
+  top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: min(1240px, 132%);
+  background: url("/static/echoimage.png") center / contain no-repeat;
+  opacity: 0.3;
+}
 .hero--center h1 { margin-inline: auto; max-width: 900px; }
 .hero--center .hero-lede { margin-inline: auto; max-width: 54ch; color: var(--ink); }
 .hero--center .hero-support { margin-inline: auto; max-width: 62ch; text-align: left; }

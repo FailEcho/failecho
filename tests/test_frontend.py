@@ -182,13 +182,28 @@ def test_static_assets_stay_small():
     assert len(JS) < 12_000
     assert sum(len(x) for x in (HTML, CSS, JS)) < 56_000
 
+    # The hero artwork is the single heaviest thing the homepage loads, so it
+    # is counted here rather than left out of the number it dominates. It is
+    # decorative: quantised hard, and capped so it cannot creep back up.
+    art = (STATIC / "echoimage.png").stat().st_size
+    assert art < 90_000, f"hero art is {art} bytes; re-quantise it"
+
     per_visit = (
         sum(len(x) for x in (HTML, CSS, JS))
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-light.png").stat().st_size
+        + art
     )
-    assert per_visit < 120_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 165_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
+
+
+def test_the_hero_art_stays_behind_the_hero():
+    """Decoration must not reach the bands below, or the text on top of it."""
+    assert '.hero--center::before' in CSS
+    block = CSS[CSS.index(".hero--center::before"):CSS.index(".hero--center h1")]
+    assert "z-index: -1" in block and "pointer-events: none" in block
+    assert "overflow: hidden" in CSS[CSS.index(".hero--center {"):CSS.index(".hero--center::before")]
 
 
 def test_mobile_layout_rules_exist():
