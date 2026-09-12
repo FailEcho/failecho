@@ -23,11 +23,14 @@ in the thread falls off /new without ever reaching the front page.
       `claude plugin marketplace add FailEcho/failecho` then
       `claude plugin install failecho@failecho` installs and loads both the
       MCP server and the hook. Re-check if either manifest changes.
-- [x] Load tested 2026-09-11 on a throwaway copy on the production box
-      (50 concurrent, 20s, zero failures): homepage ~210–270 req/s, p99 ~1s;
-      `/v1/query` ~60 req/s, p99 ~1.1s. At 200 concurrent nothing failed,
-      but p99 rose to ~5s (homepage) and ~6.5s (query). Re-run
-      `.venv/bin/python scripts/loadtest.py` if the code changes before launch.
+- [x] Load tested 2026-09-12 on the launch build, on a throwaway copy on the
+      production box (50 concurrent, 20s per profile, zero failures):
+      homepage 287 req/s, p50 108 ms, p99 987 ms; `/v1/query` 60 req/s,
+      p50 815 ms, p99 1.1 s; mixed traffic 195 req/s, with 429s where the
+      write rate limit is meant to bite. /setup answers in ~2 ms. At 200
+      concurrent (measured 09-11) nothing failed, but p99 rose to ~5 s
+      (homepage) and ~6.5 s (query). Re-run
+      `.venv/bin/python scripts/loadtest.py` if the code changes again.
 - [ ] Read the current stats and be ready to say them out loud, split by
       source: `real_observations_total` (independent agents) and
       `first_party_observations` (your own agents). On 2026-09-11 both were 0.
