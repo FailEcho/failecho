@@ -775,7 +775,7 @@ footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
 }
 .loop-node {
   flex: none; width: 196px; height: 196px; border-radius: 50%;
-  border: 1px dashed var(--line-2); background: var(--surface);
+  border: 1px dashed var(--line-2); background: transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; padding: 10px 20px; text-align: center;
 }
@@ -859,3 +859,30 @@ footer { padding-block: 40px 64px; border-top: 1px solid var(--line); }
   .install pre { padding-right: 18px; padding-top: 46px; }
   .install-copy { top: 10px; left: 12px; right: auto; }
 }
+
+/* ---- the echo, at the edges -------------------------------------------- */
+/* A waveform running top to bottom in the margins: the same signal on both
+   sides, which is what the section is about. Decoration only, so it is
+   dropped entirely when the window is too narrow to hold it clear of the
+   text. */
+.band--wave { background: none; position: relative; }
+.band--wave > * { position: relative; z-index: 1; }
+.band--wave::before, .band--wave::after {
+  content: none;
+  position: absolute; top: 0; bottom: 0; width: 44px;
+  background-image: url("/static/wave.svg");
+  background-repeat: repeat-y;
+  background-size: 44px 560px;
+  opacity: 0.85;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
+}
+@media (min-width: 1300px) {
+  .band--wave::before, .band--wave::after { content: ""; }
+  .band--wave::before { left: 0; }
+  .band--wave::after { right: 0; transform: scaleX(-1); }
+}
+@media (prefers-reduced-motion: reduce) { .band--wave::before, .band--wave::after { opacity: 0.6; } }
+
+/* A CTA closing a band sits under its heading, not against it. */
+.band .hero-actions { margin-top: 4px; }

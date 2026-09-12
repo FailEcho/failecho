@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="560" viewBox="0 0 44 560">
+<!-- An echo: a swell that decays, with a faster ripple on it.
+     One period, so the strip tiles down the page. -->
+<path d="M0 2h4M0 22h4M0 42h6M0 62h7M0 82h9M0 102h11M0 122h14M0 142h17M0 162h22M0 182h28M0 202h32M0 222h33M0 242h33M0 262h31M0 282h29M0 302h28M0 322h29M0 342h30M0 362h30M0 382h28M0 402h25M0 422h20M0 442h15M0 462h11M0 482h9M0 502h7M0 522h5M0 542h4" stroke="#39434f" stroke-width="4"
+      stroke-linecap="round" fill="none"/>
+</svg>
