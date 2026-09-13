@@ -291,7 +291,11 @@ h1 {
   animation: beat 2.6s ease-in-out infinite;
 }
 @keyframes beat { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
-@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+@keyframes tick { 0% { color: var(--red); } 100% { color: inherit; } }
+.ticked { animation: tick 1.8s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .pulse, .ticked, .install-panel:not([hidden]) { animation: none; }
+}
 
 /* ---- metrics ----------------------------------------------------------- */
 .metrics {
@@ -717,12 +721,14 @@ footer.shell {
   color: var(--ink); border-bottom-color: var(--red);
 }
 /* All panels as tall as the tallest, so a tab switch cannot resize the card,
-   the hero, or the artwork sized to the hero. Measured 136/232/195/136 wide,
-   150/244/197/150 at 390px. The two-line panels have room to spare at that
+   the hero, or the artwork sized to the hero. Measured 136/206/177/136
+   wide, 150/237/192/150 at 390px. The two-line panels have room to spare at that
    height, so their content sits in the middle of it rather than leaving a
    block of empty card underneath. */
+@keyframes panelin { from { opacity: 0; } to { opacity: 1; } }
+.install-panel:not([hidden]) { animation: panelin .14s ease-out; }
 .install-panel {
-  position: relative; min-height: 232px;
+  position: relative; min-height: 208px;
   display: flex; flex-direction: column; justify-content: center;
 }
 
@@ -741,7 +747,10 @@ footer.shell {
 }
 .install-copy { position: absolute; top: 12px; right: 12px; }
 .install pre { margin: 0; padding: 20px 82px 8px 20px; overflow-x: auto; }
-.install code { font-family: var(--mono); font-size: 15px; line-height: 1.95; }
+.install code { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; }
+/* Two lines of text in a card sized for the tallest panel reads as an
+   empty card. These two get the room the others spend on content. */
+#panel-plugin code, #panel-agent code { font-size: 15px; line-height: 1.95; }
 .install-foot {
   margin: 0; padding: 10px 20px 18px;
   font-size: 13.5px; color: var(--ink-3);
@@ -858,10 +867,12 @@ footer.shell {
 @media (max-width: 640px) {
   .hero--center { padding-block: 76px 66px; }
   .statcards { grid-template-columns: minmax(0, 1fr); }
-  .install-panel { min-height: 250px; }
+  .install-panel { min-height: 240px; }
   /* 13.5px mono put the REST and agent snippets 40px over a 435px box, so
-     both scrolled sideways on a phone. Smaller type fits them instead. */
-  .install code { font-size: 12px; }
+     both scrolled sideways on a phone. Smaller type fits them instead, and
+     the two short panels lose their desktop bump for the same reason: the
+     agent line is the longest one on the card. */
+  .install code, #panel-plugin code, #panel-agent code { font-size: 12px; }
   .install pre { padding-right: 18px; padding-top: 46px; }
   .install-copy { top: 10px; left: 12px; right: auto; }
 }
@@ -911,6 +922,7 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   font-size: 13.5px; line-height: 1.35; color: var(--ink-3);
   padding: 6px 10px; border-left: 2px solid var(--line); border-radius: 0 4px 4px 0;
   text-decoration: none;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
 }
 .pagenav a:hover { color: var(--ink); border-left-color: var(--red); background: var(--surface); }
 .pagenav a:target, .pagenav a.here { color: var(--ink); border-left-color: var(--red); }

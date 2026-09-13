@@ -27,6 +27,22 @@
     if (node) node.textContent = value;
   }
 
+  // A figure that moved since the last poll flashes once. The page claims the
+  // network is live; this is it showing that rather than asserting it. First
+  // paint never flashes -- nothing changed, the page just arrived -- and the
+  // clock is deliberately not a stat, or every cycle would flash.
+  function setStat(id, value) {
+    var node = el(id);
+    if (!node) return;
+    var seen = node.getAttribute("data-seen");
+    node.textContent = value;
+    node.setAttribute("data-seen", String(value));
+    if (seen === null || seen === String(value)) return;
+    node.classList.remove("ticked");
+    void node.offsetWidth; // restart the animation rather than let it no-op
+    node.classList.add("ticked");
+  }
+
   function setHTML(id, value) {
     var node = el(id);
     if (node) node.innerHTML = value;
@@ -52,22 +68,22 @@
 
   // -- live network ------------------------------------------------------
   function renderStats(stats) {
-    setText("stat-real-24h", number(stats.real_observations_24h));
-    setText("stat-real-reporters", number(stats.real_reporters_24h));
-    setText("stat-real-fingerprints", number(stats.real_failure_fingerprints));
-    setText("stat-real-incidents", number(stats.real_active_failures));
+    setStat("stat-real-24h", number(stats.real_observations_24h));
+    setStat("stat-real-reporters", number(stats.real_reporters_24h));
+    setStat("stat-real-fingerprints", number(stats.real_failure_fingerprints));
+    setStat("stat-real-incidents", number(stats.real_active_failures));
 
     // Zeros stay visible: an empty network is the honest state.
     show("real-empty", stats.real_observations_24h === 0);
 
     // Our own agents: labelled, never adoption.
     show("first-party-block", stats.first_party_observations > 0);
-    setText("stat-first-party", number(stats.first_party_observations || 0));
+    setStat("stat-first-party", number(stats.first_party_observations || 0));
 
     show("demo-stats-block", stats.demo_data);
     if (stats.demo_data) {
-      setText("stat-demo-agent", number(stats.demo_agent_observations));
-      setText("stat-synthetic", number(stats.synthetic_observations));
+      setStat("stat-demo-agent", number(stats.demo_agent_observations));
+      setStat("stat-synthetic", number(stats.synthetic_observations));
     }
 
     show("demo-mode-badge", stats.demo_mode);
@@ -327,9 +343,67 @@
     }
   }
 
+  // -- on-this-page rail ---------------------------------------------------
+  // Which section you are in, marked as you scroll. Read off the sections'
+  // own positions rather than an observer: the answer is then the same one
+  // the reader sees, at any scroll speed, with no threshold to tune.
+  function wireRail() {
+    var links = document.querySelectorAll(".pagenav-links a");
+    if (!links.length) return;
+
+    var pairs = [];
+    Array.prototype.forEach.call(links, function (link) {
+      var section = el(link.getAttribute("href").slice(1));
+      if (section) pairs.push([link, section]);
+    });
+    if (!pairs.length) return;
+
+    var last = 0;
+    var trailing = null;
+
+    function mark() {
+      last = Date.now();
+      // Just under the sticky header: the first thing you can actually read.
+      var line = 120;
+      var current = pairs[0];
+      for (var i = 0; i < pairs.length; i++) {
+        if (pairs[i][1].getBoundingClientRect().top <= line) current = pairs[i];
+      }
+      // A short last section never reaches the line. At the bottom of the
+      // page it is nonetheless the one you are looking at.
+      if (window.innerHeight + window.pageYOffset >=
+          document.documentElement.scrollHeight - 4) {
+        current = pairs[pairs.length - 1];
+      }
+      for (var j = 0; j < pairs.length; j++) {
+        var on = pairs[j] === current;
+        pairs[j][0].classList.toggle("here", on);
+        if (on) pairs[j][0].setAttribute("aria-current", "true");
+        else pairs[j][0].removeAttribute("aria-current");
+      }
+    }
+
+    // Throttled on the clock, not on a frame. A requestAnimationFrame latch
+    // is the usual shape here and it has a failure mode this cannot have: if
+    // the frame never arrives -- a background tab, a throttled renderer --
+    // the latch stays set and the rail freezes for the rest of the session.
+    function schedule() {
+      var since = Date.now() - last;
+      if (trailing) window.clearTimeout(trailing);
+      if (since >= 100) return mark();
+      // The scroll that stops mid-throttle still gets its answer.
+      trailing = window.setTimeout(mark, 100 - since);
+    }
+
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    mark();
+  }
+
   addCopyButtons();
   wireCopyButtons();
   wireTabs();
+  wireRail();
   if (el("stat-real-24h")) {
     refresh();
     if (!document.hidden) startPolling();

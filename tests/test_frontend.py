@@ -195,15 +195,21 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
-    assert len(CSS) < 36_000
-    assert len(JS) < 12_000
+    # 36k -> 37k, 12k -> 15k for three pieces of motion that carry
+    # information: a figure that moved since the last poll, the rail marking
+    # the section you are in, and a tab switch reading as a swap. The script
+    # takes most of it -- the rail reads section positions itself rather than
+    # tuning an observer's thresholds, and that logic is worth its comments.
+    assert len(CSS) < 37_000
+    assert len(JS) < 15_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
     # to reclaim, so the next addition is an honest raise rather than a trim.
     # 58k -> 60k, same reason: the rail's CSS is shared with the homepage's
     # stylesheet even though only /setup and /about use it.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 60_000
+    # 60k -> 64k for the motion above.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 64_000
 
     # The hero artwork is the single heaviest thing the homepage loads, so it
     # is counted here rather than left out of the number it dominates. It is
@@ -404,3 +410,53 @@ def test_no_install_snippet_is_wider_than_its_box():
         default=0,
     )
     assert longest <= 66, f"longest snippet line is {longest} chars; it will scroll"
+
+
+def test_only_motion_that_carries_information_is_on_the_page():
+    """Three animations, each answering a question the reader would otherwise
+    have to take on trust: has anything happened since I opened this, where
+    am I in this page, and did that tab actually change something."""
+    assert "@keyframes tick" in CSS, "a figure that moved does not say so"
+    assert "@keyframes panelin" in CSS, "a tab switch does not read as a swap"
+    assert "@keyframes beat" in CSS, "the live pulse is gone"
+    # And nothing that animates a number upward from zero: that would draw
+    # growth the network has not had. Three keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 3
+
+
+def test_every_animation_respects_reduced_motion():
+    reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce) {\n  .pulse"):]
+    reduced = reduced[:reduced.index("}")]
+    for selector in (".pulse", ".ticked", ".install-panel:not([hidden])"):
+        assert selector in reduced, f"{selector} keeps animating under reduced motion"
+
+
+def test_the_first_paint_of_a_figure_never_flashes():
+    """Nothing changed when the page arrives; the page just arrived. The flash
+    means new evidence, so it has to be worth something when it happens."""
+    assert 'if (seen === null || seen === String(value)) return;' in JS
+    # The clock is not a stat: it changes every cycle and would flash forever.
+    assert 'setText("updated"' in JS
+    assert 'setStat("updated"' not in JS
+
+
+def test_the_rail_marker_cannot_freeze():
+    """A requestAnimationFrame latch is the usual throttle here, and if the
+    frame never arrives -- background tab, throttled renderer -- the latch
+    stays set and the rail stops updating for the rest of the session."""
+    rail = JS[JS.index("function wireRail()"):]
+    code = "\n".join(
+        line for line in rail.splitlines() if not line.lstrip().startswith("//")
+    )
+    assert "requestAnimationFrame" not in code
+    assert "setTimeout(mark" in code
+
+
+def test_the_hero_bump_is_only_on_the_two_short_panels():
+    """The MCP config and the REST snippet fill their panel already; the two
+    two-line panels are the ones that looked empty."""
+    assert ".install code { font-family: var(--mono); font-size: 13.5px" in CSS
+    assert "#panel-plugin code, #panel-agent code { font-size: 15px" in CSS
+    # ... and the bump comes off on a phone, where the agent line is the
+    # longest thing on the card and 15px sends it sideways.
+    assert ".install code, #panel-plugin code, #panel-agent code { font-size: 12px; }" in CSS
