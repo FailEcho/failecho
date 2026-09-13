@@ -226,7 +226,7 @@ a[rel~="external"]:hover::after { color: var(--red); }
 /* ---- hero -------------------------------------------------------------- */
 .hero { padding-block: 96px 80px; }
 h1 {
-  margin: 0 0 24px;
+  margin: 0 0 18px;
   font-family: var(--serif);
   font-weight: 400;
   font-size: clamp(38px, 4.6vw, 60px);
@@ -244,7 +244,7 @@ h1 {
   max-width: 56ch;
 }
 
-.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 32px; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 22px; }
 
 .hero-tagline {
   margin: 0 0 10px;
@@ -673,7 +673,7 @@ footer.shell {
 /* The artwork sits behind the hero, isolated so it cannot reach the bands
    below, and quiet enough that the headline keeps its contrast. */
 .hero--center {
-  text-align: center; padding-block: 96px 80px;
+  text-align: center; padding-block: 72px 60px;
   position: relative; isolation: isolate; overflow: hidden;
 }
 .hero--center::before {
@@ -686,7 +686,7 @@ footer.shell {
 }
 .hero--center h1 { margin-inline: auto; max-width: 900px; }
 .hero--center .hero-lede { margin-inline: auto; max-width: 54ch; color: var(--ink); }
-.hero--center .hero-support { margin-inline: auto; max-width: 62ch; text-align: left; }
+.hero--center .hero-support { margin-inline: auto; max-width: 62ch; text-align: left; margin-bottom: 24px; }
 .hero--center .hero-actions { justify-content: center; }
 .hero--center .hero-tagline {
   display: inline-block; border-left: 0; padding-left: 0;
@@ -695,7 +695,7 @@ footer.shell {
 
 /* ---- install card, one tab per way in ---------------------------------- */
 .install {
-  margin: 34px auto 12px; max-width: 660px; text-align: left;
+  margin: 24px auto 12px; max-width: 660px; text-align: left;
   background: var(--surface); border: 1px solid var(--line-2);
   border-radius: var(--r); overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
@@ -736,7 +736,7 @@ footer.shell {
   margin: 0; padding: 10px 18px 16px;
   font-size: 12.5px; color: var(--ink-3);
 }
-.install-note { margin: 0 0 34px; font-size: 14px; color: var(--ink-2); }
+.install-note { margin: 0 0 22px; font-size: 14px; color: var(--ink-2); }
 
 /* ---- centred bands ----------------------------------------------------- */
 .band--center { text-align: center; }
