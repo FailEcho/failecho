@@ -473,6 +473,12 @@
       bar.classList.add("is-open");
       bar.style.setProperty("--bar-h-open", bar.offsetHeight + "px");
       bar.classList.toggle("is-open", wasOpen);
+      // How far the page moves is how far the bar grew.
+      document.body.style.setProperty(
+        "--bar-shift",
+        (parseFloat(bar.style.getPropertyValue("--bar-h-open"))
+          - parseFloat(bar.style.getPropertyValue("--bar-h"))) + "px"
+      );
       // Read once more so the browser cannot batch the class changes past
       // the point where turning transitions back on would animate them.
       void bar.offsetHeight;
@@ -482,6 +488,7 @@
     function open(on) {
       bar.classList.toggle("is-open", on);
       scrim.classList.toggle("is-open", on);
+      document.body.classList.toggle("menu-open", on);
     }
 
     // Opening is per item; closing is not. Closing on the item's own

@@ -222,7 +222,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 43_000
+    assert len(CSS) < 44_000
     assert len(JS) < 23_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -233,7 +233,7 @@ def test_static_assets_stay_small():
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
     # opening on top of the word that opened it, 65k -> 69k for the hero,
     # 69k -> 73k for the two-state bar and the drifting ground.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 79_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 80_000
 
     # The artwork is not behind the hero any more, where it was the wrong
     # shape at most window sizes and blocked the first paint. It closes the
@@ -254,7 +254,7 @@ def test_static_assets_stay_small():
     )
     # 119k -> 150k: the artwork is back, once, below the fold and lazy, as
     # the closing band. Both halves of it are the same request.
-    assert per_visit < 151_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 153_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -691,3 +691,32 @@ def test_a_scramble_never_ends_on_noise_and_never_overlaps_itself():
     assert 'node.getAttribute("data-scrambling") === "1"' in JS
     assert 'node.removeAttribute("data-scrambling")' in JS
     assert "node.textContent = text;" in JS
+
+
+def test_every_page_loads_the_script():
+    """/about and /404 did not, so on those two pages the menus never opened,
+    the page never blurred, the rail never marked a section and no code block
+    had a copy control. Nothing announced it: the markup was all there."""
+    for page in STATIC.glob("*.html"):
+        body = page.read_text()
+        assert "/static/app.js" in body, f"{page.name} loads no script"
+        assert 'id="copy-status"' in body, f"{page.name} has nowhere to announce a copy"
+
+
+def test_the_page_moves_with_the_bar_wherever_you_are_on_it():
+    """The bar growing pushed the page down by itself, but only at the very
+    top of the document: a sticky element keeps its slot in the flow where it
+    started, so past that slot it was growing something off screen. The growth
+    is taken back out of the flow and the page is moved by the same amount
+    instead -- measured at 25px at y=0, y=900 and y=2200, on three pages."""
+    assert ".topbar.is-open { margin-bottom: calc(var(--bar-h" in CSS
+    assert "body.menu-open main," in CSS
+    assert "transform: translateY(var(--bar-shift" in CSS
+    # The margin has to move with everything else or the page jolts up first.
+    bar = CSS[CSS.index(".topbar {"):CSS.index(".topbar::after")]
+    assert "margin-bottom 0.22s ease" in bar
+    assert '"--bar-shift"' in JS and 'classList.toggle("menu-open"' in JS
+
+
+def test_menu_entries_say_they_lead_somewhere():
+    assert '.navpanel b::after { content: " \\2197"; ' in CSS

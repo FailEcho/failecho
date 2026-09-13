@@ -130,7 +130,9 @@ a[rel~="external"]:hover::after { color: var(--red); }
   background: rgba(0, 0, 0, 0.72);
   backdrop-filter: saturate(160%) blur(16px);
   -webkit-backdrop-filter: saturate(160%) blur(16px);
-  transition: background 0.22s ease;
+  /* margin-bottom moves with the rest of it, or the page jolts up 25px
+     the instant a menu opens and then eases back down. */
+  transition: background 0.22s ease, margin-bottom 0.22s ease;
 }
 /* The rule is a gradient, not a border: solid in the middle and gone at both
    edges, so it reads as a horizon rather than as a box's bottom side. */
@@ -222,6 +224,8 @@ a[rel~="external"]:hover::after { color: var(--red); }
     rgba(255, 255, 255, 0.75) 78%, transparent);
 }
 .navpanel b { font-size: 16px; }
+.navpanel b::after { content: " \2197"; font-size: .8em; color: var(--ink-3); }
+.navpanel a:hover b::after { color: var(--red); }
 .navpanel span { font-size: 13.5px; }
 .navitem:hover .navpanel, .navitem:focus-within .navpanel {
   opacity: 1; visibility: visible; transform: none;
@@ -235,6 +239,17 @@ a[rel~="external"]:hover::after { color: var(--red); }
    comes down rather than only sprouting a panel. */
 .topbar-row { transition: padding 0.22s ease; }
 .topbar.is-open .topbar-row { padding-block: 28px; }
+
+/* And the page comes with it. The bar growing used to push the page down by
+   itself, but only at the very top of the document: a sticky element keeps
+   its slot in the flow where it started, so once you have scrolled past that
+   slot, growing it moves something that is no longer on screen. The growth
+   is taken back out of the flow with a negative margin, and the page is
+   moved by the same amount instead, which happens wherever you are. */
+.topbar.is-open { margin-bottom: calc(var(--bar-h, 76px) - var(--bar-h-open, 101px)); }
+main, footer, .echoband { transition: transform 0.22s ease; }
+body.menu-open main,
+body.menu-open footer { transform: translateY(var(--bar-shift, 25px)); }
 /* The mark grows into the taller bar rather than sitting in the middle of it. */
 .brand-mark, .brand-word {
   transition: height 0.22s ease, transform 0.22s ease, opacity 0.22s ease;
