@@ -2,14 +2,18 @@
 
 **Post this first, two or three days before `devto-post.md`.**
 
-Long-form, in the shape that does well on dev.to right now: a named concept,
-a real scientific anchor, an ASCII diagram, a table, and a question at the end.
+Long-form, in the shape that does well on dev.to right now: a named concept, a
+real scientific anchor, an ASCII diagram, and a question at the end.
 
-The one thing deliberately not copied from that format is invented metrics.
-Posts in this genre often close with a results table full of impressive
-numbers. Ours has a table too, and every figure in it is zero, because that is
-what is true. That inversion is the most defensible thing in the piece and
-probably the most memorable.
+**FailEcho is not mentioned in it.** Not the name, not a link, not "a thing I
+built", and not in a reply in the comments either. That is the whole point of
+posting it first: an account whose only article is about its author's product
+reads as an ad, and the main post lands better on a profile that already has
+something worth reading on it. The bio carries the link; that is enough.
+
+What the post does instead is leave the reader thinking about failures that
+nobody records and agents that never meet. Two days later the main post is
+about exactly that. The connection is the reader's to make.
 
 The previous warm-up (the 11pm debugging one) is in git history.
 
@@ -204,80 +208,53 @@ recompute it by hand when somebody asks where the number came from.
 When there is not enough evidence, return that. Not a guess with a low
 confidence bolted on — an actual "I don't know". Agents handle it fine.
 
-## 6. So I built the pheromone trail
+## 6. The question I cannot answer alone
 
-It is called **FailEcho**. Agents report tool failures and recovery outcomes as
-metadata; the next agent to hit the same fingerprint gets told what worked
-instead of guessing.
+Here is the thing I keep coming back to, and cannot settle by thinking harder:
 
-In Claude Code it is two lines. Any other MCP client points at an endpoint.
-There is a REST API if you do not want MCP, and you can hand the whole job to
-the agent — there is an `llms.txt` written for exactly that.
+**Do different people's agent failures actually overlap?**
 
-Now the part where this post stops resembling the genre it is written in.
+The theory says they should. We are all calling the same twenty MCP servers and
+the same dozen public APIs, and when GitHub renames a field it renames it for
+everyone at once. Your 422 on Tuesday and my 422 on Thursday are plausibly the
+same 422.
 
-Articles like this usually end with a results table. Here is mine, live at the
-time of writing:
+But "obviously true" is where most wrong ideas live. It is equally plausible
+that the interesting failures are all local — your auth setup, my rate limit,
+their internal service — and that the shared surface is too thin for any of
+this to matter. A pheromone trail nobody else walks is just a smell.
 
-| Metric | Value |
-|---|---:|
-| Independent agents reporting | **0** |
-| Distinct reporters, last 24h | **0** |
-| Cross-agent recoveries recorded | **0** |
-| Known failure fingerprints | 3 |
-
-That is not modesty. **The pheromone trail is empty.** Every number above is on
-the front page of the site, unrounded, and the three fingerprints are mine.
-
-A stigmergic system with one participant is not a colony. It is one ant walking
-in a circle.
-
-## 7. The actual question
-
-Here is what I genuinely do not know, and cannot find out alone:
-
-**Do different people's agent failures overlap at all?**
-
-The theory says they should. Everyone is calling the same twenty MCP servers
-and the same dozen public APIs, and when GitHub renames a field it renames it
-for all of us at once. But I have no evidence, and "obviously true" is where
-most wrong ideas live.
-
-There is one number that decides it. A recovery action needs five observed
-attempts before it is recommended, and three distinct reporters before it
-carries full weight. **Five and three.** Not five thousand. If ten people point
-this at the popular MCP servers for a week, the failures we share cross those
-thresholds and we all stop paying separately for the same mistake. If they
-never cross, the overlap is not there and the idea is wrong — which is also
-worth knowing, and I will publish that too.
-
-It runs after the tool call with a two second timeout, so the worst case when
-my server falls over is your agent waits two seconds. One environment variable
-turns it off. MIT, no account, no API key.
-
-https://failecho.com
+I do not know which world we are in. It is decidedly testable, and I do not
+think anyone has tested it.
 
 ## Your turn
 
-Two things I would genuinely like to know, whether or not you ever install
-anything:
+Three things I would genuinely like to know:
 
-- **What failure does your agent keep rediscovering?** The one you have
-  explained to it four times.
-- **Would you leave a reporter on for a week?** And if not — what is the thing
-  that stops you? I would rather hear that now than guess at it.
+- **What failure does your agent keep rediscovering?** The specific one you
+  have explained to it four times, in four different sessions.
+- **Was it a failure only you could have hit**, or would anyone calling that
+  service have walked into it too? That is the whole question above, in one
+  concrete case.
+- **What do you do about it now?** A line in the system prompt, a wrapper, a
+  note in the repo, or nothing at all and you just eat it every time.
+
+I am collecting answers to the middle one in particular. If enough people
+describe failures that turn out to be the same failure, that settles it.
 
 ---
 
 ## Before publishing
 
-- Re-check the four numbers in the table against
-  `https://failecho.com/v1/stats` on the morning you post. They are the most
-  scrutinised thing in the piece precisely because they are zeros.
-- The Wilson figures (0.57 and 0.89) are computed from the standard formula at
-  z=1.96. Recheck if you quote different counts.
+- **Do not mention FailEcho.** Not in the post, not in a comment, not in a
+  reply to someone who asks what you would use. If somebody asks directly, the
+  honest answer is "I have been building something around this, it is in my
+  bio" — once, and only if asked.
+- The Wilson figures (0.57 and 0.89) come from the standard formula at z=1.96.
+  Recheck if you quote different counts.
 - Grassé coined *stigmergie* in 1959 studying termites; the etymology is
-  *stigma* + *ergon*. Both are correct as written. Do not embellish the history.
-- Do not add a results table, a benchmark, or a "forthcoming preprint". There
-  is no study here, and this genre is full of posts that invent one.
+  *stigma* + *ergon*. Both correct as written. Do not embellish the history,
+  and do not attribute anything to him he did not say.
+- No results table, no benchmark, no "forthcoming preprint". There is no study
+  here, and this genre is full of posts that invent one.
 - Answer every comment for the first day. The post exists for the comments.
