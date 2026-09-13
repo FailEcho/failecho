@@ -208,8 +208,9 @@ def test_static_assets_stay_small():
     # to reclaim, so the next addition is an honest raise rather than a trim.
     # 58k -> 60k, same reason: the rail's CSS is shared with the homepage's
     # stylesheet even though only /setup and /about use it.
-    # 60k -> 64k for the motion above.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 64_000
+    # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
+    # opening on top of the word that opened it.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 65_000
 
     # The hero artwork is the single heaviest thing the homepage loads, so it
     # is counted here rather than left out of the number it dominates. It is
@@ -460,3 +461,23 @@ def test_the_hero_bump_is_only_on_the_two_short_panels():
     # ... and the bump comes off on a phone, where the agent line is the
     # longest thing on the card and 15px sends it sideways.
     assert ".install code, #panel-plugin code, #panel-agent code { font-size: 12px; }" in CSS
+
+
+def test_the_nav_panel_opens_below_the_word_that_opens_it():
+    """.navitem was an inline span, so its box was the line box and not the
+    padded link inside it. top: 100% then landed ten pixels up, over the
+    bottom of "Network" and "Developers"."""
+    item = CSS[CSS.index(".navitem { position: relative"):]
+    item = item[:item.index("}")]
+    assert "display: flex" in item, "the item box must match the link it wraps"
+    assert "top: calc(100% + 10px)" in CSS
+
+
+def test_the_gap_above_the_nav_panel_does_not_break_the_hover():
+    """Ten pixels of nothing between the link and the panel would close the
+    panel halfway to it. The bridge is a child of .navitem, so the pointer
+    never leaves the item it is hovering."""
+    assert ".navpanel::before" in CSS
+    bridge = CSS[CSS.index(".navpanel::before"):]
+    bridge = bridge[:bridge.index("}")]
+    assert "top: -10px" in bridge and "height: 10px" in bridge, "bridge does not span the gap"
