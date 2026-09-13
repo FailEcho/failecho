@@ -876,3 +876,42 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   .band { padding-block: 60px; }
   .foot-links { gap: 15px 22px; }
 }
+
+/* ---- on-this-page rail --------------------------------------------------
+   /setup and /about grew past ten sections each, which is more than a reader
+   will scroll through hoping. A sticky rail beside the content is the cheapest
+   way to make a long page navigable without cutting it into more pages.
+
+   The sections keep .shell so nothing else about them changes; the rule below
+   neutralises it inside the grid, which is the one place it must not apply. */
+.pagelayout {
+  max-width: var(--max); margin: 0 auto; padding-inline: var(--gutter);
+  display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 0 56px;
+  align-items: start;
+}
+.pagelayout .shell { max-width: none; margin-inline: 0; padding-inline: 0; }
+
+.pagenav { position: sticky; top: 92px; padding-block: 96px 0; }
+.pagenav-title {
+  margin: 0 0 12px; font-size: 11px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.pagenav-links { display: flex; flex-direction: column; gap: 2px; }
+.pagenav a {
+  font-size: 13.5px; line-height: 1.35; color: var(--ink-3);
+  padding: 6px 10px; border-left: 2px solid var(--line); border-radius: 0 4px 4px 0;
+  text-decoration: none;
+}
+.pagenav a:hover { color: var(--ink); border-left-color: var(--red); background: var(--surface); }
+.pagenav a:target, .pagenav a.here { color: var(--ink); border-left-color: var(--red); }
+
+/* Below this the rail has nowhere to live: one column, and /setup falls back
+   to the chip nav it already had. */
+@media (max-width: 1100px) {
+  .pagelayout { display: block; padding-inline: 0; max-width: none; }
+  .pagelayout .shell {
+    max-width: var(--max); margin-inline: auto; padding-inline: var(--gutter);
+  }
+  .pagenav { display: none; }
+}
+@media (min-width: 1101px) { .setup-jump { display: none; } }

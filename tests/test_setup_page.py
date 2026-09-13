@@ -174,3 +174,30 @@ def test_the_jump_nav_comes_before_the_sections_it_jumps_to():
     nav = body.index('class="shell setup-jump"')
     first_section = body.index('id="let-the-agent"')
     assert hero_end < nav < first_section, "the nav has drifted below a section"
+
+
+def test_the_long_pages_have_an_on_this_page_rail():
+    """Both grew past ten sections, which is more than anyone scrolls through
+    hoping. Every section the rail lists must exist, or the rail is furniture
+    that scrolls to nowhere."""
+    import re
+    from pathlib import Path
+
+    static = Path(__file__).resolve().parents[1] / "app" / "web" / "static"
+    for page in ("setup.html", "about.html"):
+        html = (static / page).read_text()
+        assert 'class="pagenav"' in html, f"{page} has no rail"
+        rail = html[html.index('class="pagenav"'):html.index('class="pagemain"')]
+        targets = re.findall(r'href="#([^"]+)"', rail)
+        assert len(targets) >= 10, f"{page} rail lists only {len(targets)}"
+        ids = set(re.findall(r'id="([^"]+)"', html))
+        for t in targets:
+            assert t in ids, f"{page} rail points at #{t}, which does not exist"
+
+
+def test_the_rail_does_not_double_up_with_the_chip_nav():
+    """/setup keeps its chip nav for narrow screens, where the rail cannot
+    live. Showing both at once is two tables of contents."""
+    css = (Path(__file__).resolve().parents[1] / "app" / "web" / "static" / "style.css").read_text()
+    assert "@media (min-width: 1101px) { .setup-jump { display: none; } }" in css
+    assert ".pagenav { display: none; }" in css

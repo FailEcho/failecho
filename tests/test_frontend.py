@@ -191,13 +191,17 @@ def test_static_assets_stay_small():
     # reclaim and the next addition would be a raise rather than a trim; this
     # is it, for the mobile code size that stops the install card scrolling
     # sideways on a phone.
-    assert len(CSS) < 34_000
+    # 34k -> 35k for the on-this-page rail on /setup and /about, both of
+    # which passed ten sections.
+    assert len(CSS) < 35_000
     assert len(JS) < 12_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
     # to reclaim, so the next addition is an honest raise rather than a trim.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 58_000
+    # 58k -> 60k, same reason: the rail's CSS is shared with the homepage's
+    # stylesheet even though only /setup and /about use it.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 60_000
 
     # The hero artwork is the single heaviest thing the homepage loads, so it
     # is counted here rather than left out of the number it dominates. It is

@@ -66,10 +66,29 @@
       Pick the one line that matches how you run agents. Everything below talks to the same network, so an agent set up one way benefits from failures reported another way.
     </p>
   </section>
+<div class="pagelayout">
+  <nav class="pagenav" aria-label="On this page">
+    <p class="pagenav-title">On this page</p>
+    <div class="pagenav-links">
+      <a href="#let-the-agent">Let your agent set it up</a>
+      <a href="#claude-code">Claude Code — the fast path</a>
+      <a href="#hook">Claude Code — without the plugin</a>
+      <a href="#mcp-clients">Any other MCP client</a>
+      <a href="#rest-api">Your own code, no MCP</a>
+      <a href="#check">How to tell it is working</a>
+      <a href="#sends">What leaves your machine</a>
+      <a href="#pyclient">Python client</a>
+      <a href="#alone">It works before anyone else joins</a>
+      <a href="#listed">Where FailEcho is listed</a>
+      <a href="#trouble">If nothing shows up</a>
+    </div>
+  </nav>
+  <div class="pagemain">
+
 
   <nav class="shell setup-jump" aria-label="Choose your integration"><a href="#let-the-agent"><span>00</span> Let the agent ↗</a><a href="#claude-code"><span>01</span> Claude Code ↗</a><a href="#mcp-clients"><span>02</span> MCP clients ↗</a><a href="#rest-api"><span>03</span> REST API ↗</a></nav>
 
-  <section class="shell band" id="let-the-agent" aria-labelledby="agent-title">
+  <section class="shell band" id="agent" id="let-the-agent" aria-labelledby="agent-title">
     <div class="band-head">
       <h2 id="agent-title" class="label">Let your agent set it up</h2>
       <p class="band-sub">The shortest path, and the one least likely to go wrong: hand the job to the thing that will be using it.</p>
@@ -93,7 +112,7 @@
     </p>
   </section>
 
-  <section class="shell band" id="claude-code" aria-labelledby="cc-title">
+  <section class="shell band" id="cc" id="claude-code" aria-labelledby="cc-title">
     <div class="band-head">
       <h2 id="cc-title" class="label">Claude Code — the fast path</h2>
       <p class="band-sub">Installs the MCP server and a hook, so lookups and reports happen on their own.</p>
@@ -113,7 +132,7 @@
     </p>
   </section>
 
-  <section class="shell band" aria-labelledby="hook-title">
+  <section class="shell band" id="hook" aria-labelledby="hook-title">
     <div class="band-head">
       <h2 id="hook-title" class="label">Claude Code — without the plugin</h2>
       <p class="band-sub">The same hook, installed by hand. One file, no dependencies beyond Python 3.</p>
@@ -136,7 +155,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </figure>
   </section>
 
-  <section class="shell band" id="mcp-clients" aria-labelledby="mcp-title">
+  <section class="shell band" id="mcp" id="mcp-clients" aria-labelledby="mcp-title">
     <div class="band-head">
       <h2 id="mcp-title" class="label">Any other MCP client</h2>
       <p class="band-sub">Cursor, Claude Desktop, your own agent framework: paste the endpoint into the client's MCP settings, as type <code>http</code>.</p>
@@ -197,7 +216,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </p>
   </section>
 
-  <section class="shell band" id="rest-api" aria-labelledby="rest-title">
+  <section class="shell band" id="rest" id="rest-api" aria-labelledby="rest-title">
     <div class="band-head">
       <h2 id="rest-title" class="label">Your own code, no MCP</h2>
       <p class="band-sub">One HTTP call. This one stores nothing and is never rate limited.</p>
@@ -241,7 +260,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </p>
   </section>
 
-  <section class="shell band" aria-labelledby="check-title">
+  <section class="shell band" id="check" aria-labelledby="check-title">
     <div class="band-head">
       <h2 id="check-title" class="label">How to tell it is working</h2>
     </div>
@@ -252,7 +271,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </ul>
   </section>
 
-  <section class="shell band" aria-labelledby="sends-title">
+  <section class="shell band" id="sends" aria-labelledby="sends-title">
     <div class="band-head">
       <h2 id="sends-title" class="label">What leaves your machine</h2>
     </div>
@@ -281,7 +300,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </p>
   </section>
 
-  <section class="shell band" aria-labelledby="pyclient-title">
+  <section class="shell band" id="pyclient" aria-labelledby="pyclient-title">
     <div class="band-head">
       <h2 id="pyclient-title" class="label">Python client</h2>
       <p class="band-sub">A wrapper that reports and asks around one call. Not on PyPI yet.</p>
@@ -305,7 +324,7 @@ if outcome.failed and outcome.decision.actionable:
     </ul>
   </section>
 
-  <section class="shell band" id="alone" aria-labelledby="alone-title">
+  <section class="shell band" id="alone" id="alone" aria-labelledby="alone-title">
     <div class="band-head">
       <h2 id="alone-title" class="label">It works before anyone else joins</h2>
       <p class="band-sub">A shared network is the goal. It is not the requirement.</p>
@@ -334,7 +353,7 @@ if outcome.failed and outcome.decision.actionable:
     </p>
   </section>
 
-  <section class="shell band" aria-labelledby="listed-title">
+  <section class="shell band" id="listed" aria-labelledby="listed-title">
     <div class="band-head">
       <h2 id="listed-title" class="label">Where FailEcho is listed</h2>
       <p class="band-sub">If you would rather install from a directory than from
@@ -350,7 +369,7 @@ if outcome.failed and outcome.decision.actionable:
     </ul>
   </section>
 
-  <section class="shell band" aria-labelledby="trouble-title">
+  <section class="shell band" id="trouble" aria-labelledby="trouble-title">
     <div class="band-head">
       <h2 id="trouble-title" class="label">If nothing shows up</h2>
       <p class="band-sub">Four things account for almost every quiet install. If none of them is it, that is a bug and I want to hear about it.</p>
@@ -393,6 +412,8 @@ if outcome.failed and outcome.decision.actionable:
       <a href="mailto:security@failecho.com">security@failecho.com</a>.
     </p>
   </section>
+  </div>
+</div>
 </main>
 
 <footer class="shell">
