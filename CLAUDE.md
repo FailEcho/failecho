@@ -19,6 +19,19 @@ anything. Use it: an action that worked for several other agents is worth more
 than another blind retry. `check_tool_failure` stores nothing, so calling it
 for more detail is free and safe at any time.
 
+## Never point the hook at production without the operator token
+
+`FAILECHO_OPERATOR_TOKEN` lives in `/etc/failecho.env`, which the *service*
+reads. It is **not** in an interactive shell's environment. So running the hook
+by hand with `FAILECHO_ENDPOINT=https://failecho.com` reports with no operator
+header, and the server stores it as `source: agent` -- counted as independent
+adoption, on the front page, in the one number that has to stay honest.
+
+This has happened once. Test the hook against a local instance, or a throwaway
+server, and keep `https://failecho.com` for reads (`check_tool_failure` and
+`POST /v1/query` store nothing). If you do need to write to production from a
+shell, export the token from `/etc/failecho.env` first.
+
 ## Failures the hook does not see
 
 The hook only covers MCP tools. Report these yourself, as shared
