@@ -5,7 +5,7 @@ recognise that it is hitting the exact failure Agent A reported 40 seconds ago.
 
     fingerprint = sha256(
         canonical_service | operation | version | schema_hash |
-        error_type | error_code | normalized_error
+        canonical_error_type | error_code | normalized_error
     )
 
 Properties we care about:
@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 
 from app.core.aliases import canonical_service
+from app.core.error_types import canonical_error_type
 
 #: Truncated SHA-256. 128 bits of digest is far more than enough at this scale
 #: and keeps URLs, logs and JSON payloads readable.
@@ -63,7 +64,7 @@ def compute_fingerprint(
             operation,
             version,
             schema_hash,
-            error_type,
+            canonical_error_type(error_type, error_code),
             error_code,
             normalized_error,
         )

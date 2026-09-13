@@ -172,9 +172,21 @@
       <li>A bare <code>-server</code> is not stripped, because
         <code>my-internal-server</code> is a name rather than a wrapper.</li>
     </ul>
+    <p class="prose">
+      The error class gets the same treatment, for the same reason. A 404
+      arrives as <code>not_found</code> from our hook and <code>http_error</code>
+      from anything reading a status off a response, so synonyms are mapped to
+      one class, and a class that says nothing on its own defers to the status
+      code beside it — <code>http_error</code> with a 404 is
+      <code>not_found</code>. A class that does say something is never
+      overridden: <code>auth_error</code> with a 500 stays as reported, because
+      that disagreement is the reporter's to keep. Unrecognised classes are
+      left exactly as written; your internal taxonomy is not ours to
+      reinterpret. <code>401</code> and <code>403</code> stay apart.
+    </p>
     <p class="fineprint">
-      The rules are in <code>app/core/aliases.py</code>, which is about eighty
-      lines and mostly comments.
+      The rules are in <code>app/core/aliases.py</code> and
+      <code>app/core/error_types.py</code>, both short and mostly comments.
     </p>
   </section>
 

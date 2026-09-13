@@ -1,4 +1,4 @@
-"""One-off: rewrite service names and fingerprints to their canonical form.
+"""One-off: rewrite service names, error classes and fingerprints to canonical form.
 
 `service` is part of the fingerprint, so introducing canonical names changes
 every fingerprint that was computed from a non-canonical one. Rows written
@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.aliases import canonical_service  # noqa: E402
+from app.core.error_types import canonical_error_type  # noqa: E402
 from app.core.fingerprint import compute_fingerprint  # noqa: E402
 
 
@@ -33,7 +34,7 @@ def main() -> int:
     conn.row_factory = sqlite3.Row
 
     remap: dict[str, str] = {}
-    plan: list[tuple[str, int, str, str, str | None, str | None]] = []
+    plan: list[tuple[str, int, str, str, str | None, str | None, str | None]] = []
 
     for table in ("observations", "fingerprints", "hourly_stats"):
         cols = {r[1] for r in conn.execute(f"pragma table_info({table})")}
@@ -44,6 +45,12 @@ def main() -> int:
             new = canonical_service(old)
             if old != new:
                 remap[old] = new
+            old_type = row["error_type"] if "error_type" in row.keys() else None
+            new_type = canonical_error_type(
+                old_type, row["error_code"] if "error_code" in row.keys() else None
+            ) or None
+            if old_type != new_type:
+                remap[f"error_type:{old_type}"] = f"error_type:{new_type}"
             old_fp = row["fingerprint"] if "fingerprint" in row.keys() else None
             new_fp = None
             if old_fp:
@@ -54,31 +61,36 @@ def main() -> int:
                     operation=patched.get("operation"),
                     version=patched.get("version"),
                     schema_hash=patched.get("schema_hash"),
-                    error_type=patched.get("error_type"),
+                    error_type=new_type,
                     error_code=patched.get("error_code"),
                     normalized_error=patched.get("normalized_error"),
                 )
-            if old != new or (old_fp and new_fp != old_fp):
-                plan.append((table, row["_rid"], old, new, old_fp, new_fp))
+            if old != new or old_type != new_type or (old_fp and new_fp != old_fp):
+                plan.append((table, row["_rid"], old, new, old_fp, new_fp, new_type))
 
     print(f"service names to rewrite: {len(remap)}")
     for old, new in sorted(remap.items()):
         print(f"  {old}  ->  {new}")
     print(f"rows to touch: {len(plan)}")
 
-    fp_map = {old: new for _, _, _, _, old, new in plan if old and new and old != new}
+    fp_map = {old: new for *_, old, new, _t in plan if old and new and old != new}
 
     if not args.apply:
         print("\ndry run; pass --apply to write")
         return 0
 
     with conn:
-        for table, rowid, _old, new, old_fp, new_fp in plan:
+        for table, rowid, _old, new, old_fp, new_fp, new_type in plan:
             if old_fp and new_fp:
                 conn.execute(
                     f"update {table} set service = ?, fingerprint = ? where rowid = ?",
                     (new, new_fp, rowid),
                 )
+                if new_type is not None:
+                    conn.execute(
+                        f"update {table} set error_type = ? where rowid = ?",
+                        (new_type, rowid),
+                    )
             else:
                 conn.execute(
                     f"update {table} set service = ? where rowid = ?", (new, rowid)

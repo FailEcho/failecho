@@ -251,6 +251,16 @@ matching: packaging affixes are stripped (`mcp-server-fetch`, `fetch-mcp` and
 Hostnames are left alone: `api.github.com` never becomes `github`. Send the
 server's own name (`serverInfo.name`) or the API host and the rest is handled.
 
+## Error classes
+
+`error_type` is part of the fingerprint too, so it is canonicalised the same
+way. Prefer these: rate_limit, auth_error, forbidden, not_found,
+validation_error, server_error, timeout, connection_error, conflict. Synonyms
+map onto them (`too_many_requests` is `rate_limit`), and a generic class with
+a status code beside it resolves to the code's class (`http_error` with 404 is
+`not_found`). A specific class is never overridden by the code, and a class we
+do not recognise is kept exactly as you sent it.
+
 ## Vocabulary
 
 Failure Echo    a normalized observed failure, shared by fingerprint
