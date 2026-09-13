@@ -531,8 +531,18 @@
   // without JS -- or with reduced motion asked for -- gets it immediately.
   var NOISE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#%&$?/\\<>*+=-";
 
-  function scramble(node) {
+  // `rate` is characters settled per frame, at 22ms a frame, so the run
+  // takes length / rate frames. The lede is 64 characters at 1.5 -- about
+  // 0.9s. A button label is a tenth of that, so it needs a *slower* rate to
+  // last long enough to read as a settle: "Get started" at 0.75 is 15 frames,
+  // roughly a third of a second, which is about how long a pointer takes to
+  // arrive and stop.
+  function scramble(node, rate) {
+    if (node.getAttribute("data-scrambling") === "1") return;
     var text = node.textContent.trim();
+    if (!text) return;
+    node.setAttribute("data-scrambling", "1");
+
     var settled = 0;
     var frames = 0;
 
@@ -547,14 +557,14 @@
       }
       node.textContent = out;
       frames += 1;
-      // Three characters settle every two frames, at 22ms a frame: about
-      // 0.9s for the line, which reads as a settle rather than as a wait.
-      settled = Math.floor(frames * 1.5);
+      settled = Math.floor(frames * (rate || 1.5));
       if (settled <= text.length) {
         window.setTimeout(tick, 22);
         return;
       }
+      // Always the real text at the end, never a frame of noise.
       node.textContent = text;
+      node.removeAttribute("data-scrambling");
     }
 
     tick();
@@ -564,8 +574,23 @@
     var reduced = window.matchMedia
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) return;
-    var nodes = document.querySelectorAll("[data-scramble]");
-    Array.prototype.forEach.call(nodes, scramble);
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll("[data-scramble]"),
+      function (node) { scramble(node, 1.5); }
+    );
+
+    // The same settle on a button, on hover and on focus. Not the copy
+    // controls: their label is their feedback, and a button that says
+    // "Copied" must not be busy spelling something else when it does.
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".btn:not([data-copy-target])"),
+      function (button) {
+        function run() { scramble(button, 0.75); }
+        button.addEventListener("mouseenter", run);
+        button.addEventListener("focus", run);
+      }
+    );
   }
 
   addCopyButtons();

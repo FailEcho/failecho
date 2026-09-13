@@ -673,3 +673,21 @@ def test_nothing_dead_lies_between_the_nav_item_and_its_panel():
     assert "left: 0" in bridge and "right: 0" in bridge, "diagonal moves too"
     # It must sit below the links, or it eats clicks on them.
     assert ".topbar.is-open .topbar-row { padding-block: 28px; }" in CSS
+
+
+def test_buttons_settle_the_same_way_the_lede_does():
+    """One effect, two speeds. The rate is characters per frame, so a short
+    label needs a slower rate than a long sentence to last long enough to
+    read: "Get started" at 0.75 is 15 frames, about a third of a second."""
+    assert "scramble(button, 0.75)" in JS
+    assert "scramble(node, 1.5)" in JS
+    # Not the copy controls: their label is their feedback.
+    assert '.btn:not([data-copy-target])' in JS
+
+
+def test_a_scramble_never_ends_on_noise_and_never_overlaps_itself():
+    """A button hovered twice quickly would otherwise restore whatever the
+    first run happened to be showing when the second one read it."""
+    assert 'node.getAttribute("data-scrambling") === "1"' in JS
+    assert 'node.removeAttribute("data-scrambling")' in JS
+    assert "node.textContent = text;" in JS
