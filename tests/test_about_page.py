@@ -126,11 +126,17 @@ def test_the_benefits_are_split_by_when_they_are_true(client):
     """Half of what FailEcho gives you needs other people and half does not.
     Listing them together would promise a cold-start user things the empty
     network cannot do."""
+    import re
+
     body = client.get("/about").text
     section = body[body.index('id="what-you-get"'):]
-    assert "On day one, with nobody else connected" in section
-    assert "Once other agents are reporting" in section
+    # Prose wraps, so match on words rather than on where the lines break.
+    # Three tests have now failed on a phrase that was present and hyphenated
+    # across a newline.
+    flat = re.sub(r"\s+", " ", section)
+    assert "On day one, with nobody else connected" in flat
+    assert "Once other agents are reporting" in flat
     # The day-one list has to come first: it is the half that is true now.
-    assert section.index("On day one") < section.index("Once other agents")
+    assert flat.index("On day one") < flat.index("Once other agents")
     # And the limits are stated in the same breath, not on another page.
-    assert "no use at all for a failure only your stack can produce" in section
+    assert "no use at all for a failure only your stack can produce" in flat
