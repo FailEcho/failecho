@@ -59,6 +59,31 @@ from app.schemas.query import (
 )
 
 
+def operator_token_from(
+    header_value: str | None, authorization: str | None = None
+) -> str | None:
+    """The operator token, from either header the client was able to send.
+
+    ``X-FailEcho-Operator`` wins when both are present. ``Authorization`` is
+    accepted as ``Bearer <token>`` because hosts that filter header names still
+    let that one through; anything that is not a bearer scheme is ignored
+    rather than guessed at, so an unrelated credential is never compared.
+
+    Present-but-empty is a *failed* claim, not an absent one. An empty header
+    returns "" so it is still checked and still fails to demo, because the
+    alternative is that a malformed claim quietly counts as ordinary agent
+    telemetry -- which is the adoption number.
+    """
+    if header_value is not None:
+        return header_value
+    if authorization is None:
+        return None
+    scheme, _, value = authorization.partition(" ")
+    if scheme.strip().lower() != "bearer":
+        return None
+    return value.strip()
+
+
 def source_from_kind(
     reporter_kind: str | None, operator_token: str | None = None
 ) -> str:

@@ -52,6 +52,13 @@ REPORTER_KIND_DEMO = "demo"
 
 # Header the operator's own agents send, carrying FIN_FIRST_PARTY_TOKEN.
 OPERATOR_HEADER = "X-FailEcho-Operator"
+#: Some MCP hosts only forward an allowlist of header names, and a bespoke one
+#: is never on it -- Claude Desktop's custom connector rejects
+#: ``X-FailEcho-Operator`` outright. ``Authorization`` always is, so the same
+#: operator token is accepted there as a bearer credential. Nothing about the
+#: service requires it: reads and writes remain open, and this only decides how
+#: a report is *labelled*.
+OPERATOR_BEARER_HEADER = "Authorization"
 
 
 def _env_str(name: str, default: str) -> str:

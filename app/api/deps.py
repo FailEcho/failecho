@@ -7,9 +7,9 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import OPERATOR_HEADER
+from app.core.config import OPERATOR_BEARER_HEADER, OPERATOR_HEADER
 from app.core.privacy import hash_reporter_id
-from app.core.service import source_from_kind
+from app.core.service import operator_token_from, source_from_kind
 from app.core.ratelimit import check_write_limit, client_key
 from app.db.database import get_session
 
@@ -63,8 +63,23 @@ async def reporter_source(
             ),
         ),
     ] = None,
+    authorization: Annotated[
+        str | None,
+        Header(
+            alias=OPERATOR_BEARER_HEADER,
+            include_in_schema=False,
+            description=(
+                "Accepted only as an alternative way to send the operator "
+                "token, for hosts that filter custom header names. The "
+                "service needs no credential: without one you are an ordinary "
+                "reporter, which is the normal case."
+            ),
+        ),
+    ] = None,
 ) -> str:
-    return source_from_kind(x_reporter_kind, x_failecho_operator)
+    return source_from_kind(
+        x_reporter_kind, operator_token_from(x_failecho_operator, authorization)
+    )
 
 
 SourceDep = Annotated[str, Depends(reporter_source)]

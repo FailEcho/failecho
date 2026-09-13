@@ -22,10 +22,16 @@ from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
 from starlette.routing import Route
 
-from app.core.config import OPERATOR_HEADER, REPORTER_KIND_HEADER, settings
+from app.core.config import (
+    OPERATOR_BEARER_HEADER,
+    OPERATOR_HEADER,
+    REPORTER_KIND_HEADER,
+    settings,
+)
 from app.core.privacy import hash_reporter_id
 from app.core.ratelimit import check_write_limit, client_key
 from app.core.service import (
+    operator_token_from,
     query_intelligence,
     record_observation,
     record_recovery_outcome,
@@ -98,7 +104,11 @@ def _source_from(ctx: Context | None) -> str:
     """
     headers = _request_headers(ctx)
     return source_from_kind(
-        headers.get(REPORTER_KIND_HEADER.lower()), headers.get(OPERATOR_HEADER.lower())
+        headers.get(REPORTER_KIND_HEADER.lower()),
+        operator_token_from(
+            headers.get(OPERATOR_HEADER.lower()),
+            headers.get(OPERATOR_BEARER_HEADER.lower()),
+        ),
     )
 
 

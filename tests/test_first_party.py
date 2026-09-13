@@ -215,3 +215,53 @@ def test_python_client_sends_the_operator_header(monkeypatch):
 
     monkeypatch.setenv("FAILECHO_OPERATOR_TOKEN", "from-env")
     assert FailEcho()._headers()[OPERATOR_HEADER] == "from-env"
+
+
+# ---------------------------------------------------------------------------
+# hosts that will not send a custom header
+# ---------------------------------------------------------------------------
+
+
+def bearer(value: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {value}"}
+
+
+def test_the_operator_token_is_accepted_as_a_bearer_credential(
+    client, rows, operator_token
+):
+    """Claude Desktop's custom connector refuses header names off its
+    allowlist, so `X-FailEcho-Operator` never leaves the client. Authorization
+    is always allowed, so the same token is honoured there."""
+    observe(client, headers=bearer(TOKEN))
+    assert sources(rows) == ["first_party"]
+
+
+def test_a_wrong_bearer_token_still_fails_to_demo(client, rows, operator_token):
+    observe(client, headers=bearer("a-guess"))
+    assert sources(rows) == ["demo_agent"]
+
+
+def test_an_unrelated_authorization_header_is_not_an_operator_claim(
+    client, rows, operator_token
+):
+    """Someone's proxy credential is not a claim to be FailEcho. Comparing it
+    would turn an ordinary reporter into a failed operator claim, and quietly
+    keep their genuine telemetry out of the adoption count."""
+    observe(client, headers={"Authorization": "Basic dXNlcjpwYXNz"})
+    assert sources(rows) == ["agent"]
+
+
+def test_an_empty_claim_is_a_failed_claim_not_an_absent_one(
+    client, rows, operator_token
+):
+    """Regression: reading the token with a truthiness check turned an empty
+    operator header into no header at all, so a malformed claim landed in the
+    adoption count instead of failing safe to demo."""
+    observe(client, headers={"X-FailEcho-Operator": ""})
+    observe(client, headers=bearer(""))
+    assert sources(rows) == ["demo_agent", "demo_agent"]
+
+
+def test_the_custom_header_wins_when_both_are_sent(client, rows, operator_token):
+    observe(client, headers={**bearer("wrong"), "X-FailEcho-Operator": TOKEN})
+    assert sources(rows) == ["first_party"]
