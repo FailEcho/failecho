@@ -1,17 +1,19 @@
-# dev.to warm-up post — the discussion one
+# dev.to warm-up post
 
 **Post this first, two or three days before `devto-post.md`.**
 
-Discussion posts outperform tutorials on dev.to by a wide margin, and a new
-account needs comments more than it needs claps. This one names FailEcho
-nowhere. The connection is thematic: it is about retrying things that cannot
-work, which is the same thing the product is about, so the main post lands on
-an audience already thinking about it.
+Long-form, in the shape that does well on dev.to right now: a named concept,
+a real scientific anchor, an ASCII diagram, a table, and a question at the end.
 
-Set `discussion` in the tags. End on a question and answer every reply.
+The one thing deliberately not copied from that format is invented metrics.
+Posts in this genre often close with a results table full of impressive
+numbers. Ours has a table too, and every figure in it is zero, because that is
+what is true. That inversion is the most defensible thing in the piece and
+probably the most memorable.
 
-The previous advice-shaped draft (four engineering lessons) is in git history
-if you would rather lead technical.
+The previous warm-up (the 11pm debugging one) is in git history.
+
+Tags: `ai`, `programming`, `discuss`, `opensource`
 
 ---
 
@@ -19,119 +21,263 @@ if you would rather lead technical.
 
 ```
 ---
-title: The bug was fixed at 11pm. I kept debugging until 2am.
+title: Your AI Agent Has No Colleagues
 published: false
-description: On the developer version of the retry loop, and why "one more try" is the hardest thing to stop.
-tags: discuss, mentalhealth, career, productivity
+description: Every agent rediscovers the same failures alone, at full price. Ants solved this problem 60 million years ago.
+tags: ai, programming, discuss, opensource
 ---
-```
-
-Alternative titles:
-
-```
-Why can't we stop debugging when we know we should stop?
-The sunk cost fallacy has a keyboard shortcut and it's Ctrl+R
 ```
 
 ---
 
 ## Draft
 
-I fixed the bug at 11pm.
-
-I know that now because I checked the git log the next morning. The commit
-that made the tests pass is timestamped 23:04. I kept going until 2am.
-
-What was I doing for three hours? Re-running the suite. Reading the same
-forty lines. Changing a thing, changing it back. Refreshing a page that had
-already worked six times.
-
-I don't think I'm unusual here :D
-
-## The loop
-
-Here's the shape of it, and I bet you recognise it:
-
-1. Something breaks
-2. You try the obvious fix
-3. It doesn't work
-4. **You try it again**
-
-Step four is the interesting one. Not a different fix — the *same* one, maybe
-with a small change you couldn't defend if asked. And when that fails, again.
-
-There's a decent amount of psychology behind why. Sunk cost, mostly: three
-hours in, stopping means those three hours were wasted, and continuing means
-they might not have been. Which is nonsense, because the three hours are gone
-either way, but it does not feel like nonsense at 1am.
-
-Some of it is that debugging is a variable-ratio reward schedule, which is the
-same mechanism that makes slot machines work. Sometimes the fourth identical
-retry *does* work — a cache expired, a deploy finished — so the behaviour gets
-reinforced at random intervals. That is the schedule psychologists use when
-they want a behaviour to be maximally hard to extinguish.
-
-And some of it is just that we're bad at telling two situations apart:
-
-> **This will work if I keep going.**
+> "The coordination of the builders is not direct. It is the work already done
+> that directs and triggers the work that follows."
 >
-> **This can never work and I need a different approach.**
+> — Pierre-Paul Grassé, describing termites, 1959
 
-They feel identical from the inside. Same frustration, same tunnel, same
-certainty that the answer is close.
+## 1. The Loop
 
-## The thing that actually helps
+You have seen this. Every agent framework does it:
 
-Not discipline. I've tried discipline, it works for about a week :3
+```
+> create_issue
+  x 422 validation_error
 
-What actually helps is **someone else having already been there**. One
-sentence from a colleague — "oh, that's the schema cache, restart it" — ends
-three hours instantly. It isn't that they're smarter. They just already paid
-for that information, and you didn't have to.
+> create_issue        (retry)
+  x 422 validation_error
 
-Which is why I think Stack Overflow, for all the jokes, was one of the most
-important pieces of infrastructure we ever built. Not the answers. The
-*evidence that someone else hit the same wall.*
+> create_issue        (retry, arguments tweaked slightly)
+  x 422 validation_error
+```
 
-## What I've actually changed
+Three attempts. Three identical failures. Then it apologises to you, which
+somehow makes it worse.
 
-Two things, and they're both embarrassingly small:
+The instinct is to blame the model. But look at what it had to work with:
 
-**A timer.** Twenty-five minutes on one bug. When it goes, I write down what
-I've ruled out. Usually the act of writing it ends it, because "I've ruled
-out nothing, I've just been rerunning the tests" is very hard to write down
-and then keep doing.
+```
+422 validation_error
+```
 
-**Saying it out loud to someone.** Not asking for help — just describing it.
-The rubber duck thing is real, and I don't fully understand why.
+Tell me, from that string, whether retrying is worth it.
 
-Neither is a fix. I still did the 2am thing last month. But the gap between
-"I'm stuck" and "I've noticed I'm stuck" is shorter than it was, and that gap
-is where all the hours go.
+Is it a field renamed in last week's release, or a service having a bad ten
+minutes? Same six characters either way. In one case retrying is exactly right
+and works in thirty seconds. In the other you can retry until your budget is
+gone, and the real answer was "the field is called `content` now, refresh your
+tool schema."
+
+The model has to guess. It guesses retry, because that is what nearly all the
+code it ever read does.
+
+## 2. Why "don't retry blindly" in your system prompt does nothing
+
+The first instinct, once you notice this, is to write a rule.
+
+```
+When a tool call fails, do not retry immediately.
+Consider whether the failure is transient before trying again.
+```
+
+It sounds reasonable. It does approximately nothing, for a boring reason:
+**the instruction does not contain the missing information either.**
+
+You have told the agent to consider whether the failure is transient. It still
+has no way to find out. You have asked it to make the same guess, more
+thoughtfully. On a hard task, under context pressure, it will guess retry
+again — and it will be right often enough that the behaviour never extinguishes.
+
+That last part is the trap. A retry that works occasionally, at unpredictable
+intervals, is a **variable-ratio reinforcement schedule** — the same mechanism
+that makes slot machines difficult to walk away from. It is the schedule
+psychologists reach for when they want a behaviour to be maximally resistant to
+extinction. Your agent is on it. So are you, at 1am, hammering the same test.
+
+## 3. What humans actually do instead
+
+Watch how a senior engineer resolves the same 422.
+
+They do not reason about it. They turn around and say "hey, has anyone seen
+this?" — and someone across the room says "oh, they renamed that field on
+Tuesday."
+
+Three seconds. No analysis. The knowledge existed; it was just in someone
+else's head.
+
+That is the entire mechanism, and it is not intelligence. It is **population**.
+A senior engineer is not smarter than your agent. They are *networked* — into a
+team, a Slack channel, a Stack Overflow thread written by a stranger in 2019
+who hit the same wall and left a note.
+
+Your agent has none of that. It is a brilliant engineer working alone in a room
+with no colleagues, no chat, no history. Every failure is the first time anyone
+has ever seen it.
+
+## 4. Ants solved this 60 million years ago
+
+In 1959 the French zoologist Pierre-Paul Grassé was studying termites building
+a nest, and hit a puzzle: the colony produces an elaborate, coherent structure,
+but no termite has the plan, and no termite tells another what to do.
+
+His answer was a word he coined for it: **stigmergy**, from the Greek *stigma*
+(mark) and *ergon* (work). Coordination by trace.
+
+A termite deposits a pellet of soil. The pellet changes the local environment.
+The next termite, encountering the modified environment, is more likely to
+deposit its own pellet there. Nobody communicated. Nobody remembered. **The work
+already done directed the work that followed.**
+
+Ants do the same with pheromone trails. An ant that finds food leaves a trail
+home. Other ants follow it and reinforce it. A trail to nothing evaporates. The
+colony converges on good routes without a single ant understanding the map.
+
+Notice what stigmergy is *not*. It is not messaging. It is not shared memory.
+The ants never meet. The signal lives **in the environment**, and it is left by
+individuals who are gone by the time it is useful to anyone.
+
+That is exactly the shape of the problem with agents. Agent A hits the 422 on
+Monday and its context window is destroyed. Agent B hits it on Thursday with no
+idea Agent A ever existed. They will never meet, they cannot message each
+other, and they do not need to — if there is somewhere to leave the pellet.
+
+## 5. What the trace has to contain
+
+The temptation is to log the error and call it a trail. That does not work,
+because an error message is not a signal about what to *do*.
+
+A useful trace needs three parts:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  THE ANATOMY OF A USEFUL FAILURE TRACE                           │
+├──────────────────────────────────────────────────────────────────┤
+│  1. AN IDENTITY                                                  │
+│     A stable id for "this exact failure", so two agents can      │
+│     tell they hit the same thing. Not the raw string: that one   │
+│     contains a request id and a timestamp and will never match   │
+│     anything again.                                              │
+├──────────────────────────────────────────────────────────────────┤
+│  2. AN OUTCOME, NOT AN INTENTION                                 │
+│     What the next agent tried, and whether it worked. "I         │
+│     refreshed the schema" is worthless. "I refreshed the schema  │
+│     and the call then succeeded" is the whole point.             │
+├──────────────────────────────────────────────────────────────────┤
+│  3. A DENOMINATOR                                                │
+│     Successes too, or the failure rate is meaningless. 100       │
+│     failures out of 200 calls is an outage. 100 out of a         │
+│     million is a Tuesday.                                        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Part 1 is fiddly and worth spelling out. These two are the same bug:
+
+```
+Repository 8823 rejected field body at 2026-09-11T14:02:11Z
+Repository 41902 rejected field body at 2026-09-12T09:41:55Z
+```
+
+Compare them raw and you have two unrelated incidents forever. So you normalise
+first — replace the parts that vary, keep the parts that mean something — and
+hash what is left together with the service and operation:
+
+```python
+text = URL_RE.sub("<URL>", text)
+text = UUID_RE.sub("<UUID>", text)
+text = TIMESTAMP_RE.sub("<TS>", text)
+text = LONG_NUMBER_RE.sub("<N>", text)
+```
+
+Both lines collapse to one shape. Now they are one thing you can count. It is
+also a good place to strip anything credential-shaped, since you are already
+walking the string with regexes and you very much do not want tokens in a
+shared log.
+
+And once you are counting, resist the urge to have a model score the result.
+Count it. If an action was tried 5 times and worked 5 times, that is 5/5 — but
+so is 117/124, and those are not equally trustworthy. A Wilson score lower
+bound folds sample size in for you: 5/5 scores about **0.57**, 117/124 scores
+about **0.89**. Ten floating point operations, no dependencies, and you can
+recompute it by hand when somebody asks where the number came from.
+
+When there is not enough evidence, return that. Not a guess with a low
+confidence bolted on — an actual "I don't know". Agents handle it fine.
+
+## 6. So I built the pheromone trail
+
+It is called **FailEcho**. Agents report tool failures and recovery outcomes as
+metadata; the next agent to hit the same fingerprint gets told what worked
+instead of guessing.
+
+In Claude Code it is two lines. Any other MCP client points at an endpoint.
+There is a REST API if you do not want MCP, and you can hand the whole job to
+the agent — there is an `llms.txt` written for exactly that.
+
+Now the part where this post stops resembling the genre it is written in.
+
+Articles like this usually end with a results table. Here is mine, live at the
+time of writing:
+
+| Metric | Value |
+|---|---:|
+| Independent agents reporting | **0** |
+| Distinct reporters, last 24h | **0** |
+| Cross-agent recoveries recorded | **0** |
+| Known failure fingerprints | 3 |
+
+That is not modesty. **The pheromone trail is empty.** Every number above is on
+the front page of the site, unrounded, and the three fingerprints are mine.
+
+A stigmergic system with one participant is not a colony. It is one ant walking
+in a circle.
+
+## 7. The actual question
+
+Here is what I genuinely do not know, and cannot find out alone:
+
+**Do different people's agent failures overlap at all?**
+
+The theory says they should. Everyone is calling the same twenty MCP servers
+and the same dozen public APIs, and when GitHub renames a field it renames it
+for all of us at once. But I have no evidence, and "obviously true" is where
+most wrong ideas live.
+
+There is one number that decides it. A recovery action needs five observed
+attempts before it is recommended, and three distinct reporters before it
+carries full weight. **Five and three.** Not five thousand. If ten people point
+this at the popular MCP servers for a week, the failures we share cross those
+thresholds and we all stop paying separately for the same mistake. If they
+never cross, the overlap is not there and the idea is wrong — which is also
+worth knowing, and I will publish that too.
+
+It runs after the tool call with a two second timeout, so the worst case when
+my server falls over is your agent waits two seconds. One environment variable
+turns it off. MIT, no account, no API key.
+
+https://failecho.com
 
 ## Your turn
 
-I'm genuinely curious about two things:
+Two things I would genuinely like to know, whether or not you ever install
+anything:
 
-- **What's your longest one?** The record for time spent on something that
-  turned out to be already fixed, or fixable in one line.
-- **What actually gets you out?** Not what you know you should do. What
-  works, on a real bad night.
-
-I'll read all of them. I suspect the honest answers are more useful than any
-productivity advice either of us has read :D
+- **What failure does your agent keep rediscovering?** The one you have
+  explained to it four times.
+- **Would you leave a reporter on for a week?** And if not — what is the thing
+  that stops you? I would rather hear that now than guess at it.
 
 ---
 
 ## Before publishing
 
-- The 11pm/2am story is written as yours. It needs to be true — check a real
-  git log and use the real times, or write your own version. A fabricated
-  anecdote in a mental-health post is the worst possible thing to be caught
-  doing.
-- Do not mention FailEcho anywhere in this post. Not in the body, not in a
-  comment. The bio link is enough and is the whole point of posting it first.
-- Reply to every comment for the first day. This post exists for the comments;
-  a discussion post with no author in the thread is worse than no post.
-- Tags: `discuss` is the one that matters. It puts it in front of people who
-  came to argue, which is what you want here.
+- Re-check the four numbers in the table against
+  `https://failecho.com/v1/stats` on the morning you post. They are the most
+  scrutinised thing in the piece precisely because they are zeros.
+- The Wilson figures (0.57 and 0.89) are computed from the standard formula at
+  z=1.96. Recheck if you quote different counts.
+- Grassé coined *stigmergie* in 1959 studying termites; the etymology is
+  *stigma* + *ergon*. Both are correct as written. Do not embellish the history.
+- Do not add a results table, a benchmark, or a "forthcoming preprint". There
+  is no study here, and this genre is full of posts that invent one.
+- Answer every comment for the first day. The post exists for the comments.
