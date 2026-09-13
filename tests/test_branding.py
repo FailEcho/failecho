@@ -141,17 +141,20 @@ def test_wordmark_ships_a_variant_for_each_theme():
     assert mean_glyph_luma(light) < 90, "light-theme wordmark should be near-ink"
 
 
-def test_wordmark_is_used_on_the_dark_page(client):
-    """The page commits to the dark palette, so the white master is the one used.
+def test_both_wordmark_variants_are_used_on_the_ground_they_are_for(client):
+    """The white master on black, the dark master on white.
 
-    Header and footer only: the hero now leads with the problem statement
-    rather than repeating the wordmark the header already establishes.
+    The top bar has two states now -- black at the top of the page, white once
+    you have scrolled -- so the header carries the dark-ink wordmark and the
+    footer, which is always on black, carries the white one. Getting these the
+    wrong way round makes the mark invisible rather than merely wrong.
     """
     body = client.get("/").text
-    assert body.count("/static/wordmark-dark.png?v=") >= 2, "header and footer"
+    assert body.count("/static/wordmark-light.png?v=") == 1, "the white bar"
+    assert body.count("/static/wordmark-dark.png?v=") == 1, "the footer, on black"
+    # The brand is the mark alone until the bar turns white.
+    assert body.count("/static/logo.png?v=") >= 1
     assert 'alt="FailEcho"' in body
-    # The light variant still ships for the social card and any light context.
-    assert (STATIC / "wordmark-light.png").exists()
 
 
 def test_favicon_is_square_for_search_results():

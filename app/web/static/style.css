@@ -53,8 +53,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 15.5px;
-  line-height: 1.6;
+  font-size: 16.5px;
+  line-height: 1.62;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -121,12 +121,28 @@ a[rel~="external"]:hover::after { color: var(--red); }
 .fineprint code { color: var(--ink-2); }
 
 /* ---- top bar ----------------------------------------------------------- */
+/* Two states. At the top of the page the bar is the page: black, no rule
+   under it, and the brand is the mark alone -- the name is already in the
+   headline underneath. Once you scroll it becomes a white bar that separates
+   itself from the content, and the mark gives way to the wordmark, which is
+   the version that has to say who this is when the headline is gone. */
 .topbar {
   position: sticky; top: 0; z-index: 10;
-  background: rgba(4, 6, 10, 0.88);
-  border-bottom: 1px solid var(--line);
-  backdrop-filter: saturate(160%) blur(14px);
+  background: #000;
+  border-bottom: 1px solid transparent;
+  transition: background 0.22s ease, border-color 0.22s ease;
 }
+.topbar.is-stuck {
+  background: #fff;
+  border-bottom-color: rgba(0, 0, 0, 0.12);
+}
+.topbar.is-stuck .nav > a,
+.topbar.is-stuck .navitem > a,
+.topbar.is-stuck .nav a { color: #2b3038; }
+.topbar.is-stuck .nav > a:hover,
+.topbar.is-stuck .navitem > a:hover { color: #000; background: rgba(0, 0, 0, 0.06); }
+.topbar.is-stuck .nav .btn--red { color: #fff; }
+.topbar.is-stuck .skip-link { color: var(--ink); }
 
 .topbar-row {
   display: flex; align-items: center; gap: 14px 20px; flex-wrap: wrap;
@@ -135,7 +151,10 @@ a[rel~="external"]:hover::after { color: var(--red); }
 
 .brand { display: inline-flex; align-items: center; gap: 10px; }
 .brand:hover { color: inherit; }
-.brand-word { display: block; width: auto; height: 21px; }
+.brand-mark { display: block; width: auto; height: 28px; }
+.brand-word { display: none; width: auto; height: 21px; }
+.topbar.is-stuck .brand-mark { display: none; }
+.topbar.is-stuck .brand-word { display: block; }
 
 .nav {
   display: flex; align-items: center; gap: 4px;
@@ -237,8 +256,8 @@ h1 {
   margin: 0 0 18px;
   font-family: var(--serif);
   font-weight: 400;
-  font-size: clamp(38px, 4.6vw, 60px);
-  line-height: 1.04;
+  font-size: clamp(40px, 5.6vw, 84px);
+  line-height: 1.02;
   letter-spacing: -0.02em;
   text-wrap: balance;
 }
@@ -308,7 +327,8 @@ h1 {
 @keyframes tick { 0% { color: var(--red); } 100% { color: inherit; } }
 .ticked { animation: tick 1.8s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .pulse, .ticked, .caret, .install-panel:not([hidden]) { animation: none; }
+  .pulse, .ticked, .caret, .hero--split::before,
+  .install-panel:not([hidden]) { animation: none; }
 }
 
 /* ---- metrics ----------------------------------------------------------- */
@@ -694,21 +714,37 @@ footer.shell {
    below and quiet enough that the type keeps its contrast on black. */
 .hero--split {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
-  gap: 0 64px; align-items: center;
+  gap: 0 64px; align-items: start;
   padding-block: 64px 56px;
   position: relative; isolation: isolate; overflow: hidden;
+}
+/* Two red fields drifting past each other. It replaces a 74KB photograph of
+   roughly the same thing, and unlike the photograph it is never the wrong
+   shape for the viewport. Both layers are painted on the same element so the
+   whole thing is one composited layer, and it is a background-position
+   animation rather than a transform on a giant box: no layout, no repaint of
+   anything above it. */
+@keyframes drift {
+  0%   { background-position: 12% 34%, 84% 62%; }
+  50%  { background-position: 30% 58%, 62% 36%; }
+  100% { background-position: 12% 34%, 84% 62%; }
 }
 .hero--split::before {
   content: "";
   position: absolute; z-index: -1; pointer-events: none;
-  top: 0; bottom: 0; right: -12%; width: min(1000px, 86%);
-  background: url("/static/echoimage.png") center / contain no-repeat;
-  opacity: 0.13;
+  inset: -14% -6% -20% 12%;
+  background:
+    radial-gradient(38% 46% at 50% 50%, rgba(248, 48, 48, 0.30), transparent 68%),
+    radial-gradient(44% 38% at 50% 50%, rgba(192, 0, 16, 0.26), transparent 70%);
+  background-repeat: no-repeat;
+  background-size: 78% 74%, 66% 82%;
+  filter: blur(26px);
+  animation: drift 26s ease-in-out infinite;
 }
-.hero--split h1 { margin: 0 0 18px; max-width: 15ch; }
+.hero--split h1 { grid-column: 1 / -1; margin: 0 0 30px; max-width: none; }
 .hero-def {
   margin: 20px 0 0; max-width: 56ch;
-  font-size: 15.5px; line-height: 1.7; color: var(--ink-2);
+  font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
 }
 .hero--split .hero-actions { margin-top: 30px; }
 .hero--split .hero-tagline {
@@ -720,10 +756,9 @@ footer.shell {
 
 @media (max-width: 980px) {
   .hero--split { grid-template-columns: minmax(0, 1fr); gap: 40px 0; }
-  .hero--split::before { right: -30%; width: 130%; opacity: 0.1; }
-  .hero--split h1 { max-width: none; }
+  .hero--split::before { inset: -10% -20% -10% -20%; filter: blur(34px); }
 }
-.hero--split .hero-lede { max-width: 44ch; color: var(--ink); }
+.hero--split .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 
 /* ---- install card, one tab per way in ---------------------------------- */
 .install {
@@ -825,21 +860,21 @@ footer.shell {
   display: flex; align-items: center; justify-content: center; gap: 44px;
 }
 .loop-node {
-  flex: none; width: 196px; height: 196px; border-radius: 50%;
+  flex: none; width: 236px; height: 236px; border-radius: 50%;
   border: 1px dashed var(--line-2); background: transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; padding: 10px 20px; text-align: center;
 }
 .loop-node:first-child { border-color: var(--red-deep); }
 .loop-n {
-  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+  font-family: var(--mono); font-size: 12px; color: var(--ink-3);
   letter-spacing: 0.08em;
 }
 .loop-node .flow-name {
-  font-family: var(--sans); font-size: 16.5px; font-weight: 550; color: var(--ink);
+  font-family: var(--sans); font-size: 20px; font-weight: 550; color: var(--ink);
 }
 .loop-node span:last-child {
-  font-size: 12.5px; line-height: 1.4; color: var(--ink-2); min-height: 2.8em;
+  font-size: 14.5px; line-height: 1.4; color: var(--ink-2); min-height: 2.8em;
 }
 .loop-track li + li { position: relative; }
 .loop-track li + li::before {
@@ -855,7 +890,7 @@ footer.shell {
 }
 .loop-return {
   position: relative; margin: 0 auto; height: 46px;
-  width: calc(100% - 196px);
+  width: calc(100% - 236px);
   border: 1px dashed var(--line-2); border-top: 0;
   border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
   margin-bottom: 30px;

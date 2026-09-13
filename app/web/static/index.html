@@ -51,7 +51,8 @@
 <header class="topbar">
   <div class="shell topbar-row">
     <a class="brand" href="/" aria-label="FailEcho home">
-      <img class="brand-word" src="/static/wordmark-dark.png?v={{ASSET_V}}" width="97" height="25" alt="FailEcho">
+      <img class="brand-mark" src="/static/logo.png?v={{ASSET_V}}" width="30" height="30" alt="FailEcho">
+      <img class="brand-word" src="/static/wordmark-light.png?v={{ASSET_V}}" width="97" height="25" alt="" aria-hidden="true">
     </a>
     <span class="stamp" id="demo-mode-badge" hidden>DEMO MODE</span>
     <nav class="nav" aria-label="Primary">
@@ -90,9 +91,9 @@
 <noscript><p class="shell fineprint">Live figures require JavaScript. Read <a href="/v1/stats">the current network data</a> directly; a dash means the figure has not loaded.</p></noscript>
 
   <section class="shell hero hero--split" aria-labelledby="hero-title">
-   <div class="hero-left">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
-    <p class="hero-lede">
+   <div class="hero-left">
+    <p class="hero-lede" data-scramble>
       Live failure and recovery intelligence for autonomous software.
     </p>
     <p class="hero-def">

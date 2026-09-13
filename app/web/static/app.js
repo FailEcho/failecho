@@ -427,10 +427,75 @@
     mark();
   }
 
+  // -- top bar ------------------------------------------------------------
+  // Black while you are at the top, white once you are not. Thresholded with
+  // hysteresis: a bar that repaints twice per pixel around a single boundary
+  // flickers on a trackpad.
+  function wireTopbar() {
+    var bar = document.querySelector(".topbar");
+    if (!bar) return;
+    var stuck = false;
+    function check() {
+      var y = window.pageYOffset;
+      if (!stuck && y > 24) stuck = true;
+      else if (stuck && y < 8) stuck = false;
+      else return;
+      bar.classList.toggle("is-stuck", stuck);
+    }
+    window.addEventListener("scroll", check, { passive: true });
+    check();
+  }
+
+  // -- scrambled lede -------------------------------------------------------
+  // The one line that says what this is, resolving out of noise. It runs
+  // once, on load, and never again: an effect that repeats is a thing to
+  // wait for rather than read. The final text is in the markup, so a reader
+  // without JS -- or with reduced motion asked for -- gets it immediately.
+  var NOISE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#%&$?/\\<>*+=-";
+
+  function scramble(node) {
+    var text = node.textContent.trim();
+    var settled = 0;
+    var frames = 0;
+
+    function tick() {
+      var out = "";
+      for (var i = 0; i < text.length; i++) {
+        if (i < settled || text.charAt(i) === " ") {
+          out += text.charAt(i);
+        } else {
+          out += NOISE.charAt(Math.floor(Math.random() * NOISE.length));
+        }
+      }
+      node.textContent = out;
+      frames += 1;
+      // Three characters settle every two frames, at 22ms a frame: about
+      // 0.9s for the line, which reads as a settle rather than as a wait.
+      settled = Math.floor(frames * 1.5);
+      if (settled <= text.length) {
+        window.setTimeout(tick, 22);
+        return;
+      }
+      node.textContent = text;
+    }
+
+    tick();
+  }
+
+  function wireScramble() {
+    var reduced = window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return;
+    var nodes = document.querySelectorAll("[data-scramble]");
+    Array.prototype.forEach.call(nodes, scramble);
+  }
+
   addCopyButtons();
   wireCopyButtons();
   wireTabs();
   wireRail();
+  wireTopbar();
+  wireScramble();
   if (el("stat-real-24h")) {
     refresh();
     if (!document.hidden) startPolling();

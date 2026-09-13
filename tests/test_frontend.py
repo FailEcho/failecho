@@ -207,6 +207,9 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
+    # 39k -> 41k, 16k -> 18k: the two states of the top bar, the drifting
+    # hero ground that replaced a 74KB photograph, and the scramble. The
+    # stylesheet grew by less than the image it removed.
     # 37k -> 39k for the two-column hero: a grid, a code block that is its
     # own copy control, and a prompt caret. The centred hero's rules were
     # deleted rather than left behind -- nothing else used them.
@@ -215,8 +218,8 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 39_000
-    assert len(JS) < 16_000
+    assert len(CSS) < 41_000
+    assert len(JS) < 18_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -224,23 +227,25 @@ def test_static_assets_stay_small():
     # 58k -> 60k, same reason: the rail's CSS is shared with the homepage's
     # stylesheet even though only /setup and /about use it.
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
-    # opening on top of the word that opened it, 65k -> 69k for the hero.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 69_000
+    # opening on top of the word that opened it, 65k -> 69k for the hero,
+    # 69k -> 73k for the two-state bar and the drifting ground.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 73_000
 
-    # The hero artwork is the single heaviest thing the homepage loads, so it
-    # is counted here rather than left out of the number it dominates. It is
-    # decorative: quantised hard, and capped so it cannot creep back up.
-    art = (STATIC / "echoimage.png").stat().st_size
-    assert art < 90_000, f"hero art is {art} bytes; re-quantise it"
+    # The hero artwork used to be the single heaviest thing the homepage
+    # loaded: a 74KB photograph, decorative, and the wrong shape at most
+    # window sizes. It is two radial gradients now and weighs nothing, so the
+    # page carries the brand marks and its own source and that is all.
+    assert "echoimage" not in CSS and "echoimage" not in HTML
 
     per_visit = (
         sum(len(x) for x in (HTML, CSS, JS))
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-light.png").stat().st_size
-        + art
+        + (STATIC / "wordmark-dark.png").stat().st_size
     )
-    # 165k -> 167k, all of it the two-column hero's markup and CSS.
-    assert per_visit < 167_000, f"page weight crept to {per_visit} bytes"
+    # 167k -> 116k: the photograph is gone, and both wordmarks are counted
+    # because the bar and the footer each use one.
+    assert per_visit < 116_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -249,8 +254,21 @@ def test_the_hero_art_stays_behind_the_hero():
     assert ".hero--split::before" in CSS
     block = CSS[CSS.index(".hero--split::before"):CSS.index(".hero--split h1")]
     assert "z-index: -1" in block and "pointer-events: none" in block
-    frame = CSS[CSS.index(".hero--split {"):CSS.index(".hero--split::before")]
+    frame = CSS[CSS.index(".hero--split {"):CSS.index("@keyframes drift")]
     assert "overflow: hidden" in frame and "isolation: isolate" in frame
+
+
+def test_the_hero_ground_is_drawn_not_downloaded():
+    """It was a 74KB photograph that was the wrong shape at most viewport
+    sizes. Two drifting radial gradients say the same thing, weigh nothing,
+    and fit any window."""
+    assert "@keyframes drift" in CSS
+    assert "echoimage" not in CSS
+    block = CSS[CSS.index(".hero--split::before"):CSS.index(".hero--split h1")]
+    assert "radial-gradient" in block
+    # Animating background-position, not a transform on a huge box: the hero
+    # must not repaint the page every frame on a 400M VPS's visitors' laptops.
+    assert "background-position" in CSS[CSS.index("@keyframes drift"):]
 
 
 def test_mobile_layout_rules_exist():
@@ -414,7 +432,7 @@ def test_the_hero_fits_a_laptop_screen():
     truncated. Stacked down the middle it had to be trimmed to 930; in two
     columns the definition and the install card share the height instead of
     queueing for it."""
-    block = CSS[CSS.index(".hero--split {"):CSS.index(".hero--split::before")]
+    block = CSS[CSS.index(".hero--split {"):CSS.index("@keyframes drift")]
     assert "padding-block: 64px 56px" in block, "the homepage hero has grown again"
     assert "grid-template-columns" in block, "the hero is stacked again"
 
@@ -440,9 +458,10 @@ def test_only_motion_that_carries_information_is_on_the_page():
     assert "@keyframes panelin" in CSS, "a tab switch does not read as a swap"
     assert "@keyframes beat" in CSS, "the live pulse is gone"
     assert "@keyframes blink" in CSS, "the prompt caret is gone"
+    assert "@keyframes drift" in CSS, "the hero ground is static again"
     # And nothing that animates a number upward from zero: that would draw
-    # growth the network has not had. Four keyframes is the whole budget.
-    assert CSS.count("@keyframes") == 4
+    # growth the network has not had. Five keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 5
 
 
 def test_every_animation_respects_reduced_motion():
@@ -523,3 +542,39 @@ def test_the_hero_puts_the_words_left_and_the_command_right():
         assert phrase in HTML
     # And the code blocks are in the right-hand column, not the left.
     assert HTML.index('class="hero-right"') < HTML.index('id="code-plugin"')
+
+
+def test_the_top_bar_has_two_states_and_two_brands():
+    """Black while you are at the top -- the bar is the page, and the name is
+    already in the headline underneath. White once you have scrolled, where
+    the wordmark has to say who this is on its own."""
+    assert ".topbar.is-stuck" in CSS
+    stuck = CSS[CSS.index(".topbar.is-stuck {"):]
+    stuck = stuck[:stuck.index("}")]
+    assert "background: #fff" in stuck
+    rest = CSS[CSS.index(".topbar {"):CSS.index(".topbar.is-stuck {")]
+    assert "background: #000" in rest
+    # The mark alone at the top, the wordmark once the bar is white.
+    assert ".topbar.is-stuck .brand-mark { display: none; }" in CSS
+    assert ".topbar.is-stuck .brand-word { display: block; }" in CSS
+    # Nav links have to change with the ground or they vanish into the white.
+    assert ".topbar.is-stuck .nav a { color:" in CSS
+
+
+def test_the_bar_does_not_flicker_at_its_own_boundary():
+    """One threshold repainting twice a pixel is what a trackpad finds."""
+    bar = JS[JS.index("function wireTopbar()"):]
+    bar = bar[:bar.index("\n  }") + 4]
+    assert "y > 24" in bar and "y < 8" in bar, "no hysteresis on the scroll state"
+
+
+def test_the_lede_scrambles_once_and_settles_on_the_real_sentence():
+    """The sentence is in the markup, so it is what a reader without JS gets,
+    and what anyone who asked for reduced motion gets immediately."""
+    assert "data-scramble" in HTML
+    assert "Live failure and recovery intelligence for autonomous software." in HTML
+    scramble = JS[JS.index("function wireScramble()"):]
+    assert '"(prefers-reduced-motion: reduce)"' in scramble
+    assert "if (reduced) return;" in scramble
+    # It ends on the text it started from, never on a frame of noise.
+    assert "node.textContent = text;" in JS
