@@ -83,6 +83,26 @@ _REDACTION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bAKIA[0-9A-Z]{12,}\b"), "<REDACTED>"),
     # Card-shaped digit groups: 4111 1111 1111 1111 / 4111-1111-1111-1111
     (re.compile(r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{2,4}\b"), "<REDACTED>"),
+    # Credentials in a URI: scheme://user:password@host
+    #
+    # Any scheme, not just http. A connection string is the most common way a
+    # password ends up inside an error message -- "connection to
+    # postgres://admin:hunter2@db:5432 refused" -- and only https was covered,
+    # by the URL rule in pass 2. Everything else came through intact:
+    # redis, postgres, mysql, amqp, mongodb. Tested, not assumed.
+    #
+    # The userinfo match is greedy to the last @ before a slash or a space,
+    # which is what makes it hold for the two shapes a tighter pattern missed:
+    # an empty username (redis://:secret@host) and a password containing an @
+    # (mysql://root:P@ssw0rd@host). It cannot run past the host, because the
+    # character class excludes both whitespace and /.
+    #
+    # The host is deliberately kept: it is the useful part of the failure, and
+    # pass 2 turns it into <URL> or <IP> anyway where it can.
+    (
+        re.compile(r"\b([a-z][a-z0-9+.\-]{1,15})://[^\s/]*@", re.IGNORECASE),
+        r"\1://<REDACTED>@",
+    ),
 ]
 
 # ---------------------------------------------------------------------------

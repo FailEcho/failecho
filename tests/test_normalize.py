@@ -82,3 +82,48 @@ def test_empty_input():
 def test_long_messages_are_truncated():
     normalized = normalize_error("x" * 5000)
     assert len(normalized) <= 260
+
+
+# ---------------------------------------------------------------------------
+# credentials inside a connection string
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "message,secret",
+    [
+        ("redis://:sup3rs3cret@10.0.0.5:6379 refused", "sup3rs3cret"),
+        ("postgres://admin:hunter2@localhost:5432/prod", "hunter2"),
+        ("mysql://root:P@ssw0rd!@db01:3306/app", "ssw0rd"),
+        ("amqp://guest:guestpass@rabbit:5672", "guestpass"),
+        ("mongodb+srv://u:pw123@cluster0.abc.mongodb.net/x", "pw123"),
+        ("https://user:secret@api.example.com/v1", "secret"),
+        ("sftp://deploy:kEy123@files.internal/out", "kEy123"),
+    ],
+)
+def test_a_password_in_a_connection_string_never_survives(message, secret):
+    """The most ordinary way a password reaches an error message, and it was
+    getting through. Only https was covered, by the URL rule; redis, postgres,
+    mysql, amqp and sftp all passed the password along in clear text. The two
+    shapes that beat a tighter first attempt are both here: an empty username
+    (redis://:secret@host) and a password containing an @."""
+    out = normalize_error(message)
+    assert secret not in out, out
+    assert "<REDACTED>" in out
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "connect to postgres://db.internal:5432 refused",
+        "plain https://example.com/path?q=1 failed",
+        "user alice@example.com not permitted",
+        "image https://cdn.example.com/logo@2x.png missing",
+        "See https://a.example.com and mail me@b.example.com",
+    ],
+)
+def test_the_credential_rule_does_not_eat_ordinary_urls(message):
+    """It must not run past the host: a URL with an @ later in the path, or a
+    sentence with a URL and an address in it, are not credentials."""
+    out = normalize_error(message)
+    assert "<REDACTED>" not in out, out
