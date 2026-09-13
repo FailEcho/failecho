@@ -263,7 +263,11 @@ def test_packaging_exposes_the_relay_command():
     assert project["project"]["scripts"]["failecho-mcp"] == "failecho_mcp:main"
     packages = project["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"]
     assert "failecho_mcp" in packages
-    assert project["project"]["version"] == failecho_mcp.__version__
+    # The relay ships as its own distribution now (`failecho-mcp` on PyPI and
+    # npm), so its version tracks those releases and no longer has to match the
+    # server's. It bumped to 0.1.1 on its own to carry the MCP registry's
+    # ownership token; the server had no reason to move.
+    assert failecho_mcp.__version__, "the relay still declares a version"
     # "failecho" stays free for the Python client. This distribution installs
     # the server and the relay; `import failecho` would fail after installing it.
     assert project["project"]["name"] == "failecho-server"

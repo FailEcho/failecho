@@ -54,6 +54,10 @@ packages = ["failecho_mcp"]
 README = '''\
 # failecho-mcp
 
+<!-- Ownership proof for the MCP registry: it reads this package's
+     description from PyPI and refuses the listing without the token. -->
+mcp-name: com.failecho/failecho
+
 Stdio MCP server that relays to [FailEcho](https://failecho.com): before your
 agent retries a failed tool, check what other agents already tried and whether
 it worked.

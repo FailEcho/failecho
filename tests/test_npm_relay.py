@@ -95,3 +95,23 @@ def test_the_package_declares_what_it_ships():
     assert manifest["bin"]["failecho-mcp"] == "bin/failecho-mcp.js"
     assert "dependencies" not in manifest, "zero dependencies is the point"
     assert manifest["license"] == "MIT"
+
+
+def test_the_two_relays_ship_the_same_version():
+    """One source of behaviour, two distributions. If they drift, somebody is
+    running a relay whose bugs were fixed in the other language."""
+    import re
+    root = RELAY.parents[2]
+    npm = json.loads((root / "npm-relay" / "package.json").read_text())["version"]
+    py = re.search(
+        r'__version__ = "([^"]+)"',
+        (root / "failecho_mcp" / "__init__.py").read_text(),
+    ).group(1)
+    assert npm == py, f"npm is {npm}, PyPI relay is {py}"
+
+
+def test_the_npm_package_carries_the_registry_ownership_token():
+    """The MCP registry fetches this from npm and refuses the listing without
+    it. Removing it breaks publishing, not installing, so nothing else notices."""
+    manifest = json.loads((RELAY.parents[1] / "package.json").read_text())
+    assert manifest["mcpName"] == "com.failecho/failecho"

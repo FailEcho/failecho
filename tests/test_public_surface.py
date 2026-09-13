@@ -314,3 +314,13 @@ def test_llms_txt_carries_the_config_block_agents_need(client):
     assert '"mcpServers"' in body
     assert '"type": "http"' in body
     assert "/mcp" in body
+
+
+def test_the_pypi_relay_readme_carries_the_registry_token():
+    """The MCP registry reads this package's PyPI description and refuses the
+    listing unless the token is in it. It lives in a build script, where
+    nothing else would ever exercise it."""
+    from pathlib import Path
+
+    builder = Path(__file__).resolve().parents[1] / "scripts" / "build_relay_package.py"
+    assert "mcp-name: com.failecho/failecho" in builder.read_text()
