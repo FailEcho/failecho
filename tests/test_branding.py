@@ -563,23 +563,21 @@ def test_openapi_description_leads_with_ai_agents(client):
 
 
 def test_the_square_icons_are_centred():
-    """The mark *looks* like it sits in the middle of every square icon.
+    """The mark sits in the middle of every square icon.
 
-    Two separate bugs live here. An off-centre master once went straight into
-    the favicon, because faint anti-aliasing made the whole canvas count as
-    content and the build's trim step did nothing. Measure visible pixels
-    only, as the build does.
+    Three bugs have lived here. An off-centre master went straight into the
+    favicon, because faint anti-aliasing made the whole canvas count as
+    content and the build's trim step did nothing. Then the build tried to
+    centre by *visual weight* instead of by outline: the measurement said the
+    weight sat high and right, so it pushed the mark down and left, and a
+    144px icon ended up with 19px of air above the mark and 4px below. That is
+    not a subtle optical balance, it is off-centre, and it is what a search
+    result shows.
 
-    Then equal margins turned out not to mean centred. The mark is an
-    asymmetric crescent with a tail, so a perfectly centred bounding box put
-    its visual weight about 3% right and 5% high -- invisible at full size,
-    and plainly wrong in Claude Desktop's small dark connector tile, where it
-    sat high with a gap underneath.
-
-    So this checks the thing that was actually wrong: where the weight is.
-    The bounding box is allowed to be lopsided, and has to be, but only
-    within the margin the build reserves -- a mark shoved against an edge is
-    the first bug coming back.
+    A favicon is drawn at 16-32px and often cropped to a circle. The only
+    property that survives that is equal margins on the visible bounding box,
+    so that is what is checked -- to the pixel, with rounding the only
+    tolerance.
     """
     import pytest
 
@@ -589,36 +587,25 @@ def test_the_square_icons_are_centred():
     static = Path(__file__).resolve().parents[1] / "app" / "web" / "static"
     for name in ("favicon.png", "apple-touch-icon.png"):
         icon = Image.open(static / name).convert("RGBA")
-        # One definition of "visible", the same one the build optimises: how
-        # far each pixel stands out from the dark ground the mark is drawn
-        # for. Weighting by opacity instead makes the bright lobe and the dark
-        # tail count equally, and the two measures then disagree by about 2%
-        # while both claim to be centring the same icon.
+        width, height = icon.size
+
+        # "Visible" against the dark ground these icons are drawn for, which
+        # also handles apple-touch-icon.png being opaque already.
         backdrop = Image.new("RGBA", icon.size, (13, 14, 16, 255))
         flat = Image.alpha_composite(backdrop, icon).convert("RGB")
         visible = ImageChops.difference(flat, backdrop.convert("RGB")).convert("L")
         mask = visible.point(lambda v: 255 if v > 16 else 0)
-        left, top, right, bottom = mask.getbbox()
-        width, height = icon.size
+        box = mask.getbbox()
+        assert box, f"{name} has no visible mark"
+        left, top, right, bottom = box
 
-        # Weight, not box: sum where the ink is, as the eye does.
-        pixels = visible.load()
-        total = sum_x = sum_y = 0
-        for y in range(height):
-            for x in range(width):
-                weight = pixels[x, y]
-                if weight <= 16:
-                    continue
-                total += weight
-                sum_x += x * weight
-                sum_y += y * weight
-        assert total, f"{name} has no visible mark"
-        off_x = (sum_x / total - width / 2) / width
-        off_y = (sum_y / total - height / 2) / height
-        assert abs(off_x) < 0.015, f"{name} weight sits {off_x:+.1%} off horizontally"
-        assert abs(off_y) < 0.015, f"{name} weight sits {off_y:+.1%} off vertically"
+        off_x = (left + right) / 2 - width / 2
+        off_y = (top + bottom) / 2 - height / 2
+        assert abs(off_x) <= 1, f"{name} sits {off_x:+.1f}px off horizontally"
+        assert abs(off_y) <= 1, f"{name} sits {off_y:+.1f}px off vertically"
 
-        # And the first bug: nothing jammed against an edge.
+        # And the first bug: nothing jammed against an edge, where a rounded
+        # crop would take a bite out of it.
         assert min(left, top, width - right, height - bottom) >= 4, (
             f"{name} touches its edge; a rounded crop would clip it"
         )
