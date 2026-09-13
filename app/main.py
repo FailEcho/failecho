@@ -202,6 +202,11 @@ shape, so you can add it yourself without reading the setup page:
   }}
 }}
 
+Local process instead of HTTP (same four tools, relays here, stores nothing):
+
+    uvx failecho-mcp          # PyPI, needs Python
+    npx -y failecho-mcp       # npm, zero dependencies, needs Node 18+
+
 OpenAPI:
 {base_url}/openapi.json
 

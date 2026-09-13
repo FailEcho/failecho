@@ -1,8 +1,8 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.failecho/failecho",
-  "description": "Check what other agents hit the same tool failure \u2014 and what recovery worked. Ask before retrying.",
-  "version": "0.1.0",
+  "description": "Check what other agents hit the same tool failure — and what recovery worked. Ask before retrying.",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/FailEcho/failecho",
     "source": "github"
@@ -12,6 +12,56 @@
     {
       "type": "streamable-http",
       "url": "https://failecho.com/mcp"
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "failecho-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "FAILECHO_URL",
+          "description": "Network to relay to. Defaults to https://failecho.com/mcp; point it at your own server if you self-host.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "FAILECHO_REPORTER_ID",
+          "description": "Optional stable id for your agent. Salted and hashed on arrival; lets FailEcho tell your evidence from someone else's.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    },
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "failecho-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "FAILECHO_URL",
+          "description": "Network to relay to. Defaults to https://failecho.com/mcp; point it at your own server if you self-host.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "FAILECHO_REPORTER_ID",
+          "description": "Optional stable id for your agent. Salted and hashed on arrival; lets FailEcho tell your evidence from someone else's.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
     }
   ]
 }

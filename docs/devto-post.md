@@ -119,6 +119,22 @@ That gives you four tools: `check_tool_failure` before a retry, plus
 contributing. Without the hook your agent has to call these itself, so put a
 line about it in your system prompt or it won't bother.
 
+### Host can only start a process
+
+Some hosts cannot speak HTTP at all. Same relay, either runtime, pick whichever
+you already have:
+
+```json
+{ "mcpServers": { "failecho": { "command": "uvx", "args": ["failecho-mcp"] } } }
+```
+
+```json
+{ "mcpServers": { "failecho": { "command": "npx", "args": ["-y", "failecho-mcp"] } } }
+```
+
+Both are ours, both forward to the same network, both store nothing locally.
+The Node one has no dependencies and starts in about a second.
+
 ### No MCP at all
 
 One HTTP call. This one stores nothing and is never rate limited:

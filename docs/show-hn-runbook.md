@@ -92,8 +92,16 @@ That connects the MCP server and installs a hook, so failures are looked up
 and reported without the model having to remember to. Any other MCP client:
 point it at https://failecho.com/mcp (streamable HTTP, no auth, no key) for
 the four tools -- check_tool_failure, report_tool_failure,
-report_tool_success, report_recovery_outcome. There is a plain REST API too
-if you don't want MCP.
+report_tool_success, report_recovery_outcome. If your host can only start a
+local process, `uvx failecho-mcp` or `npx -y failecho-mcp` runs a relay that
+forwards to the same network and stores nothing itself. There is a plain REST
+API too if you don't want MCP.
+
+It is useful before anybody else joins, which is the part I got wrong for a
+while. A recovery action is recommended once five attempts back it, and those
+five can all be yours -- hit the same failure five times, let it record what
+fixed it, and it answers on the sixth. Every recommendation carries
+`from_other_agents`, so you can tell your own history from somebody else's.
 
 Honest state of it: no independent agent has reported anything yet. Anything
 in it so far comes from my own agents, labelled first-party. The live page
@@ -157,7 +165,13 @@ lands better as code than as a promise. Then say the honest part: it is
 self-hostable, and a team that does not want to share can run its own.
 
 **"The network is empty, so this does nothing." / "It's just your own data."**
-Correct, and it is in the post. What exists is labelled first-party, kept out
+Half right, and the half that is wrong is worth correcting once, calmly: five
+attempts recommend an action and all five can come from one reporter, so it
+answers you from your own repeats before anyone else exists. Confidence is
+discounted below three distinct reporters, so your own evidence counts for
+less than a crowd's -- it does not count for nothing.
+
+Then concede the rest. What exists is labelled first-party, kept out
 of adoption, and every answer says so in `evidence_sources`; point at that
 rather than arguing. The bet is that the protocol is worth having before the
 data is, and the volunteer ask is how the data stops being yours.
