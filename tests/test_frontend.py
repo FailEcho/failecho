@@ -222,7 +222,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 44_000
+    assert len(CSS) < 45_000
     assert len(JS) < 23_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -233,7 +233,7 @@ def test_static_assets_stay_small():
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
     # opening on top of the word that opened it, 65k -> 69k for the hero,
     # 69k -> 73k for the two-state bar and the drifting ground.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 80_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 81_000
 
     # The artwork is not behind the hero any more, where it was the wrong
     # shape at most window sizes and blocked the first paint. It closes the
@@ -254,7 +254,7 @@ def test_static_assets_stay_small():
     )
     # 119k -> 150k: the artwork is back, once, below the fold and lazy, as
     # the closing band. Both halves of it are the same request.
-    assert per_visit < 153_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 154_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -468,9 +468,10 @@ def test_only_motion_that_carries_information_is_on_the_page():
     assert "@keyframes panelin" in CSS, "a tab switch does not read as a swap"
     assert "@keyframes beat" in CSS, "the live pulse is gone"
     assert "@keyframes blink" in CSS, "the prompt caret is gone"
+    assert "@keyframes steplit" in CSS, "the loop is a static diagram again"
     # And nothing that animates a number upward from zero: that would draw
-    # growth the network has not had. Four keyframes is the whole budget.
-    assert CSS.count("@keyframes") == 4
+    # growth the network has not had. Six keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 6
 
 
 def test_every_animation_respects_reduced_motion():
@@ -703,20 +704,47 @@ def test_every_page_loads_the_script():
         assert 'id="copy-status"' in body, f"{page.name} has nowhere to announce a copy"
 
 
-def test_the_page_moves_with_the_bar_wherever_you_are_on_it():
-    """The bar growing pushed the page down by itself, but only at the very
-    top of the document: a sticky element keeps its slot in the flow where it
-    started, so past that slot it was growing something off screen. The growth
-    is taken back out of the flow and the page is moved by the same amount
-    instead -- measured at 25px at y=0, y=900 and y=2200, on three pages."""
+def test_opening_a_menu_never_moves_the_page():
+    """The bar growing pushed the page down at the top of the document and
+    nowhere else, because a sticky element keeps its slot in the flow where it
+    started. Making that consistent by moving the page deliberately was worse
+    than the inconsistency -- it read as motion sickness. The growth is kept
+    out of the flow, so the bar opens over the page."""
     assert ".topbar.is-open { margin-bottom: calc(var(--bar-h" in CSS
-    assert "body.menu-open main," in CSS
-    assert "transform: translateY(var(--bar-shift" in CSS
-    # The margin has to move with everything else or the page jolts up first.
-    bar = CSS[CSS.index(".topbar {"):CSS.index(".topbar::after")]
-    assert "margin-bottom 0.22s ease" in bar
-    assert '"--bar-shift"' in JS and 'classList.toggle("menu-open"' in JS
+    assert "body.menu-open" not in CSS, "the page is being moved again"
+    assert "--bar-shift" not in CSS and "--bar-shift" not in JS
+    assert "menu-open" not in JS
 
 
-def test_menu_entries_say_they_lead_somewhere():
-    assert '.navpanel b::after { content: " \\2197"; ' in CSS
+def test_only_the_entries_that_leave_the_site_proper_are_marked():
+    """The API reference and llms.txt hand you a document rather than another
+    page of the site; the other four entries are just pages."""
+    assert ".navpanel a[data-leads] b::after" in CSS
+    assert HTML.count("data-leads") == 2
+    for href in ('href="/docs" data-leads', 'href="/llms.txt" data-leads'):
+        assert href in HTML
+
+
+def test_the_light_goes_round_the_loop():
+    """The return path is the point of the diagram, so it lights up too."""
+    assert "@keyframes steplit" in CSS and "@keyframes numberlit" in CSS
+    assert ".loop-return { animation: steplit 8s ease-in-out 6.4s infinite; }" in CSS
+    for delay in ("1.6s", "3.2s", "4.8s"):
+        assert "animation-delay: " + delay in CSS
+    reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce) {\n  .pulse"):]
+    reduced = reduced[:reduced.index("}")]
+    assert ".loop-node" in reduced and ".loop-return" in reduced
+
+
+def test_the_scramble_uses_the_sentences_own_letters():
+    """A made-up alphabet of symbols read as a different piece of text
+    arriving and being replaced. The same letters read as this text settling
+    into place, which is what is happening."""
+    assert "var NOISE" not in JS, "the symbol alphabet is back"
+    assert 'var pool = text.replace(/\\s+/g, "");' in JS
+    assert "pool.charAt(Math.floor(Math.random() * pool.length))" in JS
+
+
+def test_the_four_install_panels_start_on_the_same_line():
+    assert "justify-content: flex-start" in CSS
+    assert "min-height: 208px" in CSS

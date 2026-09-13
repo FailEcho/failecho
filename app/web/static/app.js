@@ -473,12 +473,6 @@
       bar.classList.add("is-open");
       bar.style.setProperty("--bar-h-open", bar.offsetHeight + "px");
       bar.classList.toggle("is-open", wasOpen);
-      // How far the page moves is how far the bar grew.
-      document.body.style.setProperty(
-        "--bar-shift",
-        (parseFloat(bar.style.getPropertyValue("--bar-h-open"))
-          - parseFloat(bar.style.getPropertyValue("--bar-h"))) + "px"
-      );
       // Read once more so the browser cannot batch the class changes past
       // the point where turning transitions back on would animate them.
       void bar.offsetHeight;
@@ -488,7 +482,6 @@
     function open(on) {
       bar.classList.toggle("is-open", on);
       scrim.classList.toggle("is-open", on);
-      document.body.classList.toggle("menu-open", on);
     }
 
     // Opening is per item; closing is not. Closing on the item's own
@@ -536,7 +529,6 @@
   // once, on load, and never again: an effect that repeats is a thing to
   // wait for rather than read. The final text is in the markup, so a reader
   // without JS -- or with reduced motion asked for -- gets it immediately.
-  var NOISE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#%&$?/\\<>*+=-";
 
   // `rate` is characters settled per frame, at 22ms a frame, so the run
   // takes length / rate frames. The lede is 64 characters at 1.5 -- about
@@ -550,6 +542,11 @@
     if (!text) return;
     node.setAttribute("data-scrambling", "1");
 
+    // The noise is the sentence's own letters, shuffled. Punctuation and
+    // symbols from a made-up alphabet read as a different piece of text
+    // arriving and then being replaced; the same letters read as this text
+    // settling into place, which is what it is.
+    var pool = text.replace(/\s+/g, "");
     var settled = 0;
     var frames = 0;
 
@@ -559,7 +556,7 @@
         if (i < settled || text.charAt(i) === " ") {
           out += text.charAt(i);
         } else {
-          out += NOISE.charAt(Math.floor(Math.random() * NOISE.length));
+          out += pool.charAt(Math.floor(Math.random() * pool.length));
         }
       }
       node.textContent = out;

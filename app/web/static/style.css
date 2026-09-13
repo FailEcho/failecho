@@ -224,8 +224,10 @@ a[rel~="external"]:hover::after { color: var(--red); }
     rgba(255, 255, 255, 0.75) 78%, transparent);
 }
 .navpanel b { font-size: 16px; }
-.navpanel b::after { content: " \2197"; font-size: .8em; color: var(--ink-3); }
-.navpanel a:hover b::after { color: var(--red); }
+.navpanel a[data-leads] b::after {
+  content: " \2197"; font-size: .8em; color: var(--ink-3);
+}
+.navpanel a[data-leads]:hover b::after { color: var(--red); }
 .navpanel span { font-size: 13.5px; }
 .navitem:hover .navpanel, .navitem:focus-within .navpanel {
   opacity: 1; visibility: visible; transform: none;
@@ -240,16 +242,13 @@ a[rel~="external"]:hover::after { color: var(--red); }
 .topbar-row { transition: padding 0.22s ease; }
 .topbar.is-open .topbar-row { padding-block: 28px; }
 
-/* And the page comes with it. The bar growing used to push the page down by
-   itself, but only at the very top of the document: a sticky element keeps
-   its slot in the flow where it started, so once you have scrolled past that
-   slot, growing it moves something that is no longer on screen. The growth
-   is taken back out of the flow with a negative margin, and the page is
-   moved by the same amount instead, which happens wherever you are. */
+/* The page does not move. The bar grew the page downward at the top of the
+   document and nowhere else -- a sticky element keeps its slot in the flow
+   where it started -- and moving the page deliberately, to make that
+   consistent, was worse than the inconsistency: it read as motion sickness
+   rather than as polish. The growth is kept out of the flow entirely, so the
+   bar opens over the page and nothing under it shifts. */
 .topbar.is-open { margin-bottom: calc(var(--bar-h, 76px) - var(--bar-h-open, 101px)); }
-main, footer, .echoband { transition: transform 0.22s ease; }
-body.menu-open main,
-body.menu-open footer { transform: translateY(var(--bar-shift, 25px)); }
 /* The mark grows into the taller bar rather than sitting in the middle of it. */
 .brand-mark, .brand-word {
   transition: height 0.22s ease, transform 0.22s ease, opacity 0.22s ease;
@@ -398,7 +397,8 @@ h1 {
 @keyframes tick { 0% { color: var(--red); } 100% { color: inherit; } }
 .ticked { animation: tick 1.8s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .pulse, .ticked, .caret, .install-panel:not([hidden]) { animation: none; }
+  .pulse, .ticked, .caret, .loop-node, .loop-node .loop-n, .loop-return,
+  .install-panel:not([hidden]) { animation: none; }
 }
 
 /* ---- metrics ----------------------------------------------------------- */
@@ -846,16 +846,17 @@ footer.shell {
 .install-tabs button[aria-selected="true"] {
   color: var(--ink); border-bottom-color: var(--red);
 }
-/* All panels as tall as the tallest, so a tab switch cannot resize the card,
-   the hero, or the artwork sized to the hero. Measured 136/206/177/136
-   wide, 150/237/192/150 at 390px. The two-line panels have room to spare at that
-   height, so their content sits in the middle of it rather than leaving a
-   block of empty card underneath. */
+/* All four panels as tall as the tallest and starting on the same line, so
+   switching tab moves neither the code nor the sentence underneath it. With
+   the card gone there is nothing to see in the space a short panel leaves --
+   it is the page's own black -- but centring the content in that space made
+   the code start somewhere different on every tab, which is what made the
+   four of them look like four different things. Measured 140/207/182/140. */
 @keyframes panelin { from { opacity: 0; } to { opacity: 1; } }
 .install-panel:not([hidden]) { animation: panelin .14s ease-out; }
 .install-panel {
   position: relative; min-height: 208px;
-  display: flex; flex-direction: column; justify-content: center;
+  display: flex; flex-direction: column; justify-content: flex-start;
 }
 
 /* Copy controls added by the script sit over the top-right of their box. */
@@ -929,7 +930,25 @@ footer.shell {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; padding: 10px 20px; text-align: center;
 }
-.loop-node:first-child { border-color: var(--red-deep); }
+/* The light goes round: one step at a time, then the return path, then
+   again. An eight-second lap, slow enough to read as a diagram rather than
+   as a warning. */
+@keyframes steplit {
+  0%, 3%    { border-color: var(--line-2); background: transparent; }
+  8%, 16%   { border-color: var(--red); background: var(--red-dim); }
+  24%, 100% { border-color: var(--line-2); background: transparent; }
+}
+@keyframes numberlit {
+  0%, 3%    { color: var(--ink-3); }
+  8%, 16%   { color: var(--red); }
+  24%, 100% { color: var(--ink-3); }
+}
+.loop-node { animation: steplit 8s ease-in-out infinite; }
+.loop-node .loop-n { animation: numberlit 8s ease-in-out infinite; }
+.loop-node:nth-child(2), .loop-node:nth-child(2) .loop-n { animation-delay: 1.6s; }
+.loop-node:nth-child(3), .loop-node:nth-child(3) .loop-n { animation-delay: 3.2s; }
+.loop-node:nth-child(4), .loop-node:nth-child(4) .loop-n { animation-delay: 4.8s; }
+.loop-return { animation: steplit 8s ease-in-out 6.4s infinite; }
 .loop-n {
   font-family: var(--mono); font-size: 12px; color: var(--ink-3);
   letter-spacing: 0.08em;
