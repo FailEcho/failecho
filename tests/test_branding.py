@@ -563,11 +563,23 @@ def test_openapi_description_leads_with_ai_agents(client):
 
 
 def test_the_square_icons_are_centred():
-    """The mark sits in the middle of every square icon.
+    """The mark *looks* like it sits in the middle of every square icon.
 
-    An off-centre master once went straight into the favicon, because faint
-    anti-aliasing made the whole canvas count as content and the build's trim
-    step did nothing. Measure visible pixels only, as the build now does.
+    Two separate bugs live here. An off-centre master once went straight into
+    the favicon, because faint anti-aliasing made the whole canvas count as
+    content and the build's trim step did nothing. Measure visible pixels
+    only, as the build does.
+
+    Then equal margins turned out not to mean centred. The mark is an
+    asymmetric crescent with a tail, so a perfectly centred bounding box put
+    its visual weight about 3% right and 5% high -- invisible at full size,
+    and plainly wrong in Claude Desktop's small dark connector tile, where it
+    sat high with a gap underneath.
+
+    So this checks the thing that was actually wrong: where the weight is.
+    The bounding box is allowed to be lopsided, and has to be, but only
+    within the margin the build reserves -- a mark shoved against an edge is
+    the first bug coming back.
     """
     import pytest
 
@@ -577,13 +589,36 @@ def test_the_square_icons_are_centred():
     static = Path(__file__).resolve().parents[1] / "app" / "web" / "static"
     for name in ("favicon.png", "apple-touch-icon.png"):
         icon = Image.open(static / name).convert("RGBA")
-        if icon.getchannel("A").getextrema()[0] == 255:
-            # Opaque icon: the mark is whatever differs from the backdrop.
-            ground = Image.new("RGB", icon.size, icon.getpixel((0, 0))[:3])
-            visible = ImageChops.difference(icon.convert("RGB"), ground).convert("L")
-        else:
-            visible = icon.getchannel("A")
-        left, top, right, bottom = visible.point(lambda v: 255 if v > 16 else 0).getbbox()
+        # One definition of "visible", the same one the build optimises: how
+        # far each pixel stands out from the dark ground the mark is drawn
+        # for. Weighting by opacity instead makes the bright lobe and the dark
+        # tail count equally, and the two measures then disagree by about 2%
+        # while both claim to be centring the same icon.
+        backdrop = Image.new("RGBA", icon.size, (13, 14, 16, 255))
+        flat = Image.alpha_composite(backdrop, icon).convert("RGB")
+        visible = ImageChops.difference(flat, backdrop.convert("RGB")).convert("L")
+        mask = visible.point(lambda v: 255 if v > 16 else 0)
+        left, top, right, bottom = mask.getbbox()
         width, height = icon.size
-        assert abs(left - (width - right)) <= 2, f"{name} off-centre horizontally"
-        assert abs(top - (height - bottom)) <= 2, f"{name} off-centre vertically"
+
+        # Weight, not box: sum where the ink is, as the eye does.
+        pixels = visible.load()
+        total = sum_x = sum_y = 0
+        for y in range(height):
+            for x in range(width):
+                weight = pixels[x, y]
+                if weight <= 16:
+                    continue
+                total += weight
+                sum_x += x * weight
+                sum_y += y * weight
+        assert total, f"{name} has no visible mark"
+        off_x = (sum_x / total - width / 2) / width
+        off_y = (sum_y / total - height / 2) / height
+        assert abs(off_x) < 0.015, f"{name} weight sits {off_x:+.1%} off horizontally"
+        assert abs(off_y) < 0.015, f"{name} weight sits {off_y:+.1%} off vertically"
+
+        # And the first bug: nothing jammed against an edge.
+        assert min(left, top, width - right, height - bottom) >= 4, (
+            f"{name} touches its edge; a rounded crop would clip it"
+        )

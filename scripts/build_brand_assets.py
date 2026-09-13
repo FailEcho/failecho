@@ -90,22 +90,72 @@ def fit_width(image: Image.Image, width: int) -> Image.Image:
     return image.resize((width, height), Image.LANCZOS)
 
 
-def square(image: Image.Image, size: int, margin: float = 0.08) -> Image.Image:
-    """Centre the mark on a transparent square canvas.
+def optical_centre(image: Image.Image, ground: tuple[int, int, int]) -> tuple[float, float]:
+    """Where the mark *looks* like it sits, against the ground it will sit on.
+
+    Weighted by how far each pixel stands out from the ground rather than by
+    opacity: this mark's bright lobe pulls the eye far harder than its dark
+    tail, and an opacity-weighted centre barely moves because both are equally
+    solid. Measured that way the correction came out at less than half what
+    the eye was asking for.
+    """
+    flat = Image.alpha_composite(
+        Image.new("RGBA", image.size, (*ground, 255)), image
+    ).convert("RGB")
+    pixels = flat.load()
+    alpha = image.getchannel("A").load()
+    total = sum_x = sum_y = 0
+    for y in range(image.height):
+        for x in range(image.width):
+            if alpha[x, y] <= SOLID_ALPHA:
+                continue
+            r, g, b = pixels[x, y]
+            weight = abs(r - ground[0]) + abs(g - ground[1]) + abs(b - ground[2])
+            if weight < 24:
+                continue
+            total += weight
+            sum_x += x * weight
+            sum_y += y * weight
+    if not total:
+        return image.width / 2, image.height / 2
+    return sum_x / total, sum_y / total
+
+
+def square(
+    image: Image.Image,
+    size: int,
+    margin: float = 0.08,
+    ground: tuple[int, int, int] = BACKDROP,
+) -> Image.Image:
+    """Place the mark on a transparent square canvas, optically centred.
 
     Padding, never stretching: a distorted logo is worse than a small one. The
     margin keeps the strokes off the edge, where browsers and search results
     tend to crop or round the corners.
+
+    Centred by visual weight, not by bounding box. The mark is an asymmetric
+    crescent with a tail, so equal margins put its weight about 3% right and
+    5% high -- which is invisible at full size and obvious in a small tile.
+    Claude Desktop draws connector icons in a dark rounded square, and there
+    it read as sitting high with a gap underneath.
+
+    The shift is clamped to the margin, so balancing it can never push a
+    stroke off the canvas or into a rounded corner.
     """
     inner = round(size * (1 - 2 * margin))
     scaled = (
         fit_width(image, inner) if image.width >= image.height
         else fit_height(image, inner)
     )
+    base_x = (size - scaled.width) / 2
+    base_y = (size - scaled.height) / 2
+
+    mass_x, mass_y = optical_centre(scaled, ground)
+    shift_x = max(-base_x, min(base_x, size / 2 - (base_x + mass_x)))
+    shift_y = max(-base_y, min(base_y, size / 2 - (base_y + mass_y)))
+
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    canvas.alpha_composite(
-        scaled, ((size - scaled.width) // 2, (size - scaled.height) // 2)
-    )
+    canvas.alpha_composite(scaled, (round(base_x + shift_x), round(base_y + shift_y)))
     return canvas
 
 
