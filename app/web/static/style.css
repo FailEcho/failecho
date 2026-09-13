@@ -255,6 +255,11 @@ h1 {
   color: var(--ink);
 }
 
+/* Distribution metadata, not an endorsement row: text, no logos, no border.
+   Being in a registry says where to install from, not who uses it. */
+.hero-listed { margin: 10px 0 0; font-size: 13px; color: var(--ink-3); }
+.hero-listed a { color: var(--ink-2); }
+
 .hero-meta {
   margin: 0;
   font-family: var(--mono);
@@ -710,7 +715,10 @@ footer.shell {
 .install-tabs button[aria-selected="true"] {
   color: var(--ink); border-bottom-color: var(--red);
 }
-.install-panel { position: relative; min-height: 150px; }
+/* All panels as tall as the tallest, so a tab switch cannot resize the card,
+   the hero, or the artwork sized to the hero. Measured 150/200/170/150 wide,
+   148/248/213/163 at 390px. */
+.install-panel { position: relative; min-height: 200px; }
 
 /* Copy controls added by the script sit over the top-right of their box. */
 .has-copy { position: relative; }
@@ -840,7 +848,7 @@ footer.shell {
 @media (max-width: 640px) {
   .hero--center { padding-block: 76px 66px; }
   .statcards { grid-template-columns: minmax(0, 1fr); }
-  .install-panel { min-height: 0; }
+  .install-panel { min-height: 250px; }
   .install pre { padding-right: 18px; padding-top: 46px; }
   .install-copy { top: 10px; left: 12px; right: auto; }
 }

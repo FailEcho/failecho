@@ -182,7 +182,11 @@ def test_static_assets_stay_small():
     # the stat cards. Trimming comments to defend a number is the wrong trade.
     assert len(CSS) < 33_000
     assert len(JS) < 12_000
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 57_000
+    # 57k -> 58k for the distribution line under the hero and the panel
+    # height that stops a tab switch resizing the artwork. The stylesheet
+    # stayed under its own cap without raising it; there is no dead CSS left
+    # to reclaim, so the next addition is an honest raise rather than a trim.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 58_000
 
     # The hero artwork is the single heaviest thing the homepage loads, so it
     # is counted here rather than left out of the number it dominates. It is
