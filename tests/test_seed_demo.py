@@ -104,3 +104,41 @@ def test_purge_removes_synthetic_rows(seeded):
     stats = seeded.get("/v1/stats").json()
     assert stats["observations_total"] == 0
     assert stats["demo_data"] is False
+
+
+def test_the_live_demo_refuses_to_write_into_a_real_network():
+    """It defaults to 127.0.0.1:8000, which is also where a deployed FailEcho
+    listens. Run it on the server and demo telemetry lands in production --
+    labelled and excluded from adoption, but there, and the site starts
+    showing its demonstration-data banner. This happened once."""
+    import importlib.util
+    from pathlib import Path
+
+    demo = Path(__file__).resolve().parents[1] / "examples" / "live_agent" / "run_demo.py"
+    spec = importlib.util.spec_from_file_location("run_demo", demo)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["run_demo"] = module
+    spec.loader.exec_module(module)
+
+    calls = {}
+
+    def fake_stats(url, timeout=5):
+        calls["url"] = url
+        return {"real_observations_total": 0, "first_party_observations": 15}
+
+    module.http_json = fake_stats
+
+    with pytest.raises(SystemExit) as raised:
+        module.refuse_if_this_is_a_real_network("https://failecho.com", force=False)
+    assert "Refusing to run" in str(raised.value)
+    assert "--force" in str(raised.value), "say how to override it"
+
+    # An empty network is what the demo is for.
+    module.http_json = lambda url, timeout=5: {
+        "real_observations_total": 0, "first_party_observations": 0
+    }
+    module.refuse_if_this_is_a_real_network("http://127.0.0.1:8100", force=False)
+
+    # And --force still means force.
+    module.http_json = fake_stats
+    module.refuse_if_this_is_a_real_network("https://failecho.com", force=True)

@@ -68,6 +68,43 @@ def network_is_up(base_url: str) -> bool:
         return False
 
 
+def refuse_if_this_is_a_real_network(base_url: str, force: bool) -> None:
+    """Stop before writing demo telemetry into somebody's live network.
+
+    The default target is 127.0.0.1:8000, which is also the port a deployed
+    FailEcho listens on behind its proxy. Run this on the server and the demo
+    writes 34 observations and 22 recovery outcomes into production. They are
+    labelled `demo_agent` and excluded from every adoption number, so nothing
+    is faked -- but they are still demo rows in a live database, and the site
+    starts showing its "demonstration telemetry" banner.
+
+    This happened. The check is cheap: a network with first-party or
+    independent evidence in it belongs to somebody.
+    """
+    if force:
+        return
+    try:
+        stats = http_json(f"{base_url}/v1/stats")
+    except (urllib.error.URLError, OSError, ValueError):
+        return  # unreachable is the caller's problem, not ours to diagnose here
+    real = int(stats.get("real_observations_total") or 0)
+    first_party = int(stats.get("first_party_observations") or 0)
+    if not (real or first_party):
+        return
+    raise SystemExit(
+        f"\nRefusing to run against {base_url}.\n\n"
+        f"  It already holds {real} independent and {first_party} first-party "
+        f"observations,\n  which means it is a real network rather than a "
+        f"scratch one. This demo\n  writes demo telemetry, and it does not "
+        f"belong there.\n\n"
+        f"  Start a throwaway instance on another port:\n"
+        f"    FIN_DATABASE_URL=sqlite+aiosqlite:////tmp/demo.db \\\n"
+        f"      .venv/bin/python -m uvicorn app.main:app --port 8100\n"
+        f"    python examples/live_agent/run_demo.py --network http://127.0.0.1:8100\n\n"
+        f"  Or pass --force if you really mean this one.\n"
+    )
+
+
 class BackgroundToolServer:
     """Runs the demo tool server in a thread, so the demo is one command."""
 
@@ -227,6 +264,11 @@ def main() -> int:
         action="store_true",
         help="do not start the demo tool server (it is already running)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="write demo telemetry even if the target looks like a real network",
+    )
     args = parser.parse_args()
 
     if not network_is_up(args.network_url):
@@ -237,6 +279,8 @@ def main() -> int:
         say("or:")
         say("    .venv/bin/python -m uvicorn app.main:app --reload")
         return 1
+
+    refuse_if_this_is_a_real_network(args.network_url, args.force)
 
     server: BackgroundToolServer | None = None
     if not args.no_tool_server:
