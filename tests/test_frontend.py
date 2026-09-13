@@ -187,7 +187,11 @@ def test_static_assets_stay_small():
     """A status page has no excuse to be heavy on a small VPS."""
     # Raised once, deliberately, for the install tabs, the loop diagram and
     # the stat cards. Trimming comments to defend a number is the wrong trade.
-    assert len(CSS) < 33_000
+    # 33k -> 34k. Flagged last time that there was no dead CSS left to
+    # reclaim and the next addition would be a raise rather than a trim; this
+    # is it, for the mobile code size that stops the install card scrolling
+    # sideways on a phone.
+    assert len(CSS) < 34_000
     assert len(JS) < 12_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -338,3 +342,16 @@ def test_the_hero_fits_a_laptop_screen():
     not by removing anything."""
     block = CSS[CSS.index(".hero--center {"):CSS.index(".hero--center::before")]
     assert "padding-block: 72px 60px" in block, "the homepage hero has grown again"
+
+
+def test_no_install_snippet_is_wider_than_its_box():
+    """A code box that scrolls sideways looks broken, and the REST snippet was
+    doing it: 760px of content in a 658px box on desktop. Measured after the
+    fix at 698/698 on all four tabs at 1440 and 768, and 435/435 at 390 once
+    the mobile type came down to 12px."""
+    longest = max(
+        (len(line) for block in HTML.split("<pre><code")[1:]
+         for line in block.split("</code>")[0].splitlines()),
+        default=0,
+    )
+    assert longest <= 66, f"longest snippet line is {longest} chars; it will scroll"

@@ -695,7 +695,7 @@ footer.shell {
 
 /* ---- install card, one tab per way in ---------------------------------- */
 .install {
-  margin: 24px auto 12px; max-width: 660px; text-align: left;
+  margin: 24px auto 12px; max-width: 700px; text-align: left;
   background: var(--surface); border: 1px solid var(--line-2);
   border-radius: var(--r); overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
@@ -849,6 +849,9 @@ footer.shell {
   .hero--center { padding-block: 76px 66px; }
   .statcards { grid-template-columns: minmax(0, 1fr); }
   .install-panel { min-height: 250px; }
+  /* 13.5px mono put the REST and agent snippets 40px over a 435px box, so
+     both scrolled sideways on a phone. Smaller type fits them instead. */
+  .install code { font-size: 12px; }
   .install pre { padding-right: 18px; padding-top: 46px; }
   .install-copy { top: 10px; left: 12px; right: auto; }
 }
