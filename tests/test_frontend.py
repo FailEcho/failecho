@@ -76,11 +76,12 @@ def test_only_the_first_install_panel_shows_without_javascript():
 
 def test_the_front_page_stays_brief():
     """It is a front page, not the manual. Nine sections was the old mistake."""
-    assert HTML.count("<h2") <= 4, "more than four sections means it is growing back"
+    assert HTML.count("<h2") <= 5, "more than five sections means it is growing back"
     # Four ways in, four tabs. The budget follows the install card, not the
     # other way round -- but sections are still capped at four above.
-    # 13k -> 14k when the definition moved back into the hero's left column.
-    assert len(HTML) < 14_000
+    # 13k -> 14k when the definition moved back into the hero's left column,
+    # 14k -> 15k for the three cards that close the page.
+    assert len(HTML) < 15_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -207,6 +208,7 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
+    # 25k -> 27k: the scramble pins its own box and plays once a tab.
     # 23k -> 25k: the scramble measures every distinct character so it can
     # only ever swap one for another of the same width.
     # 21k -> 23k: closing the menu belongs to the bar rather than to each
@@ -224,8 +226,8 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 45_000
-    assert len(JS) < 25_000
+    assert len(CSS) < 47_000
+    assert len(JS) < 27_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -237,7 +239,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 82_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 88_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -250,11 +252,12 @@ def test_static_assets_stay_small():
         sum(len(x) for x in (HTML, CSS, JS))
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-dark.png").stat().st_size
+        + (STATIC / "card-abstract1.webp").stat().st_size
     )
-    # 150k -> 108k: no decorative download at all now, and the light-ink
+    # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 109_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 121_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -533,9 +536,14 @@ def test_the_open_menu_takes_the_page_out_of_focus():
     assert 'event.key === "Escape"' in JS
 
 
-def test_the_logo_grows_with_the_bar():
-    assert ".topbar.is-open .brand-mark { height: 44px; }" in CSS
-    assert "transition: height 0.22s ease" in CSS
+def test_the_logo_grows_without_changing_the_bar_s_layout():
+    """It grew by height, which changes the bar's content box -- and the
+    content box only grows once the mark passes the nav links, a clamped
+    curve, while the margin compensating for the bar's growth eases linearly.
+    They did not cancel, so the page drifted up and back on every open."""
+    assert ".topbar.is-open .brand { transform: scale(1.5); }" in CSS
+    assert ".topbar.is-open .brand-mark { height:" not in CSS
+    assert ".brand { transition: transform 0.22s ease" in CSS
 
 
 def test_the_ground_is_black():
@@ -729,16 +737,54 @@ def test_the_light_goes_round_the_loop():
     assert ".loop-node" in reduced and ".loop-return::before" in reduced
 
 
-def test_the_return_path_carries_something():
-    """A dashed line said there was a way back. Circles moving along it say
-    what goes back, and which way."""
-    track = CSS[CSS.index(".loop-return::before {"):]
-    track = track[:track.index("}")]
-    assert "radial-gradient" in track and "repeat-x" in track
-    assert "animation: carry" in track
-    # Right to left: the direction the evidence travels.
-    assert "@keyframes carry { to { background-position-x: -18px; } }" in CSS
-    assert "border: 1px dashed var(--line-2); border-top: 0;" not in CSS
+def test_one_circle_walks_the_return_path_once_a_lap():
+    """The path is a path again. A dot moving the whole time would say the
+    loop never stops to do anything; this one goes after Recover lights and
+    before Fail does, which is when the evidence actually travels."""
+    assert "border: 1px dashed var(--line-2); border-top: 0;" in CSS
+    dot = CSS[CSS.index(".loop-return::before {"):]
+    dot = dot[:dot.index("}")]
+    assert "border-radius: 50%" in dot and "background: var(--red)" in dot
+    # Same eight-second lap as the steps, starting in the gap after the last.
+    assert "animation: carry 8s linear 6.4s infinite" in dot
+    assert "0%          { left: 100%; opacity: 0; }" in CSS
+
+
+def test_the_primary_button_looks_hovered():
+    """#c00010 to #f83030 is a real change that nobody could see."""
+    hover = CSS[CSS.index(".btn--red:hover {"):]
+    hover = hover[:hover.index("}")]
+    assert "box-shadow" in hover, "the only cue is a shade of red"
+
+
+def test_the_scramble_plays_once_a_tab_not_once_a_navigation():
+    """Coming back to the homepage is a fresh load, so the sentence re-settled
+    every time you navigated back to look at something."""
+    assert 'sessionStorage.getItem("failecho-settled")' in JS
+    assert 'sessionStorage.setItem("failecho-settled", "1")' in JS
+    # Storage can throw; playing it again is the lesser of the two failures.
+    assert "catch (err)" in JS
+
+
+def test_the_scramble_pins_the_box_it_is_running_in():
+    """Belt and braces on top of the width matching."""
+    assert "node.style.width = box.width" in JS
+    assert "node.style.width = hadWidth;" in JS
+    assert "ctx.measureText(ch).width * 100" in JS, "buckets are coarse again"
+
+
+def test_the_cards_are_one_image_cropped_three_ways():
+    """A 1.3MB master became a 7.5KB WebP, and one request serves all three
+    cards. They point at real pages; nothing here is a fabricated post."""
+    assert HTML.count('class="card"') == 3
+    for href in ('href="/demo"', 'href="/network"', 'href="/about"'):
+        assert href in HTML[HTML.index('class="cards"'):]
+    assert CSS.count("card-abstract1.webp") == 1, "one background, three positions"
+    for variant in ("--a", "--b", "--c"):
+        assert ".card-art" + variant + " { background-position:" in CSS
+    card = (STATIC / "card-abstract1.webp")
+    assert card.exists() and card.stat().st_size < 40_000, "re-encode the card art"
+    assert not list(STATIC.glob("abstract*.png")), "the master belongs in brand/"
 
 
 def test_the_scramble_cannot_change_the_width_of_anything():
@@ -765,3 +811,14 @@ def test_the_install_tabs_cannot_cut_a_label_off():
 def test_the_four_install_panels_start_on_the_same_line():
     assert "justify-content: flex-start" in CSS
     assert "min-height: 208px" in CSS
+
+
+def test_the_bar_s_growth_is_one_length_the_margin_can_cancel():
+    """Both halves of the compensation have to be the same kind of change,
+    eased the same way, or they do not cancel part-way through. The growth is
+    padding only -- 18 to 28, top and bottom, +20 -- and the margin is -20.
+    Measured live: bar 75 to 95, margin-bottom -20px, main moved 0px."""
+    assert ".topbar.is-open .topbar-row { padding-block: 28px; }" in CSS
+    assert ".topbar.is-open { margin-bottom: calc(var(--bar-h" in CSS
+    # Nothing else in the bar may change its own height.
+    assert ".topbar.is-open .brand { transform: scale(1.5); }" in CSS

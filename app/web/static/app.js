@@ -564,9 +564,10 @@
       var ch = text.charAt(i);
       if (ch === " " || seen[ch]) continue;
       seen[ch] = 1;
-      // Half-pixel buckets: finer than the eye and coarser than the noise
-      // in a subpixel advance width.
-      var bucket = Math.round(ctx.measureText(ch).width * 2) / 2;
+      // Exact to a hundredth of a pixel. Half-pixel buckets left each
+      // character free to differ by up to a quarter of a pixel, which over
+      // eleven characters of a button label is visible drift.
+      var bucket = Math.round(ctx.measureText(ch).width * 100) / 100;
       (buckets[bucket] = buckets[bucket] || []).push(ch);
     }
 
@@ -589,6 +590,14 @@
     node.setAttribute("data-scrambling", "1");
 
     var groups = groupsFor(node);
+    // Whatever the measurement says, the box does not move while the run is
+    // on. Restored at the end so the element goes back to sizing itself.
+    var box = node.getBoundingClientRect();
+    var hadWidth = node.style.width;
+    var hadHeight = node.style.height;
+    node.style.width = box.width + "px";
+    node.style.height = box.height + "px";
+
     var settled = 0;
     var frames = 0;
 
@@ -613,6 +622,8 @@
       }
       // Always the real text at the end, never a frame of noise.
       node.textContent = text;
+      node.style.width = hadWidth;
+      node.style.height = hadHeight;
       node.removeAttribute("data-scrambling");
     }
 
@@ -624,10 +635,24 @@
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) return;
 
-    Array.prototype.forEach.call(
-      document.querySelectorAll("[data-scramble]"),
-      function (node) { scramble(node, 1.5); }
-    );
+    // Once per tab. Coming back to the homepage is a fresh load, so without
+    // this the sentence re-settles every time you navigate back to look at
+    // something -- which is the moment it is least welcome.
+    var seen = false;
+    try {
+      seen = window.sessionStorage.getItem("failecho-settled") === "1";
+      window.sessionStorage.setItem("failecho-settled", "1");
+    } catch (err) {
+      // Private mode, or storage disabled. Playing it again is the lesser
+      // failure of the two.
+      seen = false;
+    }
+    if (!seen) {
+      Array.prototype.forEach.call(
+        document.querySelectorAll("[data-scramble]"),
+        function (node) { scramble(node, 1.5); }
+      );
+    }
 
     // The same settle on a button, on hover and on focus. Not the copy
     // controls: their label is their feedback, and a button that says

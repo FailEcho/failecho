@@ -22,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BRAND = ROOT / "brand"
 STATIC = ROOT / "app" / "web" / "static"
 
+CARD_MASTERS = BRAND / "cards"
+
 MARK_MASTER = BRAND / "failecho-logo-mark-separated.png"
 LOCKUP_MASTER = BRAND / "failecho-wordmark-separated.png"
 
@@ -50,6 +52,12 @@ BACKDROP = (13, 14, 16)
 #: Chart-paper ground, matching --paper in style.css.
 PAPER = (239, 241, 236)
 MUTED = (74, 87, 79)
+
+#: Card artwork. Drop a PNG in brand/cards/ and it becomes card-<name>.webp,
+#: sized for a three-up grid at 2x. The masters are multi-megabyte renders and
+#: have no business on a page that is otherwise 82KB of source.
+CARD_PX = 760
+CARD_QUALITY = 72
 
 #: Social card. Most platforms will not render an SVG preview, so this one is
 #: a real PNG.
@@ -211,6 +219,28 @@ def main() -> None:
         PALETTE,
     )
     save(build_og_card(lockup), "og-image.png", 128)
+    build_cards()
+
+
+def build_cards() -> None:
+    """Every PNG in brand/cards/ becomes one web-sized WebP.
+
+    The masters are full-resolution renders -- the first one was 1.3MB for a
+    380px card. WebP rather than PNG because these are continuous-tone
+    gradients, which a palette cannot hold without banding, and rather than
+    JPEG because these sit on pure black and JPEG rings around the bright
+    edges.
+    """
+    if not CARD_MASTERS.is_dir():
+        return
+    for master in sorted(CARD_MASTERS.glob("*.png")):
+        image = Image.open(master).convert("RGB")
+        scaled = fit_width(image, CARD_PX)
+        target = STATIC / f"card-{master.stem}.webp"
+        scaled.save(target, format="WEBP", quality=CARD_QUALITY, method=6)
+        print(f"{target.name:<26} {scaled.width}x{scaled.height}  "
+              f"{target.stat().st_size / 1024:.1f} KB  "
+              f"(from {master.stat().st_size / 1024:.0f} KB)")
 
 
 if __name__ == "__main__":
