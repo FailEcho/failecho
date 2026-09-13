@@ -1,0 +1,14 @@
+{
+  "name": "failecho-mcp",
+  "version": "0.1.0",
+  "description": "Stdio MCP server that relays to the FailEcho network: check what other agents hit before retrying a failed tool.",
+  "bin": { "failecho-mcp": "bin/failecho-mcp.js" },
+  "files": ["bin", "README.md"],
+  "engines": { "node": ">=18" },
+  "keywords": ["mcp", "model-context-protocol", "agents", "reliability", "retries", "failures"],
+  "homepage": "https://failecho.com",
+  "repository": { "type": "git", "url": "git+https://github.com/FailEcho/failecho.git", "directory": "npm-relay" },
+  "bugs": { "url": "https://github.com/FailEcho/failecho/issues" },
+  "license": "MIT",
+  "author": "FailEcho (https://failecho.com)"
+}
