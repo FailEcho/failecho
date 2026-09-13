@@ -165,3 +165,12 @@ def test_a_broken_install_has_somewhere_to_go(client):
     assert "mailto:contact@failecho.com" in trouble
     assert "mailto:security@failecho.com" in trouble
     assert "that is a bug and I want to hear about it" in body
+
+
+def test_the_jump_nav_comes_before_the_sections_it_jumps_to():
+    """It is a table of contents. Below the first section it is furniture."""
+    body = SETUP
+    hero_end = body.index("</section>", body.index('class="shell hero'))
+    nav = body.index('class="shell setup-jump"')
+    first_section = body.index('id="let-the-agent"')
+    assert hero_end < nav < first_section, "the nav has drifted below a section"

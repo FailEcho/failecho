@@ -109,6 +109,8 @@
                 aria-selected="false">Cursor, Desktop, any MCP client</button>
         <button type="button" role="tab" id="tab-rest" aria-controls="panel-rest"
                 aria-selected="false">Any language</button>
+        <button type="button" role="tab" id="tab-agent" aria-controls="panel-agent"
+                aria-selected="false">Let the agent</button>
       </div>
 
       <div class="install-panel" role="tabpanel" id="panel-plugin" aria-labelledby="tab-plugin">
@@ -137,6 +139,14 @@
   -d '{"service": "api.example.com", "operation": "create_issue",
        "error_type": "rate_limit", "error_code": "429"}'</code></pre>
         <p class="install-foot">One call. Stores nothing, never rate limited.</p>
+      </div>
+
+      <div class="install-panel" role="tabpanel" id="panel-agent" aria-labelledby="tab-agent" hidden>
+        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-agent"
+                aria-label="Copy the prompt for your agent">Copy</button>
+<pre><code id="code-agent">Read {{PUBLIC_URL}}/llms.txt and set yourself
+up to use FailEcho.</code></pre>
+        <p class="install-foot">Paste that at whatever you run. It configures itself.</p>
       </div>
     </div>
     <p class="install-note">

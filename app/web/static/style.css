@@ -61,6 +61,22 @@ body {
 a { color: var(--ink); text-decoration: none; }
 a:hover { color: var(--red); }
 
+/* A link in running text has to look like one before you hover it. Underline
+   anything inside a paragraph, list item or definition, then take it back off
+   the places that are already obviously interactive -- navigation, buttons,
+   tabs, the footer, reference rows. Underlining those makes a page of rules. */
+p a, li a, dd a { text-decoration: underline; text-decoration-color: var(--line-2);
+                  text-underline-offset: 3px; text-decoration-thickness: 1px; }
+p a:hover, li a:hover, dd a:hover { text-decoration-color: var(--red); }
+.nav a, .navpanel a, .foot-links a, .setup-jump a, .links a, .btn,
+.legend a, .install-tabs a { text-decoration: none; }
+
+/* Anything leaving the site says so, once, at the end of the link text.
+   Marked in the markup with rel="external" rather than matched on a hostname,
+   because the origin is configuration and belongs in one place. */
+a[rel~="external"]::after { content: " \2197"; font-size: .85em; color: var(--ink-3); }
+a[rel~="external"]:hover::after { color: var(--red); }
+
 :focus-visible { outline: 2px solid var(--red); outline-offset: 3px; border-radius: 2px; }
 
 .shell { max-width: var(--max); margin: 0 auto; padding-inline: var(--gutter); }
@@ -465,18 +481,6 @@ code { font-family: var(--mono); }
 .links a:hover { color: var(--red); }
 .links span { color: var(--ink-3); font-size: 13.5px; }
 
-/* ---- comparison -------------------------------------------------------- */
-.lead {
-  margin: 0 0 22px;
-  font-family: var(--sans);
-  font-size: clamp(20px, 2.8vw, 27px);
-  line-height: 1.3;
-  max-width: 26ch;
-}
-
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: start; }
-
-
 /* ---- privacy ----------------------------------------------------------- */
 .no-list, .yes-list { list-style: none; margin: 0; padding: 0; font-size: 15px; }
 .no-list li, .yes-list li {
@@ -492,15 +496,6 @@ code { font-family: var(--mono); }
   width: 5px; height: 9px; border: 1.5px solid var(--healthy);
   border-top: 0; border-left: 0; transform: rotate(42deg);
 }
-
-/* ---- principles -------------------------------------------------------- */
-.principles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
-              background: var(--line); border: 1px solid var(--line);
-              border-radius: 3px; overflow: hidden; }
-.principles > div { background: var(--surface); padding: 22px 22px 24px; }
-.principles h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
-.principles p { margin: 0; color: var(--ink-2); font-size: 14px; }
-.principles code { font-size: 12.5px; color: var(--ink); }
 
 /* ---- footer ------------------------------------------------------------ */
 footer.shell {

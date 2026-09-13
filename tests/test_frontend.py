@@ -51,8 +51,8 @@ def test_the_front_page_is_not_a_claude_code_accessory(client):
     body = client.get("/").text
     hero = body[body.index('class="shell hero'):body.index("</section>")]
     assert "/mcp" in hero and "/v1/query" in hero, "MCP and REST are products too"
-    assert hero.count('role="tab"') == 3
-    for tab in ("Claude Code", "any MCP client", "Any language"):
+    assert hero.count('role="tab"') == 4
+    for tab in ("Claude Code", "any MCP client", "Any language", "Let the agent"):
         assert tab in hero, tab
     # The chrome names no client at all.
     nav = body[body.index('<nav'):body.index("</nav>")]
@@ -61,15 +61,17 @@ def test_the_front_page_is_not_a_claude_code_accessory(client):
 
 def test_only_the_first_install_panel_shows_without_javascript():
     panels = HTML.count('role="tabpanel"')
-    assert panels == 3
-    assert HTML.count('role="tabpanel"') - HTML.count('role="tabpanel" id="panel-plugin"') == 2
+    assert panels == 4
+    assert HTML.count('role="tabpanel"') - HTML.count('role="tabpanel" id="panel-plugin"') == 3
     assert JS.count('setAttribute("aria-selected"') == 1, "tabs are wired, not decorative"
 
 
 def test_the_front_page_stays_brief():
     """It is a front page, not the manual. Nine sections was the old mistake."""
     assert HTML.count("<h2") <= 4, "more than four sections means it is growing back"
-    assert len(HTML) < 12_000
+    # Four ways in, four tabs. The budget follows the install card, not the
+    # other way round -- but sections are still capped at four above.
+    assert len(HTML) < 13_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -120,9 +122,9 @@ def test_semantic_landmarks_and_labels():
 
 
 def test_interactive_elements_are_real_buttons_with_labels():
-    """Three tabs, and a copy button on each panel."""
-    assert HTML.count('type="button"') == 6
-    assert HTML.count("data-copy-target=") == 3
+    """Four tabs, and a copy button on each panel."""
+    assert HTML.count('type="button"') == 8
+    assert HTML.count("data-copy-target=") == 4
     assert HTML.count("aria-label=") >= 2
     assert ":focus-visible" in CSS
 
@@ -180,7 +182,7 @@ def test_static_assets_stay_small():
     # the stat cards. Trimming comments to defend a number is the wrong trade.
     assert len(CSS) < 33_000
     assert len(JS) < 12_000
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 56_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 57_000
 
     # The hero artwork is the single heaviest thing the homepage loads, so it
     # is counted here rather than left out of the number it dominates. It is
