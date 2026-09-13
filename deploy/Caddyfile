@@ -47,6 +47,19 @@ failecho.com {
 			roll_size 10MiB
 			roll_keep 5
 		}
+		# The site promises it never stores headers or credentials, and the
+		# default access log stores every one of them: X-FailEcho-Operator,
+		# Authorization and X-Reporter-ID were all sitting here in the clear,
+		# outside the hashing the application does. Method, URI, status and
+		# duration are what an access log is for; the headers are not.
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				resp_headers delete
+				request>tls delete
+			}
+		}
 	}
 }
 
