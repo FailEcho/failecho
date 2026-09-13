@@ -203,6 +203,17 @@ a[rel~="external"]:hover::after { color: var(--red); }
 }
 /* Leaves the bar's edge as the bar starts moving, not after it stops. */
 .topbar.is-open .navpanel { top: var(--bar-h-open, 101px); }
+/* The bar's bottom padding is dead ground: the pointer leaves the nav item
+   there, the CSS :hover that shows the panel drops, and the panel is gone
+   before you have reached it. Moving fast beat it; moving slowly did not.
+   This bridges that strip. It belongs to the panel, which belongs to the
+   item, so the pointer never leaves the item on the way down -- and because
+   a hidden panel is not hit-tested, only the open one's bridge is live.
+   Sized to sit below the links, so it cannot swallow a click on one. */
+.navpanel::before {
+  content: ""; position: absolute; left: 0; right: 0; top: -30px; height: 30px;
+}
+
 /* Same horizon under the open panel. */
 .navpanel::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;

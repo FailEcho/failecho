@@ -222,7 +222,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 42_000
+    assert len(CSS) < 43_000
     assert len(JS) < 23_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -233,7 +233,7 @@ def test_static_assets_stay_small():
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
     # opening on top of the word that opened it, 65k -> 69k for the hero,
     # 69k -> 73k for the two-state bar and the drifting ground.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 78_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 79_000
 
     # The artwork is not behind the hero any more, where it was the wrong
     # shape at most window sizes and blocked the first paint. It closes the
@@ -254,7 +254,7 @@ def test_static_assets_stay_small():
     )
     # 119k -> 150k: the artwork is back, once, below the fold and lazy, as
     # the closing band. Both halves of it are the same request.
-    assert per_visit < 150_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 151_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -654,3 +654,22 @@ def test_the_install_card_is_not_a_card():
     # And the tabs start on the same line as the sentence opposite them.
     assert ".install-tabs button:first-child { padding-left: 0; }" in CSS
     assert ".hero--split .hero-lede { margin-top: 0; }" in CSS
+
+
+def test_nothing_dead_lies_between_the_nav_item_and_its_panel():
+    """The bar's bottom padding is 30px of ground that belongs to neither.
+
+    The pointer left the item there, the CSS :hover showing the panel dropped,
+    and the panel was gone before the pointer arrived. Moving fast beat it;
+    moving slowly did not, which is the wrong way round for a menu. The bridge
+    is a child of the panel, which is a child of the item, so the hover never
+    lapses -- and a hidden panel is not hit-tested, so only the open one's
+    bridge is live.
+    """
+    assert ".navpanel::before" in CSS
+    bridge = CSS[CSS.index(".navpanel::before {"):]
+    bridge = bridge[:bridge.index("}")]
+    assert "top: -30px" in bridge and "height: 30px" in bridge
+    assert "left: 0" in bridge and "right: 0" in bridge, "diagonal moves too"
+    # It must sit below the links, or it eats clicks on them.
+    assert ".topbar.is-open .topbar-row { padding-block: 28px; }" in CSS
