@@ -560,25 +560,41 @@ database and stores nothing. Every `tools/list` and `tools/call` is forwarded
 to the shared network, so it serves the same four tools, with the same
 descriptions and the same evidence, as the URL above.
 
-```bash
-uvx --from git+https://github.com/FailEcho/failecho failecho-mcp
-```
-
-It is not on PyPI yet, so `uvx` installs it from the repository. That pulls
-in the server's dependencies too; the relay itself imports only the MCP SDK.
-
-Client config (`mcpServers` style):
+**Until this is on PyPI, use `mcp-remote` instead.** It needs nothing
+installed, starts immediately, and is the only local-process path currently
+worth giving anyone:
 
 ```json
 {
   "mcpServers": {
     "failecho": {
-      "command": "uvx",
-      "args": ["--from", "git+https://github.com/FailEcho/failecho", "failecho-mcp"]
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://failecho.com/mcp"]
     }
   }
 }
 ```
+
+`mcp-remote` is a third-party bridge. Prefer the plain endpoint above when
+your client speaks Streamable HTTP.
+
+The relay can also be run straight from this repository, but only for
+development:
+
+```bash
+uvx --from git+https://github.com/FailEcho/failecho failecho-mcp
+```
+
+Do not put that in a client config. It is not on PyPI yet, so `uvx` clones
+this repository and builds the whole server -- FastAPI, SQLAlchemy, uvicorn,
+cryptography -- 40 packages and about 100 MB, none of which the relay imports.
+Measured twice from a cold cache here: once it started in 4 seconds, once it
+had not started after 280 and was killed. An MCP client gives a server tens of
+seconds before it gives up, so a first run that lands on the slow end fails,
+and it is unpredictable which you get.
+
+Once `failecho-mcp` is on PyPI the config becomes `"command": "uvx", "args":
+["failecho-mcp"]`, pulling one small dependency instead of forty.
 
 | Variable | Default | Purpose |
 |---|---|---|
