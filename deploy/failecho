@@ -23,22 +23,53 @@ case "${1:-status}" in
   restart) systemctl restart failecho && echo restarted ;;
   backup)  systemctl start failecho-backup.service && ls -lh /srv/failecho/backups | tail -3 ;;
   deploy)
+    # Keep the code that is currently serving, so a bad deploy can be undone
+    # without a human being present. Data, backups and the venv are excluded:
+    # this is a snapshot of the application, not of the network's contents.
+    PREV=/srv/failecho-previous
+    rm -rf "$PREV"; mkdir -p "$PREV"
+    rsync -a --delete --exclude='.venv' --exclude='data' --exclude='backups' \
+      /srv/failecho/ "$PREV/" 2>/dev/null || true
+
     rsync -a --delete --exclude='.venv' --exclude='data' --exclude='backups' \
       --exclude='__pycache__' --exclude='.pytest_cache' /root/agentwebsite/ /srv/failecho/
     chown -R failecho:failecho /srv/failecho
     /srv/failecho/.venv/bin/pip install --quiet -r /srv/failecho/requirements.txt
     systemctl restart failecho
-    # Wait for the restart rather than guessing at it: a single sleep once
-    # reported a healthy deploy as a silent failure.
+
+    # Ready means answering, not "systemd says active". Check the public path
+    # too: the app can be up while nothing outside can reach it.
+    ready() {
+      curl -sf --max-time 3 http://127.0.0.1:8000/health >/dev/null &&
+      curl -sf --max-time 5 --resolve failecho.com:443:127.0.0.1 \
+        https://failecho.com/health >/dev/null
+    }
     for _ in $(seq 1 40); do
       sleep 0.5
-      if curl -sf http://127.0.0.1:8000/health >/dev/null; then
+      if ready; then
         echo "deployed: $(curl -s http://127.0.0.1:8000/health)"
         exit 0
       fi
     done
-    echo 'DEPLOY UNHEALTHY: /health did not answer within 20s' >&2
+
+    echo 'DEPLOY UNHEALTHY: /health did not answer within 20s -- rolling back' >&2
     systemctl --no-pager --lines=20 status failecho >&2 || true
+    if [ -d "$PREV" ] && [ -n "$(ls -A "$PREV" 2>/dev/null)" ]; then
+      rsync -a --delete --exclude='.venv' --exclude='data' --exclude='backups' \
+        "$PREV/" /srv/failecho/
+      chown -R failecho:failecho /srv/failecho
+      systemctl restart failecho
+      for _ in $(seq 1 40); do
+        sleep 0.5
+        if ready; then
+          echo 'ROLLED BACK: the previous version is serving again' >&2
+          exit 1
+        fi
+      done
+      echo 'ROLLBACK ALSO UNHEALTHY: this needs a person' >&2
+    else
+      echo 'NO SNAPSHOT TO ROLL BACK TO' >&2
+    fi
     exit 1
     ;;
   *) echo "usage: failecho [status|usage|logs [n]|restart|backup|deploy]" ; exit 1 ;;

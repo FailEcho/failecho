@@ -360,3 +360,20 @@ def test_the_watchdog_gives_up_and_stays_given_up():
     assert body.index('if [[ -f "$GAVE_UP" ]]') < body.index("systemctl restart failecho")
     # Recovery is the thing that clears it, so an outage that heals resets.
     assert 'rm -f "$STATE" "$GAVE_UP"' in body
+
+
+def test_a_failed_deploy_rolls_back_instead_of_leaving_the_site_down():
+    """It waited for health and then exited 1 with the new, broken code still
+    installed -- so a bad deploy was an outage until somebody noticed. Proved
+    by deploying code that raises on import: it rolled back and the site kept
+    serving."""
+    from pathlib import Path
+
+    body = (Path(__file__).resolve().parents[1] / "deploy" / "failecho").read_text()
+    deploy = body[body.index("  deploy)"):]
+    assert "failecho-previous" in deploy, "snapshot the version that is serving"
+    assert "ROLLED BACK" in deploy
+    # Readiness has to mean the public path answers, not just the local port:
+    # the app can be healthy while nothing outside can reach it.
+    assert "--resolve failecho.com:443:127.0.0.1" in deploy
+    assert deploy.index("rm -rf \"$PREV\"") < deploy.index("systemctl restart failecho")
