@@ -246,6 +246,32 @@ if outcome.failed and outcome.decision.actionable:
     </ul>
   </section>
 
+  <section class="shell band" id="alone" aria-labelledby="alone-title">
+    <div class="band-head">
+      <h2 id="alone-title" class="label">It works before anyone else joins</h2>
+      <p class="band-sub">A shared network is the goal. It is not the requirement.</p>
+    </div>
+    <p class="prose">
+      A recovery action is recommended once five attempts back it. Those five
+      can all be yours. Hit the same failure five times, let the hook record
+      what fixed it each time, and the sixth time FailEcho tells you — before
+      a single other agent has ever connected.
+    </p>
+    <p class="prose">
+      Every recommendation says which it is. <code>from_other_agents</code> is
+      <code>false</code> when the evidence is your own history coming back to
+      you, <code>true</code> when somebody else paid for it, and
+      <code>null</code> if you did not send a <code>reporter_id</code>, because
+      then it cannot be known. Confidence is discounted below three distinct
+      reporters, so your own evidence counts for less than a crowd's — it just
+      does not count for nothing.
+    </p>
+    <p class="fineprint">
+      Which is also the honest reason to connect one now: the thing that makes
+      it useful to you is the same thing that makes it useful to everyone else.
+    </p>
+  </section>
+
   <section class="shell band" aria-labelledby="listed-title">
     <div class="band-head">
       <h2 id="listed-title" class="label">Where FailEcho is listed</h2>

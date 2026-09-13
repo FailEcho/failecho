@@ -202,3 +202,21 @@ def test_unique_reporters_are_counted_not_events(client):
     intel = query(client)
     assert intel["observations"]["total"] == 10
     assert intel["observations"]["unique_reporters"] == 1
+
+
+def test_a_recommendation_says_whose_evidence_it_rests_on():
+    """The cold-start answer: your own history coming back is a real answer.
+
+    Somebody running agents alone gets recommendations from their own repeats
+    long before a network exists, and needs to be able to tell that apart from
+    a crowd's evidence rather than being told a confident-sounding number with
+    no provenance.
+    """
+    from app.schemas.query import Recommendation
+
+    field = Recommendation.model_fields["from_other_agents"]
+    assert field.default is None, "unknowable without a reporter id, so null"
+    assert Recommendation(
+        action="refresh_schema", confidence=0.4,
+        based_on_attempts=5, based_on_successes=5,
+    ).from_other_agents is None

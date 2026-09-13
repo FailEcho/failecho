@@ -123,6 +123,16 @@ class Recommendation(BaseModel):
             "above has already been discounted."
         ),
     )
+    from_other_agents: bool | None = Field(
+        default=None,
+        description=(
+            "True when this rests on evidence somebody else reported, false "
+            "when it is your own history coming back to you -- which is a "
+            "real answer, not a lesser one, and is what FailEcho gives you "
+            "before anyone else has joined. Null when you did not send a "
+            "reporter id, because then it cannot be known."
+        ),
+    )
 
 
 class QueryResponse(StrictModel):

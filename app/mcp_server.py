@@ -164,6 +164,12 @@ def _rate_limited(ctx: Context | None) -> dict[str, Any] | None:
         "of the numbers. `evidence_sources` says who saw it: 'agent' means "
         "independent agents; 'first_party' alone means only FailEcho's own "
         "agents, so weigh it as one reporter's experience.\n\n"
+        "This works before any other agent has joined: five attempts back a "
+        "recommendation and all five can be your own. "
+        "`recommendation.from_other_agents` tells you which -- false means "
+        "your own history is answering you, true means somebody else's did. "
+        "Pass `reporter_id` if you want that distinction; it is salted and "
+        "hashed on arrival.\n\n"
         "Reading is free, anonymous, unauthenticated and never rate limited, "
         "and this call stores nothing."
     ),

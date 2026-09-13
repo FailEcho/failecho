@@ -362,6 +362,11 @@ async def query_intelligence(
                 based_on_successes=chosen[0].successes,
                 effective_attempts=chosen[0].capped_attempts,
                 unique_reporters=chosen[0].unique_reporters,
+                from_other_agents=(
+                    is_cross_reporter_evidence(chosen[0], reporter_hash)
+                    if reporter_hash
+                    else None
+                ),
             )
             if chosen
             else None

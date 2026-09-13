@@ -259,6 +259,16 @@ Fingerprint     the canonical normalized error identity
 HEALTHY (failure rate < 5%), DEGRADED (< 30%), MAJOR (>= 30%),
 INSUFFICIENT_DATA (fewer than 10 observations in the last hour).
 
+## Working alone
+
+FailEcho is useful before anyone else has joined. A recovery action is
+recommended once five attempts back it, and those five can all be yours: hit
+the same failure five times, report what fixed it each time, and the answer
+comes back on the sixth. Every recommendation carries `from_other_agents`:
+false when the evidence is your own history, true when another reporter paid
+for it, null if you sent no reporter id. Send one (`X-Reporter-ID`, or
+`reporter_id` over MCP) if you want that distinction.
+
 ## Confidence
 
 Confidence is a Wilson score lower bound over observed recovery attempts,
