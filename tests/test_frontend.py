@@ -193,7 +193,9 @@ def test_static_assets_stay_small():
     # sideways on a phone.
     # 34k -> 35k for the on-this-page rail on /setup and /about, both of
     # which passed ten sections.
-    assert len(CSS) < 35_000
+    # 35k -> 36k for the four jump chips staying on a wide screen next to the
+    # rail, and for the copy control fitting inside the terminal title bar.
+    assert len(CSS) < 36_000
     assert len(JS) < 12_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -288,6 +290,49 @@ def test_api_clients_still_get_json_from_a_404(client):
     assert body.json() == {"detail": "Not Found"}
 
 
+def _element_ids(html):
+    """Every id the browser actually creates, in document order.
+
+    Scraping id="..." out of the text is not the same thing. An element
+    written with two id attributes keeps the first and silently drops the
+    second, so a rail link to the dropped one resolves in a regex and does
+    nothing in a browser. That shipped once; this reads it the way the
+    parser does.
+    """
+    from html.parser import HTMLParser
+
+    found = []
+
+    class Reader(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            for name, value in attrs:
+                if name == "id" and value:
+                    found.append(value)
+                    return
+
+    Reader().feed(html)
+    return found
+
+
+def test_an_element_never_carries_two_id_attributes():
+    """The second one is dropped, so half the on-this-page rail went dead."""
+    import re
+
+    for page in STATIC.glob("*.html"):
+        for tag in re.findall(r"<[^>!]+?>", page.read_text()):
+            assert len(re.findall(r'\bid="', tag)) <= 1, f"{page.name}: {tag[:90]}"
+
+
+def test_every_id_on_a_page_is_unique():
+    """Two elements sharing an id send every link to the first one."""
+    from collections import Counter
+
+    for page in STATIC.glob("*.html"):
+        counts = Counter(_element_ids(page.read_text()))
+        dupes = sorted(k for k, v in counts.items() if v > 1)
+        assert not dupes, f"{page.name} defines {dupes} more than once"
+
+
 def test_no_page_links_to_a_fragment_that_does_not_exist():
     """Splitting the homepage stranded /#live-network, /#demo and /#privacy.
 
@@ -299,7 +344,7 @@ def test_no_page_links_to_a_fragment_that_does_not_exist():
     pages = {p.name: p.read_text() for p in STATIC.glob("*.html")}
 
     def ids_of(html):
-        return set(re.findall(r'id="([^"]+)"', html))
+        return set(_element_ids(html))
 
     home_ids = ids_of(pages["index.html"])
     for name, html in pages.items():

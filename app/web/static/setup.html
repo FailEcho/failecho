@@ -88,7 +88,7 @@
 
   <nav class="shell setup-jump" aria-label="Choose your integration"><a href="#let-the-agent"><span>00</span> Let the agent ↗</a><a href="#claude-code"><span>01</span> Claude Code ↗</a><a href="#mcp-clients"><span>02</span> MCP clients ↗</a><a href="#rest-api"><span>03</span> REST API ↗</a></nav>
 
-  <section class="shell band" id="agent" id="let-the-agent" aria-labelledby="agent-title">
+  <section class="shell band" id="let-the-agent" aria-labelledby="agent-title">
     <div class="band-head">
       <h2 id="agent-title" class="label">Let your agent set it up</h2>
       <p class="band-sub">The shortest path, and the one least likely to go wrong: hand the job to the thing that will be using it.</p>
@@ -112,7 +112,7 @@
     </p>
   </section>
 
-  <section class="shell band" id="cc" id="claude-code" aria-labelledby="cc-title">
+  <section class="shell band" id="claude-code" aria-labelledby="cc-title">
     <div class="band-head">
       <h2 id="cc-title" class="label">Claude Code — the fast path</h2>
       <p class="band-sub">Installs the MCP server and a hook, so lookups and reports happen on their own.</p>
@@ -155,7 +155,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </figure>
   </section>
 
-  <section class="shell band" id="mcp" id="mcp-clients" aria-labelledby="mcp-title">
+  <section class="shell band" id="mcp-clients" aria-labelledby="mcp-title">
     <div class="band-head">
       <h2 id="mcp-title" class="label">Any other MCP client</h2>
       <p class="band-sub">Cursor, Claude Desktop, your own agent framework: paste the endpoint into the client's MCP settings, as type <code>http</code>.</p>
@@ -216,7 +216,7 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </p>
   </section>
 
-  <section class="shell band" id="rest" id="rest-api" aria-labelledby="rest-title">
+  <section class="shell band" id="rest-api" aria-labelledby="rest-title">
     <div class="band-head">
       <h2 id="rest-title" class="label">Your own code, no MCP</h2>
       <p class="band-sub">One HTTP call. This one stores nothing and is never rate limited.</p>
@@ -324,7 +324,7 @@ if outcome.failed and outcome.decision.actionable:
     </ul>
   </section>
 
-  <section class="shell band" id="alone" id="alone" aria-labelledby="alone-title">
+  <section class="shell band" id="alone" aria-labelledby="alone-title">
     <div class="band-head">
       <h2 id="alone-title" class="label">It works before anyone else joins</h2>
       <p class="band-sub">A shared network is the goal. It is not the requirement.</p>

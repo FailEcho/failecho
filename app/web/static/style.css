@@ -419,6 +419,7 @@ td.num { font-family: var(--mono); }
 .terminal { border: 1px solid var(--line); border-radius: 3px; background: #0a0b0c; overflow: hidden; }
 .terminal-bar {
   padding: 9px 16px; border-bottom: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: var(--surface-2);
   font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
 }
@@ -716,25 +717,34 @@ footer.shell {
   color: var(--ink); border-bottom-color: var(--red);
 }
 /* All panels as tall as the tallest, so a tab switch cannot resize the card,
-   the hero, or the artwork sized to the hero. Measured 150/200/170/150 wide,
-   148/248/213/163 at 390px. */
-.install-panel { position: relative; min-height: 200px; }
+   the hero, or the artwork sized to the hero. Measured 136/232/195/136 wide,
+   150/244/197/150 at 390px. The two-line panels have room to spare at that
+   height, so their content sits in the middle of it rather than leaving a
+   block of empty card underneath. */
+.install-panel {
+  position: relative; min-height: 232px;
+  display: flex; flex-direction: column; justify-content: center;
+}
 
 /* Copy controls added by the script sit over the top-right of their box. */
 .has-copy { position: relative; }
 .has-copy > pre { padding-right: 82px; }
 .copy-btn { position: absolute; top: 10px; right: 10px; z-index: 1; }
-.terminal.has-copy > .copy-btn { top: 6px; }
+.terminal.has-copy > .copy-btn { top: 5px; right: 8px; padding: 5px 12px; font-size: 12px; }
+.terminal.has-copy > .terminal-bar { padding-right: 86px; }
 @media (max-width: 560px) {
   .has-copy > pre { padding-right: 18px; padding-top: 48px; }
   .copy-btn { left: 12px; right: auto; }
+  /* A terminal keeps its control in the title bar at every width, so its
+     body does not need the room a floating control would have taken. */
+  .terminal.has-copy > pre { padding-top: 18px; }
 }
 .install-copy { position: absolute; top: 12px; right: 12px; }
-.install pre { margin: 0; padding: 18px 76px 6px 18px; overflow-x: auto; }
-.install code { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; }
+.install pre { margin: 0; padding: 20px 82px 8px 20px; overflow-x: auto; }
+.install code { font-family: var(--mono); font-size: 15px; line-height: 1.95; }
 .install-foot {
-  margin: 0; padding: 10px 18px 16px;
-  font-size: 12.5px; color: var(--ink-3);
+  margin: 0; padding: 10px 20px 18px;
+  font-size: 13.5px; color: var(--ink-3);
 }
 .install-note { margin: 0 0 22px; font-size: 14px; color: var(--ink-2); }
 
@@ -863,7 +873,7 @@ footer.shell {
 section[id], h2[id] { scroll-margin-top: 100px; }
 .eyebrow { margin: 0 0 20px; font: 500 11px/1.5 var(--sans); letter-spacing: .12em; color: var(--ink-3); }
 .hero--page .hero-lede { font-size: 18px; max-width: 58ch; }
-.setup-jump { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; padding-bottom: 40px; }
+.setup-jump { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; padding-bottom: 40px; }
 .setup-jump a { border: 1px solid var(--line-2); padding: 20px; border-radius: var(--r); font-size: 14px; }
 .setup-jump a:hover { background: var(--surface); color: var(--ink); }
 .setup-jump span { color: var(--ink-3); font: 11px var(--mono); margin-right: 12px; }
@@ -914,4 +924,3 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   }
   .pagenav { display: none; }
 }
-@media (min-width: 1101px) { .setup-jump { display: none; } }

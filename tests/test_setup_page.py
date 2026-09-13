@@ -190,14 +190,22 @@ def test_the_long_pages_have_an_on_this_page_rail():
         rail = html[html.index('class="pagenav"'):html.index('class="pagemain"')]
         targets = re.findall(r'href="#([^"]+)"', rail)
         assert len(targets) >= 10, f"{page} rail lists only {len(targets)}"
-        ids = set(re.findall(r'id="([^"]+)"', html))
+        from tests.test_frontend import _element_ids
+
+        ids = set(_element_ids(html))
         for t in targets:
             assert t in ids, f"{page} rail points at #{t}, which does not exist"
 
 
-def test_the_rail_does_not_double_up_with_the_chip_nav():
-    """/setup keeps its chip nav for narrow screens, where the rail cannot
-    live. Showing both at once is two tables of contents."""
+def test_both_navigations_are_present_and_answer_different_questions():
+    """The chips are the four entry points and sit under the hero on every
+    width. The rail is every section and needs a wide screen, so it is the
+    one that disappears."""
     css = (Path(__file__).resolve().parents[1] / "app" / "web" / "static" / "style.css").read_text()
-    assert "@media (min-width: 1101px) { .setup-jump { display: none; } }" in css
+    assert "@media (min-width: 1101px) { .setup-jump { display: none; } }" not in css
     assert ".pagenav { display: none; }" in css
+    for page in ("setup.html", "about.html"):
+        html = (Path(__file__).resolve().parents[1] / "app" / "web" / "static" / page).read_text()
+        chips = html[html.index('class="shell setup-jump"'):]
+        chips = chips[:chips.index("</nav>")]
+        assert chips.count('href="#') == 4, f"{page} chip nav is not four chips"
