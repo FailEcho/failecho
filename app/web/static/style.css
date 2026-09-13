@@ -292,10 +292,10 @@ a[rel~="external"]:hover::after { color: var(--red); }
   color: var(--ink);
   cursor: pointer;
   border-radius: 0;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease,
+              box-shadow 0.15s ease, transform 0.15s ease;
 }
-.btn:hover { background: var(--surface-2); border-color: var(--ink-3); }
-.btn:hover { color: var(--ink); }
+.btn:hover { background: var(--surface-2); border-color: var(--ink-3); color: var(--ink); }
 
 .btn--red {
   background: var(--red-deep);
@@ -303,16 +303,20 @@ a[rel~="external"]:hover::after { color: var(--red); }
   color: #fff;
   font-weight: 600;
 }
-/* #c00010 to #f83030 is a real change and nobody could see it. The button
-   lightens, lifts a ring off the ground and lets the red bleed past its own
-   edge, which is legible at a glance rather than on comparison. */
+/* #c00010 to #f83030 is a real change and nobody could see it, and neither a
+   soft glow nor a wider one fixed that. Four cues at once do: it lightens, it
+   rises, it takes a light ring, and it throws the red past its own edge. */
 .btn--red:hover {
-  background: var(--red); border-color: var(--red); color: #fff;
-  box-shadow: 0 0 0 3px rgba(248, 48, 48, 0.28), 0 8px 26px rgba(248, 48, 48, 0.22);
+  background: var(--red); border-color: #ff7a6a; color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5),
+              0 10px 30px rgba(248, 48, 48, 0.45);
 }
 .btn:not(.btn--red):hover {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.28), 0 10px 26px rgba(0, 0, 0, 0.5);
 }
+.btn:active { transform: translateY(0); }
 
 .btn--sm { padding: 8px 15px; font-size: 13px; }
 

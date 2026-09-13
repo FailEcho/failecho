@@ -524,143 +524,56 @@
     measure();
   }
 
-  // -- scrambled lede -------------------------------------------------------
-  // The one line that says what this is, resolving out of noise. It runs
-  // once, on load, and never again: an effect that repeats is a thing to
-  // wait for rather than read. The final text is in the markup, so a reader
-  // without JS -- or with reduced motion asked for -- gets it immediately.
-
-  // `rate` is characters settled per frame, at 22ms a frame, so the run
-  // takes length / rate frames. The lede is 64 characters at 1.5 -- about
-  // 0.9s. A button label is a tenth of that, so it needs a *slower* rate to
-  // last long enough to read as a settle: "Get started" at 0.75 is 15 frames,
-  // roughly a third of a second, which is about how long a pointer takes to
-  // arrive and stop.
-  // A character may only be replaced by one that occupies exactly as much
-  // space, so the string's advance width is identical in every frame. Any
-  // other alphabet -- symbols, or the sentence's own letters picked freely --
-  // changes the width of the line, which rewraps the sentence and resizes the
-  // button while it settles. Widths come from a canvas rather than the DOM:
-  // one measurement per distinct character, no layout, no reflow.
-  var widthGroups = {};
-
-  function groupsFor(node) {
-    var style = window.getComputedStyle(node);
-    var font = style.font || (style.fontStyle + " " + style.fontWeight + " " +
-      style.fontSize + " " + style.fontFamily);
-    var text = node.textContent.trim();
-    var key = font + "|" + text;
-    if (widthGroups[key]) return widthGroups[key];
-
-    var canvas = groupsFor.canvas
-      || (groupsFor.canvas = document.createElement("canvas"));
-    var ctx = canvas.getContext("2d");
-    if (!ctx) return (widthGroups[key] = {});
-    ctx.font = font;
-
-    var buckets = {};
-    var seen = {};
-    for (var i = 0; i < text.length; i++) {
-      var ch = text.charAt(i);
-      if (ch === " " || seen[ch]) continue;
-      seen[ch] = 1;
-      // Exact to a hundredth of a pixel. Half-pixel buckets left each
-      // character free to differ by up to a quarter of a pixel, which over
-      // eleven characters of a button label is visible drift.
-      var bucket = Math.round(ctx.measureText(ch).width * 100) / 100;
-      (buckets[bucket] = buckets[bucket] || []).push(ch);
-    }
-
-    var byChar = {};
-    Object.keys(buckets).forEach(function (bucket) {
-      buckets[bucket].forEach(function (ch) { byChar[ch] = buckets[bucket]; });
-    });
-    return (widthGroups[key] = byChar);
-  }
-
-  // `rate` is characters settled per frame, at 22ms a frame, so the run takes
-  // length / rate frames. The lede is 64 characters at 1.5 -- about 0.9s. A
-  // button label is a tenth of that, so it needs a *slower* rate to last long
-  // enough to read: "Get started" at 0.75 is 15 frames, about a third of a
-  // second, which is roughly how long a pointer takes to arrive and stop.
-  function scramble(node, rate) {
-    if (node.getAttribute("data-scrambling") === "1") return;
+  // -- typed labels ---------------------------------------------------------
+  // A button label types itself out on hover. This replaced a scramble that
+  // swapped each character for another of the same width: matching widths
+  // stopped the box moving, but a word made of the right-width wrong letters
+  // reads as the word warped rather than as the word arriving. Revealing the
+  // real characters in order cannot look like anything but itself, and with
+  // the box pinned for the run nothing moves either.
+  function typeOut(node, perFrame) {
+    if (node.getAttribute("data-typing") === "1") return;
     var text = node.textContent.trim();
     if (!text) return;
-    node.setAttribute("data-scrambling", "1");
+    node.setAttribute("data-typing", "1");
 
-    var groups = groupsFor(node);
-    // Whatever the measurement says, the box does not move while the run is
-    // on. Restored at the end so the element goes back to sizing itself.
+    // Hold the size the finished label has, so a half-typed one cannot
+    // shrink the button and a caret cannot widen it.
     var box = node.getBoundingClientRect();
     var hadWidth = node.style.width;
     var hadHeight = node.style.height;
     node.style.width = box.width + "px";
     node.style.height = box.height + "px";
 
-    var settled = 0;
-    var frames = 0;
-
-    function noiseFor(ch) {
-      var group = groups[ch];
-      if (!group || group.length < 2) return ch;
-      return group[Math.floor(Math.random() * group.length)];
-    }
+    var shown = 0;
 
     function tick() {
-      var out = "";
-      for (var i = 0; i < text.length; i++) {
-        var ch = text.charAt(i);
-        out += (i < settled || ch === " ") ? ch : noiseFor(ch);
-      }
-      node.textContent = out;
-      frames += 1;
-      settled = Math.floor(frames * (rate || 1.5));
-      if (settled <= text.length) {
-        window.setTimeout(tick, 22);
+      shown += perFrame || 1;
+      if (shown >= text.length) {
+        node.textContent = text;
+        node.style.width = hadWidth;
+        node.style.height = hadHeight;
+        node.removeAttribute("data-typing");
         return;
       }
-      // Always the real text at the end, never a frame of noise.
-      node.textContent = text;
-      node.style.width = hadWidth;
-      node.style.height = hadHeight;
-      node.removeAttribute("data-scrambling");
+      node.textContent = text.slice(0, Math.floor(shown)) + "\u258c";
+      window.setTimeout(tick, 22);
     }
 
     tick();
   }
 
-  function wireScramble() {
+  function wireTypedLabels() {
     var reduced = window.matchMedia
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) return;
 
-    // Once per tab. Coming back to the homepage is a fresh load, so without
-    // this the sentence re-settles every time you navigate back to look at
-    // something -- which is the moment it is least welcome.
-    var seen = false;
-    try {
-      seen = window.sessionStorage.getItem("failecho-settled") === "1";
-      window.sessionStorage.setItem("failecho-settled", "1");
-    } catch (err) {
-      // Private mode, or storage disabled. Playing it again is the lesser
-      // failure of the two.
-      seen = false;
-    }
-    if (!seen) {
-      Array.prototype.forEach.call(
-        document.querySelectorAll("[data-scramble]"),
-        function (node) { scramble(node, 1.5); }
-      );
-    }
-
-    // The same settle on a button, on hover and on focus. Not the copy
-    // controls: their label is their feedback, and a button that says
-    // "Copied" must not be busy spelling something else when it does.
+    // Not the copy controls: their label is their feedback, and a button that
+    // says "Copied" must not be busy typing something else when it does.
     Array.prototype.forEach.call(
       document.querySelectorAll(".btn:not([data-copy-target])"),
       function (button) {
-        function run() { scramble(button, 0.75); }
+        function run() { typeOut(button, 0.8); }
         button.addEventListener("mouseenter", run);
         button.addEventListener("focus", run);
       }
@@ -673,7 +586,7 @@
   wireRail();
   wireTopbar();
   wireMenus();
-  wireScramble();
+  wireTypedLabels();
   if (el("stat-real-24h")) {
     refresh();
     if (!document.hidden) startPolling();

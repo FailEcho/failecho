@@ -597,18 +597,6 @@ def test_the_bar_does_not_flicker_at_its_own_boundary():
     assert "y > 24" in bar and "y < 8" in bar, "no hysteresis on the scroll state"
 
 
-def test_the_lede_scrambles_once_and_settles_on_the_real_sentence():
-    """The sentence is in the markup, so it is what a reader without JS gets,
-    and what anyone who asked for reduced motion gets immediately."""
-    assert "data-scramble" in HTML
-    assert "Live failure and recovery intelligence for autonomous software." in HTML
-    scramble = JS[JS.index("function wireScramble()"):]
-    assert '"(prefers-reduced-motion: reduce)"' in scramble
-    assert "if (reduced) return;" in scramble
-    # It ends on the text it started from, never on a frame of noise.
-    assert "node.textContent = text;" in JS
-
-
 def test_the_panel_leaves_the_bar_when_the_bar_starts_moving():
     """Both bar heights are measured at load, not after the transition.
 
@@ -678,24 +666,6 @@ def test_nothing_dead_lies_between_the_nav_item_and_its_panel():
     assert ".topbar.is-open .topbar-row { padding-block: 28px; }" in CSS
 
 
-def test_buttons_settle_the_same_way_the_lede_does():
-    """One effect, two speeds. The rate is characters per frame, so a short
-    label needs a slower rate than a long sentence to last long enough to
-    read: "Get started" at 0.75 is 15 frames, about a third of a second."""
-    assert "scramble(button, 0.75)" in JS
-    assert "scramble(node, 1.5)" in JS
-    # Not the copy controls: their label is their feedback.
-    assert '.btn:not([data-copy-target])' in JS
-
-
-def test_a_scramble_never_ends_on_noise_and_never_overlaps_itself():
-    """A button hovered twice quickly would otherwise restore whatever the
-    first run happened to be showing when the second one read it."""
-    assert 'node.getAttribute("data-scrambling") === "1"' in JS
-    assert 'node.removeAttribute("data-scrambling")' in JS
-    assert "node.textContent = text;" in JS
-
-
 def test_every_page_loads_the_script():
     """/about and /404 did not, so on those two pages the menus never opened,
     the page never blurred, the rail never marked a section and no code block
@@ -757,22 +727,6 @@ def test_the_primary_button_looks_hovered():
     assert "box-shadow" in hover, "the only cue is a shade of red"
 
 
-def test_the_scramble_plays_once_a_tab_not_once_a_navigation():
-    """Coming back to the homepage is a fresh load, so the sentence re-settled
-    every time you navigated back to look at something."""
-    assert 'sessionStorage.getItem("failecho-settled")' in JS
-    assert 'sessionStorage.setItem("failecho-settled", "1")' in JS
-    # Storage can throw; playing it again is the lesser of the two failures.
-    assert "catch (err)" in JS
-
-
-def test_the_scramble_pins_the_box_it_is_running_in():
-    """Belt and braces on top of the width matching."""
-    assert "node.style.width = box.width" in JS
-    assert "node.style.width = hadWidth;" in JS
-    assert "ctx.measureText(ch).width * 100" in JS, "buckets are coarse again"
-
-
 def test_the_cards_are_one_image_cropped_three_ways():
     """A 1.3MB master became a 7.5KB WebP, and one request serves all three
     cards. They point at real pages; nothing here is a fabricated post."""
@@ -785,18 +739,6 @@ def test_the_cards_are_one_image_cropped_three_ways():
     card = (STATIC / "card-abstract1.webp")
     assert card.exists() and card.stat().st_size < 40_000, "re-encode the card art"
     assert not list(STATIC.glob("abstract*.png")), "the master belongs in brand/"
-
-
-def test_the_scramble_cannot_change_the_width_of_anything():
-    """Symbols reflowed the sentence and resized the button. So did the
-    sentence's own letters picked freely -- an i is not an m. A character may
-    only be replaced by one that measures exactly the same, so the advance
-    width of the string is identical in every frame."""
-    assert "var NOISE" not in JS, "the symbol alphabet is back"
-    assert "ctx.measureText(ch).width" in JS, "widths are being guessed"
-    assert "groups[ch]" in JS and "group.length < 2" in JS, "no same-width fallback"
-    # Measured on a canvas: one measurement per distinct character, no layout.
-    assert 'document.createElement("canvas")' in JS
 
 
 def test_the_install_tabs_cannot_cut_a_label_off():
@@ -822,3 +764,39 @@ def test_the_bar_s_growth_is_one_length_the_margin_can_cancel():
     assert ".topbar.is-open { margin-bottom: calc(var(--bar-h" in CSS
     # Nothing else in the bar may change its own height.
     assert ".topbar.is-open .brand { transform: scale(1.5); }" in CSS
+
+
+def test_a_button_label_types_itself_rather_than_scrambling():
+    """Matching character widths stopped the box moving, but a word made of
+    the right-width wrong letters reads as the word warped, not as the word
+    arriving. Revealing the real characters in order cannot look like
+    anything but itself."""
+    assert "function typeOut(" in JS
+    assert "text.slice(0, Math.floor(shown))" in JS
+    assert "\\u258c" in JS, "no caret while it types"
+    assert "var NOISE" not in JS and "measureText" not in JS, "the scramble is back"
+    # The box is still pinned, so a half-typed label cannot shrink the button.
+    assert "node.style.width = box.width" in JS
+    assert "node.style.width = hadWidth;" in JS
+    # And the copy controls keep their own label.
+    assert ".btn:not([data-copy-target])" in JS
+
+
+def test_the_lede_is_left_alone():
+    """It is the sentence that says what this is. It should be readable the
+    instant the page paints, not a second later."""
+    assert "data-scramble" not in HTML
+    assert "wireScramble" not in JS
+    assert "Live failure and recovery intelligence for autonomous software." in HTML
+
+
+def test_the_primary_button_change_is_impossible_to_miss():
+    """One shade of red to another was a real change nobody could see, and a
+    soft glow did not fix it. Four cues at once: lighter, risen, ringed, and
+    throwing colour past its own edge."""
+    hover = CSS[CSS.index(".btn--red:hover {"):]
+    hover = hover[:hover.index("}")]
+    for cue in ("background: var(--red)", "translateY(-2px)",
+                "rgba(255, 255, 255, 0.5)", "rgba(248, 48, 48, 0.45)"):
+        assert cue in hover, f"the hover state lost {cue}"
+    assert ".btn:active { transform: translateY(0); }" in CSS
