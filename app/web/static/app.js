@@ -536,28 +536,73 @@
   // last long enough to read as a settle: "Get started" at 0.75 is 15 frames,
   // roughly a third of a second, which is about how long a pointer takes to
   // arrive and stop.
+  // A character may only be replaced by one that occupies exactly as much
+  // space, so the string's advance width is identical in every frame. Any
+  // other alphabet -- symbols, or the sentence's own letters picked freely --
+  // changes the width of the line, which rewraps the sentence and resizes the
+  // button while it settles. Widths come from a canvas rather than the DOM:
+  // one measurement per distinct character, no layout, no reflow.
+  var widthGroups = {};
+
+  function groupsFor(node) {
+    var style = window.getComputedStyle(node);
+    var font = style.font || (style.fontStyle + " " + style.fontWeight + " " +
+      style.fontSize + " " + style.fontFamily);
+    var text = node.textContent.trim();
+    var key = font + "|" + text;
+    if (widthGroups[key]) return widthGroups[key];
+
+    var canvas = groupsFor.canvas
+      || (groupsFor.canvas = document.createElement("canvas"));
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return (widthGroups[key] = {});
+    ctx.font = font;
+
+    var buckets = {};
+    var seen = {};
+    for (var i = 0; i < text.length; i++) {
+      var ch = text.charAt(i);
+      if (ch === " " || seen[ch]) continue;
+      seen[ch] = 1;
+      // Half-pixel buckets: finer than the eye and coarser than the noise
+      // in a subpixel advance width.
+      var bucket = Math.round(ctx.measureText(ch).width * 2) / 2;
+      (buckets[bucket] = buckets[bucket] || []).push(ch);
+    }
+
+    var byChar = {};
+    Object.keys(buckets).forEach(function (bucket) {
+      buckets[bucket].forEach(function (ch) { byChar[ch] = buckets[bucket]; });
+    });
+    return (widthGroups[key] = byChar);
+  }
+
+  // `rate` is characters settled per frame, at 22ms a frame, so the run takes
+  // length / rate frames. The lede is 64 characters at 1.5 -- about 0.9s. A
+  // button label is a tenth of that, so it needs a *slower* rate to last long
+  // enough to read: "Get started" at 0.75 is 15 frames, about a third of a
+  // second, which is roughly how long a pointer takes to arrive and stop.
   function scramble(node, rate) {
     if (node.getAttribute("data-scrambling") === "1") return;
     var text = node.textContent.trim();
     if (!text) return;
     node.setAttribute("data-scrambling", "1");
 
-    // The noise is the sentence's own letters, shuffled. Punctuation and
-    // symbols from a made-up alphabet read as a different piece of text
-    // arriving and then being replaced; the same letters read as this text
-    // settling into place, which is what it is.
-    var pool = text.replace(/\s+/g, "");
+    var groups = groupsFor(node);
     var settled = 0;
     var frames = 0;
+
+    function noiseFor(ch) {
+      var group = groups[ch];
+      if (!group || group.length < 2) return ch;
+      return group[Math.floor(Math.random() * group.length)];
+    }
 
     function tick() {
       var out = "";
       for (var i = 0; i < text.length; i++) {
-        if (i < settled || text.charAt(i) === " ") {
-          out += text.charAt(i);
-        } else {
-          out += pool.charAt(Math.floor(Math.random() * pool.length));
-        }
+        var ch = text.charAt(i);
+        out += (i < settled || ch === " ") ? ch : noiseFor(ch);
       }
       node.textContent = out;
       frames += 1;

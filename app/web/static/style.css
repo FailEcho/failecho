@@ -139,8 +139,8 @@ a[rel~="external"]:hover::after { color: var(--red); }
 .topbar::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
   background: linear-gradient(90deg,
-    transparent, rgba(255, 255, 255, 0.75) 22%,
-    rgba(255, 255, 255, 0.75) 78%, transparent);
+    transparent, rgba(255, 255, 255, 0.42) 22%,
+    rgba(255, 255, 255, 0.42) 78%, transparent);
   opacity: 0; transition: opacity 0.22s ease;
 }
 .topbar.is-stuck { background: rgba(0, 0, 0, 0.82); }
@@ -220,8 +220,8 @@ a[rel~="external"]:hover::after { color: var(--red); }
 .navpanel::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
   background: linear-gradient(90deg,
-    transparent, rgba(255, 255, 255, 0.75) 22%,
-    rgba(255, 255, 255, 0.75) 78%, transparent);
+    transparent, rgba(255, 255, 255, 0.42) 22%,
+    rgba(255, 255, 255, 0.42) 78%, transparent);
 }
 .navpanel b { font-size: 16px; }
 .navpanel a[data-leads] b::after {
@@ -397,8 +397,8 @@ h1 {
 @keyframes tick { 0% { color: var(--red); } 100% { color: inherit; } }
 .ticked { animation: tick 1.8s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .pulse, .ticked, .caret, .loop-node, .loop-node .loop-n, .loop-return,
-  .install-panel:not([hidden]) { animation: none; }
+  .pulse, .ticked, .caret, .loop-node, .loop-node .loop-n,
+  .loop-return::before, .install-panel:not([hidden]) { animation: none; }
 }
 
 /* ---- metrics ----------------------------------------------------------- */
@@ -803,38 +803,20 @@ footer.shell {
 }
 .hero--split .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 
-/* ---- the echo, twice, closing the page ---------------------------------- */
-/* The mark's own artwork, mirrored, sitting between the last section and the
-   footer. One file and one request for both halves. Decorative and nothing
-   else: hidden from assistive technology, faded into the ground at every
-   edge, and loaded lazily because it is the last thing on the page. */
-.echoband {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
-  max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter) 8px;
-  pointer-events: none;
-}
-.echoband img {
-  display: block; width: 100%; height: 210px; object-fit: cover; object-position: center;
-  opacity: 0.16;
-  -webkit-mask-image: radial-gradient(72% 78% at 50% 50%, #000 30%, transparent 78%);
-          mask-image: radial-gradient(72% 78% at 50% 50%, #000 30%, transparent 78%);
-}
-.echoband .flip { transform: scaleX(-1); }
-@media (max-width: 640px) {
-  .echoband img { height: 130px; }
-}
-
 /* ---- install card, one tab per way in ---------------------------------- */
 /* No card. The commands sit on the page's own black with the tabs above
    them, so the only things in the hero are type and one caret. */
 .install {
   margin: 24px auto 12px; max-width: 700px; text-align: left;
 }
+/* Four labels, and the longest of them is a sentence. In a 520px column they
+   do not fit on one line, and scrolling them sideways with the scrollbar
+   hidden meant "Let the agent" was simply cut off with nothing to say so.
+   They wrap instead. */
 .install-tabs {
-  display: flex; overflow-x: auto; scrollbar-width: none;
+  display: flex; flex-wrap: wrap; row-gap: 2px;
   border-bottom: 1px solid var(--line);
 }
-.install-tabs::-webkit-scrollbar { display: none; }
 .install-tabs button:first-child { padding-left: 0; }
 .install-tabs button {
   flex: none; appearance: none; cursor: pointer; white-space: nowrap;
@@ -948,7 +930,6 @@ footer.shell {
 .loop-node:nth-child(2), .loop-node:nth-child(2) .loop-n { animation-delay: 1.6s; }
 .loop-node:nth-child(3), .loop-node:nth-child(3) .loop-n { animation-delay: 3.2s; }
 .loop-node:nth-child(4), .loop-node:nth-child(4) .loop-n { animation-delay: 4.8s; }
-.loop-return { animation: steplit 8s ease-in-out 6.4s infinite; }
 .loop-n {
   font-family: var(--mono); font-size: 12px; color: var(--ink-3);
   letter-spacing: 0.08em;
@@ -971,18 +952,24 @@ footer.shell {
   border-top: 1px solid var(--ink-3); border-right: 1px solid var(--ink-3);
   transform: rotate(45deg);
 }
+/* The way back is what the diagram is for, so it is drawn as the thing that
+   actually travels it: a line of small circles moving from Recover back to
+   Fail. Right to left, because that is the direction the evidence goes. */
+@keyframes carry { to { background-position-x: -18px; } }
 .loop-return {
-  position: relative; margin: 0 auto; height: 46px;
+  position: relative; margin: 0 auto 30px; height: 46px;
   width: calc(100% - 282px);
-  border: 1px dashed var(--line-2); border-top: 0;
-  border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
-  margin-bottom: 30px;
+}
+.loop-return::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+  background-image: radial-gradient(circle, var(--red) 1.6px, transparent 2px);
+  background-size: 18px 5px; background-repeat: repeat-x;
+  opacity: 0.75;
+  animation: carry 1.15s linear infinite;
 }
 .loop-return::after {
-  content: ""; position: absolute; left: -4px; top: -1px;
-  width: 6px; height: 6px;
-  border-top: 1px solid var(--ink-3); border-left: 1px solid var(--ink-3);
-  transform: rotate(45deg);
+  content: ""; position: absolute; left: -3px; bottom: -2px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--red);
 }
 .loop-return span {
   position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
@@ -1012,8 +999,8 @@ footer.shell {
   .loop { display: block; }
   .loop-track { flex-wrap: wrap; gap: 28px 44px; }
   .loop-track li + li::before, .loop-track li + li::after { display: none; }
-  .loop-return { height: auto; width: auto; border: 0; margin: 6px 0 0; }
-  .loop-return::after { display: none; }
+  .loop-return { height: auto; width: auto; margin: 6px 0 0; }
+  .loop-return::before, .loop-return::after { display: none; }
   .loop-return span {
     position: static; transform: none; display: block; padding: 0;
     text-align: center; white-space: normal;

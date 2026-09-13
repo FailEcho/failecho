@@ -207,6 +207,8 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
+    # 23k -> 25k: the scramble measures every distinct character so it can
+    # only ever swap one for another of the same width.
     # 21k -> 23k: closing the menu belongs to the bar rather than to each
     # item, which took a listener per panel and one on the scrim.
     # 18k -> 21k for the menu that pulls the bar down, measures its own
@@ -223,7 +225,7 @@ def test_static_assets_stay_small():
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
     assert len(CSS) < 45_000
-    assert len(JS) < 23_000
+    assert len(JS) < 25_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -232,29 +234,27 @@ def test_static_assets_stay_small():
     # stylesheet even though only /setup and /about use it.
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
     # opening on top of the word that opened it, 65k -> 69k for the hero,
-    # 69k -> 73k for the two-state bar and the drifting ground.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 81_000
+    # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
+    # for everything since: the menu, the loop's light, the return path, and
+    # a scramble that has to measure before it can be stable.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 82_000
 
-    # The artwork is not behind the hero any more, where it was the wrong
-    # shape at most window sizes and blocked the first paint. It closes the
-    # page instead: below the fold, lazy, and one request for both halves.
+    # No decorative download at all: the artwork was behind the hero, where
+    # it was the wrong shape at most window sizes, then a mirrored pair above
+    # the footer, and now it is nowhere.
     assert "echoimage" not in CSS, "the stylesheet must not pull it in"
 
     # 74KB at 800px when it was a full-bleed hero ground; 28KB at 480px and
     # 24 colours now that it is a 210px band at 16% opacity behind a mask.
-    art = (STATIC / "echoimage.png").stat().st_size
-    assert art < 30_000, f"the closing artwork is {art} bytes; re-quantise it"
-
     per_visit = (
         sum(len(x) for x in (HTML, CSS, JS))
         + (STATIC / "logo.png").stat().st_size
-        + (STATIC / "wordmark-light.png").stat().st_size
         + (STATIC / "wordmark-dark.png").stat().st_size
-        + art
     )
-    # 119k -> 150k: the artwork is back, once, below the fold and lazy, as
-    # the closing band. Both halves of it are the same request.
-    assert per_visit < 154_000, f"page weight crept to {per_visit} bytes"
+    # 150k -> 108k: no decorative download at all now, and the light-ink
+    # wordmark is not on this page -- the bar and the footer both use the
+    # white-ink one.
+    assert per_visit < 109_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -267,18 +267,11 @@ def test_the_hero_ground_is_nothing_at_all():
     assert "echoimage" not in hero, "the artwork is back behind the hero"
 
 
-def test_the_closing_artwork_is_decoration_and_says_so():
-    """Two halves of one image, above the footer. It is the only decorative
-    download on the page, so it earns its weight by being one request, lazy,
-    and invisible to anything that reads the page rather than looks at it."""
-    band = HTML[HTML.index('class="echoband"'):]
-    band = band[:band.index("</div>")]
-    assert band.count("echoimage.png") == 2, "two halves"
-    assert band.count('loading="lazy"') == 2
-    assert band.count('alt=""') == 2, "decoration is not described"
-    opener = HTML[HTML.index('<div class="echoband"'):]
-    assert opener[:opener.index(">")].count('aria-hidden="true"') == 1
-    assert ".echoband .flip { transform: scaleX(-1); }" in CSS
+def test_the_page_carries_no_decorative_download():
+    """The artwork was behind the hero, then a mirrored pair above the footer,
+    and now it is nowhere. Every image the page loads is a brand mark."""
+    assert "echoimage" not in HTML and "echoimage" not in CSS
+    assert "echoband" not in HTML and "echoband" not in CSS
 
 
 def test_mobile_layout_rules_exist():
@@ -469,9 +462,10 @@ def test_only_motion_that_carries_information_is_on_the_page():
     assert "@keyframes beat" in CSS, "the live pulse is gone"
     assert "@keyframes blink" in CSS, "the prompt caret is gone"
     assert "@keyframes steplit" in CSS, "the loop is a static diagram again"
+    assert "@keyframes carry" in CSS, "nothing travels the return path"
     # And nothing that animates a number upward from zero: that would draw
-    # growth the network has not had. Six keyframes is the whole budget.
-    assert CSS.count("@keyframes") == 6
+    # growth the network has not had. Seven keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 7
 
 
 def test_every_animation_respects_reduced_motion():
@@ -728,21 +722,44 @@ def test_only_the_entries_that_leave_the_site_proper_are_marked():
 def test_the_light_goes_round_the_loop():
     """The return path is the point of the diagram, so it lights up too."""
     assert "@keyframes steplit" in CSS and "@keyframes numberlit" in CSS
-    assert ".loop-return { animation: steplit 8s ease-in-out 6.4s infinite; }" in CSS
     for delay in ("1.6s", "3.2s", "4.8s"):
         assert "animation-delay: " + delay in CSS
     reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce) {\n  .pulse"):]
     reduced = reduced[:reduced.index("}")]
-    assert ".loop-node" in reduced and ".loop-return" in reduced
+    assert ".loop-node" in reduced and ".loop-return::before" in reduced
 
 
-def test_the_scramble_uses_the_sentences_own_letters():
-    """A made-up alphabet of symbols read as a different piece of text
-    arriving and being replaced. The same letters read as this text settling
-    into place, which is what is happening."""
+def test_the_return_path_carries_something():
+    """A dashed line said there was a way back. Circles moving along it say
+    what goes back, and which way."""
+    track = CSS[CSS.index(".loop-return::before {"):]
+    track = track[:track.index("}")]
+    assert "radial-gradient" in track and "repeat-x" in track
+    assert "animation: carry" in track
+    # Right to left: the direction the evidence travels.
+    assert "@keyframes carry { to { background-position-x: -18px; } }" in CSS
+    assert "border: 1px dashed var(--line-2); border-top: 0;" not in CSS
+
+
+def test_the_scramble_cannot_change_the_width_of_anything():
+    """Symbols reflowed the sentence and resized the button. So did the
+    sentence's own letters picked freely -- an i is not an m. A character may
+    only be replaced by one that measures exactly the same, so the advance
+    width of the string is identical in every frame."""
     assert "var NOISE" not in JS, "the symbol alphabet is back"
-    assert 'var pool = text.replace(/\\s+/g, "");' in JS
-    assert "pool.charAt(Math.floor(Math.random() * pool.length))" in JS
+    assert "ctx.measureText(ch).width" in JS, "widths are being guessed"
+    assert "groups[ch]" in JS and "group.length < 2" in JS, "no same-width fallback"
+    # Measured on a canvas: one measurement per distinct character, no layout.
+    assert 'document.createElement("canvas")' in JS
+
+
+def test_the_install_tabs_cannot_cut_a_label_off():
+    """Four labels, the longest a sentence, in a 520px column. They scrolled
+    sideways with the scrollbar hidden, so the fourth was simply gone."""
+    tabs = CSS[CSS.index(".install-tabs {"):]
+    tabs = tabs[:tabs.index("}")]
+    assert "flex-wrap: wrap" in tabs
+    assert "overflow-x: auto" not in tabs, "hidden sideways scroll is back"
 
 
 def test_the_four_install_panels_start_on_the_same_line():
