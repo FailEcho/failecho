@@ -120,3 +120,17 @@ def test_the_privacy_section_has_a_linkable_anchor(client):
     body = client.get("/about").text
     assert 'id="privacy"' in body
     assert "Privacy by design" in body
+
+
+def test_the_benefits_are_split_by_when_they_are_true(client):
+    """Half of what FailEcho gives you needs other people and half does not.
+    Listing them together would promise a cold-start user things the empty
+    network cannot do."""
+    body = client.get("/about").text
+    section = body[body.index('id="what-you-get"'):]
+    assert "On day one, with nobody else connected" in section
+    assert "Once other agents are reporting" in section
+    # The day-one list has to come first: it is the half that is true now.
+    assert section.index("On day one") < section.index("Once other agents")
+    # And the limits are stated in the same breath, not on another page.
+    assert "no use at all for a failure only your stack can produce" in section

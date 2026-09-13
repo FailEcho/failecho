@@ -239,6 +239,45 @@
     </div>
   </section>
 
+  <section class="shell band" id="what-you-get" aria-labelledby="get-title">
+    <div class="band-head">
+      <h2 id="get-title" class="label">What you actually get</h2>
+      <p class="band-sub">Split by when it is true, because half of it needs other people and half of it does not.</p>
+    </div>
+
+    <h3 class="label label--quiet">On day one, with nobody else connected</h3>
+    <ul class="yes-list">
+      <li><b>Your own failure memory.</b> Five of your own recoveries and it starts recommending. Every answer says whether the evidence is yours or somebody else's.</li>
+      <li><b>Nobody has to remember to use it.</b> The hook records after every MCP call, so reporting does not depend on the model deciding to.</li>
+      <li><b>A denominator.</b> Successes are recorded too, so you get a real failure rate per service and operation rather than a pile of errors.</li>
+      <li><b>Noisy errors become countable.</b> Two messages differing only by an id and a timestamp collapse to one signature you can count.</li>
+      <li><b>It says when it does not know.</b> Thin evidence returns <code>INSUFFICIENT_DATA</code> and no recommendation, which is a real answer.</li>
+      <li><b>Confidence you can recompute.</b> A Wilson lower bound over observed attempts, from counts returned alongside it. No model produces it.</li>
+      <li><b>It cannot cost you much.</b> Runs after the tool call, two second timeout, fails open. One environment variable turns it off.</li>
+    </ul>
+
+    <h3 class="label label--quiet">Once other agents are reporting</h3>
+    <ul class="yes-list">
+      <li><b>Retries that cannot work get skipped.</b> The whole point: <code>retry 0/5</code> next to <code>refresh_schema 5/5</code>.</li>
+      <li><b>Which fix actually worked.</b> Error trackers record failures and status pages record uptime. Neither records the recovery.</li>
+      <li><b>Is it me or them?</b> Other agents hitting the same rate limit means the provider is degraded. Nobody else means it is your key.</li>
+      <li><b>Fresh breakage, flagged as fresh.</b> A signature first seen minutes ago looks different from one that has been failing all week.</li>
+      <li><b>A new agent inherits the history.</b> An agent started today can use what last month's agents learned.</li>
+      <li><b>Fewer wasted tokens and less waiting.</b> A skipped retry cycle is a tool call, an error, and the reasoning about both.</li>
+    </ul>
+
+    <p class="prose">
+      A team running many agents against the same services gets the second list
+      from its own fleet, without waiting for strangers: same stack, so the
+      failures overlap by construction.
+    </p>
+    <p class="fineprint">
+      What it is not: a replacement for error tracking or tracing, and no use
+      at all for a failure only your stack can produce. An internal service
+      nobody else calls will never match anything.
+    </p>
+  </section>
+
   <section class="shell band" aria-labelledby="why-title">
     <div class="band-head">
       <h2 id="why-title" class="label">Why FailEcho exists</h2>
