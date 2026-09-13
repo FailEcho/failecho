@@ -195,9 +195,18 @@
 
   // -- copy buttons ------------------------------------------------------
   function copyText(text) {
+    // The async clipboard rejects on a page without permission as readily as
+    // on a browser without the API, and the whole code block is the control
+    // now, so a rejection is a dead click. Fall through to the old way.
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text);
+      return navigator.clipboard.writeText(text).catch(function () {
+        return legacyCopy(text);
+      });
     }
+    return legacyCopy(text);
+  }
+
+  function legacyCopy(text) {
     return new Promise(function (resolve, reject) {
       var area = document.createElement("textarea");
       area.value = text;
@@ -218,24 +227,42 @@
   }
 
   function wireCopyButtons() {
-    var buttons = document.querySelectorAll("[data-copy-target]");
-    Array.prototype.forEach.call(buttons, function (button) {
-      button.addEventListener("click", function () {
-        var source = el(button.getAttribute("data-copy-target"));
+    var controls = document.querySelectorAll("[data-copy-target]");
+    Array.prototype.forEach.call(controls, function (control) {
+      // The hero's code blocks are the control themselves, so their feedback
+      // cannot be their own text -- rewriting it would delete the command.
+      var isBlock = control.classList.contains("copyable");
+      var original = control.textContent;
+
+      function done(ok) {
+        setText("copy-status", ok
+          ? "Copied to clipboard"
+          : "Copy failed. Select the text manually.");
+        if (isBlock) {
+          control.classList.toggle("is-copied", ok);
+          setTimeout(function () { control.classList.remove("is-copied"); }, 1600);
+          return;
+        }
+        control.textContent = ok ? "Copied" : "Copy failed";
+        setTimeout(function () { control.textContent = original; }, 1600);
+      }
+
+      function copy() {
+        var source = el(control.getAttribute("data-copy-target"));
         if (!source) return;
-        var original = button.textContent;
         copyText(source.textContent).then(
-          function () {
-            button.textContent = "Copied";
-            setText("copy-status", "Copied to clipboard");
-            setTimeout(function () { button.textContent = original; }, 1600);
-          },
-          function () {
-            button.textContent = "Copy failed";
-            setText("copy-status", "Copy failed. Select the text manually.");
-            setTimeout(function () { button.textContent = original; }, 1600);
-          }
+          function () { done(true); },
+          function () { done(false); }
         );
+      }
+
+      control.addEventListener("click", copy);
+      if (!isBlock) return;
+      // role="button" on a pre buys the announcement, not the behaviour.
+      control.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        copy();
       });
     });
   }

@@ -5,10 +5,10 @@
    System fonts only, no build step, no framework. */
 
 :root {
-  --bg:        #090b10;   /* blue-graphite, not neutral black */
-  --bg-deep:   #04060a;   /* header and footer sit below the page */
-  --surface:   #10141b;
-  --surface-2: #161b24;
+  --bg:        #000000;   /* black, all the way down */
+  --bg-deep:   #000000;   /* header and footer are the same ground */
+  --surface:   #0c1017;   /* cards lift off it rather than sit in it */
+  --surface-2: #141922;
   --line:      #1e2430;
   --line-2:    #2c3440;
 
@@ -299,10 +299,16 @@ h1 {
   animation: beat 2.6s ease-in-out infinite;
 }
 @keyframes beat { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes blink { 0%, 45% { opacity: 1; } 55%, 100% { opacity: 0; } }
+.caret {
+  display: inline-block; width: 8px; height: 1em; margin-left: 3px;
+  vertical-align: text-bottom; background: var(--red);
+  animation: blink 1.1s steps(1, end) infinite;
+}
 @keyframes tick { 0% { color: var(--red); } 100% { color: inherit; } }
 .ticked { animation: tick 1.8s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .pulse, .ticked, .install-panel:not([hidden]) { animation: none; }
+  .pulse, .ticked, .caret, .install-panel:not([hidden]) { animation: none; }
 }
 
 /* ---- metrics ----------------------------------------------------------- */
@@ -682,29 +688,42 @@ footer.shell {
   .brand-word { width: 90px; height: auto; }
 }
 
-/* ---- centred hero, install card as the anchor --------------------------- */
-/* The artwork sits behind the hero, isolated so it cannot reach the bands
-   below, and quiet enough that the headline keeps its contrast. */
-.hero--center {
-  text-align: center; padding-block: 72px 60px;
+/* ---- hero: two columns ------------------------------------------------- */
+/* Two columns: what this is on the left, the line you paste on the right.
+   The artwork stays behind both, isolated so it cannot reach the bands
+   below and quiet enough that the type keeps its contrast on black. */
+.hero--split {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
+  gap: 0 64px; align-items: center;
+  padding-block: 64px 56px;
   position: relative; isolation: isolate; overflow: hidden;
 }
-.hero--center::before {
+.hero--split::before {
   content: "";
   position: absolute; z-index: -1; pointer-events: none;
-  top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
-  width: min(1240px, 132%);
+  top: 0; bottom: 0; right: -12%; width: min(1000px, 86%);
   background: url("/static/echoimage.png") center / contain no-repeat;
-  opacity: 0.18;
+  opacity: 0.13;
 }
-.hero--center h1 { margin-inline: auto; max-width: 900px; }
-.hero--center .hero-lede { margin-inline: auto; max-width: 54ch; color: var(--ink); }
-.hero--center .hero-support { margin-inline: auto; max-width: 62ch; text-align: left; margin-bottom: 24px; }
-.hero--center .hero-actions { justify-content: center; }
-.hero--center .hero-tagline {
-  display: inline-block; border-left: 0; padding-left: 0;
-  border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px;
+.hero--split h1 { margin: 0 0 18px; max-width: 15ch; }
+.hero-def {
+  margin: 20px 0 0; max-width: 56ch;
+  font-size: 15.5px; line-height: 1.7; color: var(--ink-2);
 }
+.hero--split .hero-actions { margin-top: 30px; }
+.hero--split .hero-tagline {
+  border-left: 0; padding-left: 0; margin-top: 26px;
+  border-top: 1px solid var(--line); padding-top: 14px; display: inline-block;
+}
+.hero-right .install { margin: 0; max-width: none; }
+.hero-right .install-note { margin: 16px 0 0; }
+
+@media (max-width: 980px) {
+  .hero--split { grid-template-columns: minmax(0, 1fr); gap: 40px 0; }
+  .hero--split::before { right: -30%; width: 130%; opacity: 0.1; }
+  .hero--split h1 { max-width: none; }
+}
+.hero--split .hero-lede { max-width: 44ch; color: var(--ink); }
 
 /* ---- install card, one tab per way in ---------------------------------- */
 .install {
@@ -753,8 +772,20 @@ footer.shell {
      body does not need the room a floating control would have taken. */
   .terminal.has-copy > pre { padding-top: 18px; }
 }
-.install-copy { position: absolute; top: 12px; right: 12px; }
-.install pre { margin: 0; padding: 20px 82px 8px 20px; overflow-x: auto; }
+/* No button and no title bar: the code is the control. A pre cannot be a
+   button element without wrapping every line in it, so it takes the role,
+   the tab stop and the keyboard handling instead. */
+.copyable { cursor: pointer; position: relative; transition: background 0.15s ease; }
+.copyable:hover, .copyable:focus-visible { background: var(--surface-2); }
+.copyable::after {
+  content: "click to copy";
+  position: absolute; top: 12px; right: 14px;
+  font: 11px var(--sans); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink-3); opacity: 0; transition: opacity 0.15s ease;
+}
+.copyable:hover::after, .copyable:focus-visible::after { opacity: 1; }
+.copyable.is-copied::after { content: "copied"; color: var(--healthy); opacity: 1; }
+.install pre { margin: 0; padding: 20px 20px 10px; overflow-x: auto; }
 .install code { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; }
 /* Two lines of text in a card sized for the tallest panel reads as an
    empty card. These two get the room the others spend on content. */
@@ -873,7 +904,7 @@ footer.shell {
 }
 
 @media (max-width: 640px) {
-  .hero--center { padding-block: 76px 66px; }
+  .hero--split { padding-block: 56px 48px; }
   .statcards { grid-template-columns: minmax(0, 1fr); }
   .install-panel { min-height: 240px; }
   /* 13.5px mono put the REST and agent snippets 40px over a 435px box, so
@@ -881,8 +912,7 @@ footer.shell {
      the two short panels lose their desktop bump for the same reason: the
      agent line is the longest one on the card. */
   .install code, #panel-plugin code, #panel-agent code { font-size: 12px; }
-  .install pre { padding-right: 18px; padding-top: 46px; }
-  .install-copy { top: 10px; left: 12px; right: auto; }
+  .install pre { padding: 18px 16px 8px; }
 }
 
 /* A CTA closing a band sits under its heading, not against it. */

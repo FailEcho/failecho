@@ -27,13 +27,14 @@ JS = (STATIC / "app.js").read_text()
 def test_hero_states_the_product_immediately(client):
     """Five to ten seconds: the problem, the category, the tagline, the CTA.
 
-    The long definition moved out of the hero and into the section that
-    explains the loop -- the hero was too tall for a laptop screen, and a
-    paragraph nobody reads before the install card was the part to lose. The
-    definition still has to be on the page, for search and for anyone who
-    arrives not knowing what this is.
+    The definition came back into the hero when the hero became two columns.
+    It cost the page its height once, when everything was stacked down the
+    middle; beside the install card it costs nothing, and the reader who
+    arrives not knowing what this is no longer has to scroll to find out.
     """
-    body = client.get("/").text
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/").text)
     assert "AI agents shouldn't debug" in body and "the same failure twice." in body
     assert "Live failure and recovery intelligence for autonomous software." in body
     assert "Before you retry, check the echo." in body
@@ -78,7 +79,8 @@ def test_the_front_page_stays_brief():
     assert HTML.count("<h2") <= 4, "more than four sections means it is growing back"
     # Four ways in, four tabs. The budget follows the install card, not the
     # other way round -- but sections are still capped at four above.
-    assert len(HTML) < 13_000
+    # 13k -> 14k when the definition moved back into the hero's left column.
+    assert len(HTML) < 14_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -129,10 +131,20 @@ def test_semantic_landmarks_and_labels():
 
 
 def test_interactive_elements_are_real_buttons_with_labels():
-    """Four tabs, and a copy button on each panel."""
-    assert HTML.count('type="button"') == 8
-    assert HTML.count("data-copy-target=") == 4
-    assert HTML.count("aria-label=") >= 2
+    """Four tabs, and four code blocks that are their own copy control.
+
+    A pre cannot be a button element without wrapping every line of the
+    command in one, so the hero's blocks take the role, the tab stop and the
+    keyboard handling instead -- all three, or role="button" is a label on
+    something that does not behave like one.
+    """
+    assert HTML.count('type="button"') == 4, "the four tabs"
+    assert HTML.count("data-copy-target=") == 4, "one per code block"
+    assert HTML.count('class="copyable"') == 4
+    assert HTML.count('role="button"') == 4
+    assert HTML.count('tabindex="0"') == 4
+    assert HTML.count("aria-label=") >= 4, "each block says what it copies"
+    assert 'event.key !== "Enter" && event.key !== " "' in JS
     assert ":focus-visible" in CSS
 
 
@@ -195,13 +207,16 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
+    # 37k -> 39k for the two-column hero: a grid, a code block that is its
+    # own copy control, and a prompt caret. The centred hero's rules were
+    # deleted rather than left behind -- nothing else used them.
     # 36k -> 37k, 12k -> 15k for three pieces of motion that carry
     # information: a figure that moved since the last poll, the rail marking
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 37_000
-    assert len(JS) < 15_000
+    assert len(CSS) < 39_000
+    assert len(JS) < 16_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -209,8 +224,8 @@ def test_static_assets_stay_small():
     # 58k -> 60k, same reason: the rail's CSS is shared with the homepage's
     # stylesheet even though only /setup and /about use it.
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
-    # opening on top of the word that opened it.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 65_000
+    # opening on top of the word that opened it, 65k -> 69k for the hero.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 69_000
 
     # The hero artwork is the single heaviest thing the homepage loads, so it
     # is counted here rather than left out of the number it dominates. It is
@@ -224,16 +239,18 @@ def test_static_assets_stay_small():
         + (STATIC / "wordmark-light.png").stat().st_size
         + art
     )
-    assert per_visit < 165_000, f"page weight crept to {per_visit} bytes"
+    # 165k -> 167k, all of it the two-column hero's markup and CSS.
+    assert per_visit < 167_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
 def test_the_hero_art_stays_behind_the_hero():
     """Decoration must not reach the bands below, or the text on top of it."""
-    assert '.hero--center::before' in CSS
-    block = CSS[CSS.index(".hero--center::before"):CSS.index(".hero--center h1")]
+    assert ".hero--split::before" in CSS
+    block = CSS[CSS.index(".hero--split::before"):CSS.index(".hero--split h1")]
     assert "z-index: -1" in block and "pointer-events: none" in block
-    assert "overflow: hidden" in CSS[CSS.index(".hero--center {"):CSS.index(".hero--center::before")]
+    frame = CSS[CSS.index(".hero--split {"):CSS.index(".hero--split::before")]
+    assert "overflow: hidden" in frame and "isolation: isolate" in frame
 
 
 def test_mobile_layout_rules_exist():
@@ -394,10 +411,12 @@ def test_every_get_started_button_goes_to_setup(client):
 def test_the_hero_fits_a_laptop_screen():
     """It was 1014px tall plus a 76px bar, so on a 1080 viewport the tagline
     and the distribution line fell below the fold and the page looked
-    truncated. Trimmed to 930 by taking air out of the padding and the gaps,
-    not by removing anything."""
-    block = CSS[CSS.index(".hero--center {"):CSS.index(".hero--center::before")]
-    assert "padding-block: 72px 60px" in block, "the homepage hero has grown again"
+    truncated. Stacked down the middle it had to be trimmed to 930; in two
+    columns the definition and the install card share the height instead of
+    queueing for it."""
+    block = CSS[CSS.index(".hero--split {"):CSS.index(".hero--split::before")]
+    assert "padding-block: 64px 56px" in block, "the homepage hero has grown again"
+    assert "grid-template-columns" in block, "the hero is stacked again"
 
 
 def test_no_install_snippet_is_wider_than_its_box():
@@ -420,9 +439,10 @@ def test_only_motion_that_carries_information_is_on_the_page():
     assert "@keyframes tick" in CSS, "a figure that moved does not say so"
     assert "@keyframes panelin" in CSS, "a tab switch does not read as a swap"
     assert "@keyframes beat" in CSS, "the live pulse is gone"
+    assert "@keyframes blink" in CSS, "the prompt caret is gone"
     # And nothing that animates a number upward from zero: that would draw
-    # growth the network has not had. Three keyframes is the whole budget.
-    assert CSS.count("@keyframes") == 3
+    # growth the network has not had. Four keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 4
 
 
 def test_every_animation_respects_reduced_motion():
@@ -481,3 +501,25 @@ def test_the_gap_above_the_nav_panel_does_not_break_the_hover():
     bridge = CSS[CSS.index(".navpanel::before"):]
     bridge = bridge[:bridge.index("}")]
     assert "top: -10px" in bridge and "height: 10px" in bridge, "bridge does not span the gap"
+
+
+def test_the_ground_is_black():
+    """Asked for, and it is also the highest-contrast ground we can give the
+    type. Cards lift off it with their own surface rather than being a hole
+    cut in it, which is what a pure-black card on a pure-black page looks
+    like."""
+    assert "--bg:        #000000" in CSS
+    assert "--bg-deep:   #000000" in CSS
+    assert "--surface:   #0c1017" in CSS
+
+
+def test_the_hero_puts_the_words_left_and_the_command_right():
+    assert 'class="hero-left"' in HTML and 'class="hero-right"' in HTML
+    assert HTML.index('class="hero-left"') < HTML.index('class="hero-right"')
+    # The definition is what sits on the left, in full.
+    for phrase in ("shared failure intelligence network",
+                   "an MCP endpoint and a REST API",
+                   "the loop closes on"):
+        assert phrase in HTML
+    # And the code blocks are in the right-hand column, not the left.
+    assert HTML.index('class="hero-right"') < HTML.index('id="code-plugin"')

@@ -89,62 +89,19 @@
 <main id="main">
 <noscript><p class="shell fineprint">Live figures require JavaScript. Read <a href="/v1/stats">the current network data</a> directly; a dash means the figure has not loaded.</p></noscript>
 
-  <section class="shell hero hero--center" aria-labelledby="hero-title">
+  <section class="shell hero hero--split" aria-labelledby="hero-title">
+   <div class="hero-left">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
     <p class="hero-lede">
       Live failure and recovery intelligence for autonomous software.
     </p>
-    <div class="install">
-      <div class="install-tabs" role="tablist" aria-label="Ways to connect">
-        <button type="button" role="tab" id="tab-plugin" aria-controls="panel-plugin"
-                aria-selected="true">Claude Code</button>
-        <button type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp"
-                aria-selected="false">Cursor, Desktop, any MCP client</button>
-        <button type="button" role="tab" id="tab-rest" aria-controls="panel-rest"
-                aria-selected="false">Any language</button>
-        <button type="button" role="tab" id="tab-agent" aria-controls="panel-agent"
-                aria-selected="false">Let the agent</button>
-      </div>
-
-      <div class="install-panel" role="tabpanel" id="panel-plugin" aria-labelledby="tab-plugin">
-        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-plugin"
-                aria-label="Copy the Claude Code install">Copy</button>
-<pre><code id="code-plugin">/plugin marketplace add FailEcho/failecho
-/plugin install failecho@failecho</code></pre>
-        <p class="install-foot">Reports MCP failures for you, through a hook.</p>
-      </div>
-
-      <div class="install-panel" role="tabpanel" id="panel-mcp" aria-labelledby="tab-mcp" hidden>
-        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-mcp"
-                aria-label="Copy the MCP server config">Copy</button>
-<pre><code id="code-mcp">"failecho": {
-  "type": "http",
-  "url": "{{PUBLIC_URL}}/mcp"
-}</code></pre>
-        <p class="install-foot">Streamable HTTP. Four tools, no auth, no key. Host can only start a process? <code>uvx failecho-mcp</code> or <code>npx -y failecho-mcp</code>.</p>
-      </div>
-
-      <div class="install-panel" role="tabpanel" id="panel-rest" aria-labelledby="tab-rest" hidden>
-        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-rest"
-                aria-label="Copy the REST query">Copy</button>
-<pre><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"service":"api.example.com",
-       "operation":"create_issue","error_code":"429"}'</code></pre>
-        <p class="install-foot">One call. Stores nothing, never rate limited.</p>
-      </div>
-
-      <div class="install-panel" role="tabpanel" id="panel-agent" aria-labelledby="tab-agent" hidden>
-        <button class="btn btn--sm install-copy" type="button" data-copy-target="code-agent"
-                aria-label="Copy the prompt for your agent">Copy</button>
-<pre><code id="code-agent">Read {{PUBLIC_URL}}/llms.txt and set yourself
-up to use FailEcho.</code></pre>
-        <p class="install-foot">Paste that at whatever you run. It configures itself.</p>
-      </div>
-    </div>
-    <p class="install-note">
-      Any Model Context Protocol (MCP) client works. No account, no API key —
-      <a href="/setup">every client, step by step</a>.
+    <p class="hero-def">
+      FailEcho is a shared failure intelligence network for AI agents and
+      autonomous software — an MCP endpoint and a REST API. Ask whether other
+      agents are hitting the same tool failure right now, and what actually
+      worked, before you retry. Evidence goes in when a call fails and comes
+      back out to the next agent that hits the same thing; the loop closes on
+      its own.
     </p>
 
     <p class="hero-actions">
@@ -159,18 +116,67 @@ up to use FailEcho.</code></pre>
       · <a href="https://pypi.org/project/failecho-mcp/" rel="external noopener">PyPI</a>
       · <a href="https://www.npmjs.com/package/failecho-mcp" rel="external noopener">npm</a>
     </p>
+   </div>
+
+   <div class="hero-right">
+    <div class="install">
+      <div class="install-tabs" role="tablist" aria-label="Ways to connect">
+        <button type="button" role="tab" id="tab-plugin" aria-controls="panel-plugin"
+                aria-selected="true">Claude Code</button>
+        <button type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp"
+                aria-selected="false">Cursor, Desktop, any MCP client</button>
+        <button type="button" role="tab" id="tab-rest" aria-controls="panel-rest"
+                aria-selected="false">Any language</button>
+        <button type="button" role="tab" id="tab-agent" aria-controls="panel-agent"
+                aria-selected="false">Let the agent</button>
+      </div>
+
+      <div class="install-panel" role="tabpanel" id="panel-plugin" aria-labelledby="tab-plugin">
+<pre class="copyable" tabindex="0" role="button" data-copy-target="code-plugin"
+     aria-label="Copy the Claude Code install"><code id="code-plugin">/plugin marketplace add FailEcho/failecho
+/plugin install failecho@failecho<span class="caret" aria-hidden="true"></span></code></pre>
+        <p class="install-foot">Reports MCP failures for you, through a hook.</p>
+      </div>
+
+      <div class="install-panel" role="tabpanel" id="panel-mcp" aria-labelledby="tab-mcp" hidden>
+<pre class="copyable" tabindex="0" role="button" data-copy-target="code-mcp"
+     aria-label="Copy the MCP server config"><code id="code-mcp">"failecho": {
+  "type": "http",
+  "url": "{{PUBLIC_URL}}/mcp"
+}<span class="caret" aria-hidden="true"></span></code></pre>
+        <p class="install-foot">Streamable HTTP. Four tools, no auth, no key. Host can only start a process? <code>uvx failecho-mcp</code> or <code>npx -y failecho-mcp</code>.</p>
+      </div>
+
+      <div class="install-panel" role="tabpanel" id="panel-rest" aria-labelledby="tab-rest" hidden>
+<pre class="copyable" tabindex="0" role="button" data-copy-target="code-rest"
+     aria-label="Copy the REST query"><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"service":"api.example.com",
+       "operation":"create_issue","error_code":"429"}'<span class="caret" aria-hidden="true"></span></code></pre>
+        <p class="install-foot">One call. Stores nothing, never rate limited.</p>
+      </div>
+
+      <div class="install-panel" role="tabpanel" id="panel-agent" aria-labelledby="tab-agent" hidden>
+<pre class="copyable" tabindex="0" role="button" data-copy-target="code-agent"
+     aria-label="Copy the prompt for your agent"><code id="code-agent">Read {{PUBLIC_URL}}/llms.txt and set yourself
+up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
+        <p class="install-foot">Paste that at whatever you run. It configures itself.</p>
+      </div>
+    </div>
+    <p class="install-note">
+      Any Model Context Protocol (MCP) client works. No account, no API key —
+      <a href="/setup">every client, step by step</a>.
+    </p>
+   </div>
   </section>
 
   <section class="shell band band--center" id="how" aria-labelledby="how-title">
     <div class="band-head">
       <h2 id="how-title" class="label">One failure teaches every agent</h2>
       <p class="band-sub">
-        FailEcho is a shared failure intelligence network for AI agents and
-        autonomous software — an MCP endpoint and a REST API. Ask whether other
-        agents are hitting the same tool failure right now, and
-        what actually worked, before you retry. Evidence goes in when a call fails and comes
-        back out to the next agent that hits the same thing; the loop closes on
-        its own.
+        Four steps, and the fourth one feeds the first. Nothing here is a
+        model's guess: every recommendation is an action that measurably
+        worked for agents that hit the same failure before you.
       </p>
     </div>
 
