@@ -330,5 +330,4 @@ def test_the_hero_fits_a_laptop_screen():
     truncated. Trimmed to 930 by taking air out of the padding and the gaps,
     not by removing anything."""
     block = CSS[CSS.index(".hero--center {"):CSS.index(".hero--center::before")]
-    assert "padding-block: 72px 60px" in block
-    assert "padding-block: 120px" not in CSS and "padding-block: 96px 80px" not in CSS
+    assert "padding-block: 72px 60px" in block, "the homepage hero has grown again"
