@@ -90,9 +90,8 @@
 <main id="main">
 <noscript><p class="shell fineprint">Live figures require JavaScript. Read <a href="/v1/stats">the current network data</a> directly; a dash means the figure has not loaded.</p></noscript>
 
-  <section class="shell hero hero--split" aria-labelledby="hero-title">
+  <section class="shell hero hero--lead" aria-labelledby="hero-title">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
-   <div class="hero-left">
     <p class="hero-lede">
       Live failure and recovery intelligence for autonomous software.
     </p>
@@ -117,58 +116,73 @@
       · <a href="https://pypi.org/project/failecho-mcp/" rel="external noopener">PyPI</a>
       · <a href="https://www.npmjs.com/package/failecho-mcp" rel="external noopener">npm</a>
     </p>
-   </div>
+  </section>
 
-   <div class="hero-right">
-    <div class="install">
-      <div class="install-tabs" role="tablist" aria-label="Ways to connect">
-        <button type="button" role="tab" id="tab-plugin" aria-controls="panel-plugin"
-                aria-selected="true">Claude Code</button>
-        <button type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp"
-                aria-selected="false">Cursor, Desktop, any MCP client</button>
-        <button type="button" role="tab" id="tab-rest" aria-controls="panel-rest"
-                aria-selected="false">Any language</button>
-        <button type="button" role="tab" id="tab-agent" aria-controls="panel-agent"
-                aria-selected="false">Let the agent</button>
-      </div>
+  <section class="shell install" aria-labelledby="install-title">
+    <h2 id="install-title" class="visually-hidden">Ways to connect</h2>
+    <div class="ways">
 
-      <div class="install-panel" role="tabpanel" id="panel-plugin" aria-labelledby="tab-plugin">
+      <div class="way way--a">
+        <h3 class="way-name">Claude Code</h3>
+        <dl class="way-facts">
+          <div><dt>Install</dt><dd>Plugin, two commands</dd></div>
+          <div><dt>Reporting</dt><dd>Automatic, through a hook</dd></div>
+          <div><dt>Account</dt><dd>None</dd></div>
+        </dl>
+<p class="way-foot">Reports MCP failures for you. You never call a tool by hand.</p>
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-plugin"
      aria-label="Copy the Claude Code install"><code id="code-plugin">/plugin marketplace add FailEcho/failecho
 /plugin install failecho@failecho<span class="caret" aria-hidden="true"></span></code></pre>
-        <p class="install-foot">Reports MCP failures for you, through a hook.</p>
       </div>
 
-      <div class="install-panel" role="tabpanel" id="panel-mcp" aria-labelledby="tab-mcp" hidden>
+      <div class="way way--b">
+        <h3 class="way-name">Cursor, Desktop,<br>any MCP client</h3>
+        <dl class="way-facts">
+          <div><dt>Transport</dt><dd>Streamable HTTP</dd></div>
+          <div><dt>Tools</dt><dd>Four, no auth, no key</dd></div>
+          <div><dt>Stdio host</dt><dd><code>uvx</code> or <code>npx</code></dd></div>
+        </dl>
+<p class="way-foot">Can your host only start a process? <code>uvx failecho-mcp</code> or <code>npx -y failecho-mcp</code>.</p>
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-mcp"
      aria-label="Copy the MCP server config"><code id="code-mcp">"failecho": {
   "type": "http",
   "url": "{{PUBLIC_URL}}/mcp"
 }<span class="caret" aria-hidden="true"></span></code></pre>
-        <p class="install-foot">Streamable HTTP. Four tools, no auth, no key. Host can only start a process? <code>uvx failecho-mcp</code> or <code>npx -y failecho-mcp</code>.</p>
       </div>
 
-      <div class="install-panel" role="tabpanel" id="panel-rest" aria-labelledby="tab-rest" hidden>
+      <div class="way way--c">
+        <h3 class="way-name">Any language</h3>
+        <dl class="way-facts">
+          <div><dt>Interface</dt><dd>REST, one POST</dd></div>
+          <div><dt>Stores</dt><dd>Nothing on a query</dd></div>
+          <div><dt>Rate limit</dt><dd>None on reads</dd></div>
+        </dl>
+<p class="way-foot">One call. There is an OpenAPI document at <a href="/docs">/docs</a>.</p>
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-rest"
      aria-label="Copy the REST query"><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
   -H "Content-Type: application/json" \
   -d '{"service":"api.example.com",
        "operation":"create_issue","error_code":"429"}'<span class="caret" aria-hidden="true"></span></code></pre>
-        <p class="install-foot">One call. Stores nothing, never rate limited.</p>
       </div>
 
-      <div class="install-panel" role="tabpanel" id="panel-agent" aria-labelledby="tab-agent" hidden>
+      <div class="way way--d">
+        <h3 class="way-name">Let the agent</h3>
+        <dl class="way-facts">
+          <div><dt>Install</dt><dd>Paste one line</dd></div>
+          <div><dt>Works with</dt><dd>Whatever you run</dd></div>
+          <div><dt>Reads</dt><dd><a href="/llms.txt">/llms.txt</a></dd></div>
+        </dl>
+<p class="way-foot">It reads the guide and configures itself.</p>
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-agent"
      aria-label="Copy the prompt for your agent"><code id="code-agent">Read {{PUBLIC_URL}}/llms.txt and set yourself
 up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
-        <p class="install-foot">Paste that at whatever you run. It configures itself.</p>
       </div>
+
     </div>
     <p class="install-note">
       Any Model Context Protocol (MCP) client works. No account, no API key —
       <a href="/setup">every client, step by step</a>.
     </p>
-   </div>
   </section>
 
   <section class="shell band band--center" id="how" aria-labelledby="how-title">

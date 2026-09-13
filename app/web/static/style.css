@@ -69,7 +69,7 @@ p a, li a, dd a { text-decoration: underline; text-decoration-color: var(--line-
                   text-underline-offset: 3px; text-decoration-thickness: 1px; }
 p a:hover, li a:hover, dd a:hover { text-decoration-color: var(--red); }
 .nav a, .navpanel a, .foot-links a, .setup-jump a, .links a, .btn,
-.legend a, .install-tabs a { text-decoration: none; }
+.legend a, .way-facts a { text-decoration: none; }
 
 /* Anything leaving the site says so, once, at the end of the link text.
    Marked in the markup with rel="external" rather than matched on a hostname,
@@ -415,7 +415,7 @@ h1 {
 .ticked { animation: tick 1.8s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .pulse, .ticked, .caret, .loop-node, .loop-node .loop-n,
-  .loop-return::before, .install-panel:not([hidden]) { animation: none; }
+  .loop-return::before { animation: none; }
 }
 
 /* ---- metrics ----------------------------------------------------------- */
@@ -792,34 +792,6 @@ footer.shell {
   .brand-word { width: 90px; height: auto; }
 }
 
-/* ---- hero: two columns ------------------------------------------------- */
-/* What this is on the left, the line you paste on the right, the headline
-   across both. Nothing behind them: the ground is black, and the type and
-   the caret are the only things on it. */
-.hero--split {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
-  gap: 0 64px; align-items: start;
-  padding-block: 64px 56px;
-}
-.hero--split h1 { grid-column: 1 / -1; margin: 0 0 30px; max-width: none; }
-.hero-def {
-  margin: 20px 0 0; max-width: 56ch;
-  font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
-}
-.hero--split .hero-actions { margin-top: 30px; }
-.hero--split .hero-tagline {
-  border-left: 0; padding-left: 0; margin-top: 26px;
-  border-top: 1px solid var(--line); padding-top: 14px; display: inline-block;
-}
-.hero-right .install { margin: 0; max-width: none; }
-.hero--split .hero-lede { margin-top: 0; }
-.hero-right .install-note { margin: 16px 0 0; }
-
-@media (max-width: 980px) {
-  .hero--split { grid-template-columns: minmax(0, 1fr); gap: 40px 0; }
-}
-.hero--split .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
-
 /* ---- cards ------------------------------------------------------------- */
 /* Three ways on, each with a piece of the artwork. One file, three crops:
    the same 7.5KB image positioned differently reads as three, and there is
@@ -849,44 +821,6 @@ footer.shell {
   .cards { grid-template-columns: minmax(0, 1fr); gap: 34px 0; }
 }
 
-/* ---- install card, one tab per way in ---------------------------------- */
-/* No card. The commands sit on the page's own black with the tabs above
-   them, so the only things in the hero are type and one caret. */
-.install {
-  margin: 24px auto 12px; max-width: 700px; text-align: left;
-}
-/* Four labels, and the longest of them is a sentence. In a 520px column they
-   do not fit on one line, and scrolling them sideways with the scrollbar
-   hidden meant "Let the agent" was simply cut off with nothing to say so.
-   They wrap instead. */
-.install-tabs {
-  display: flex; flex-wrap: wrap; row-gap: 2px;
-  border-bottom: 1px solid var(--line);
-}
-.install-tabs button:first-child { padding-left: 0; }
-.install-tabs button {
-  flex: none; appearance: none; cursor: pointer; white-space: nowrap;
-  font-family: var(--sans); font-size: 13.5px; color: var(--ink-3);
-  background: transparent; border: 0; border-bottom: 2px solid transparent;
-  padding: 12px 16px 10px;
-}
-.install-tabs button:hover { color: var(--ink-2); }
-.install-tabs button[aria-selected="true"] {
-  color: var(--ink); border-bottom-color: var(--red);
-}
-/* All four panels as tall as the tallest and starting on the same line, so
-   switching tab moves neither the code nor the sentence underneath it. With
-   the card gone there is nothing to see in the space a short panel leaves --
-   it is the page's own black -- but centring the content in that space made
-   the code start somewhere different on every tab, which is what made the
-   four of them look like four different things. Measured 140/207/182/140. */
-@keyframes panelin { from { opacity: 0; } to { opacity: 1; } }
-.install-panel:not([hidden]) { animation: panelin .14s ease-out; }
-.install-panel {
-  position: relative; min-height: 208px;
-  display: flex; flex-direction: column; justify-content: flex-start;
-}
-
 /* Copy controls added by the script sit over the top-right of their box. */
 .has-copy { position: relative; }
 .has-copy > pre { padding-right: 82px; }
@@ -900,6 +834,7 @@ footer.shell {
      body does not need the room a floating control would have taken. */
   .terminal.has-copy > pre { padding-top: 18px; }
 }
+
 /* No button and no title bar: the code is the control. A pre cannot be a
    button element without wrapping every line in it, so it takes the role,
    the tab stop and the keyboard handling instead. */
@@ -907,22 +842,87 @@ footer.shell {
 .copyable:hover, .copyable:focus-visible { background: var(--surface-2); }
 .copyable::after {
   content: "click to copy";
-  position: absolute; top: 12px; right: 14px;
-  font: 11px var(--sans); letter-spacing: .04em; text-transform: uppercase;
+  position: absolute; top: 14px; right: 0;
+  font: 10.5px var(--sans); letter-spacing: .04em; text-transform: uppercase;
   color: var(--ink-3); opacity: 0; transition: opacity 0.15s ease;
 }
 .copyable:hover::after, .copyable:focus-visible::after { opacity: 1; }
 .copyable.is-copied::after { content: "copied"; color: var(--healthy); opacity: 1; }
-.install pre { margin: 0; padding: 22px 20px 10px 0; overflow-x: auto; }
-.install code { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; }
-/* Two lines of text in a card sized for the tallest panel reads as an
-   empty card. These two get the room the others spend on content. */
-#panel-plugin code, #panel-agent code { font-size: 15px; line-height: 1.95; }
-.install-foot {
-  margin: 0; padding: 10px 20px 18px 0;
-  font-size: 13.5px; color: var(--ink-3);
+
+/* ---- hero: one column, the ways underneath ------------------------------ */
+/* The four ways in are four cards below the hero rather than four tabs beside
+   it. All four are visible at once, which is the point: the question a first
+   visitor has is "is there a path for me", and a tab strip answers it one
+   quarter at a time. */
+.hero--lead { padding-block: 64px 40px; max-width: 980px; }
+.hero--lead h1 { margin: 0 0 24px; max-width: none; }
+.hero--lead .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
+.hero-def {
+  margin: 20px 0 0; max-width: 68ch;
+  font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
 }
-.install-note { margin: 0 0 22px; font-size: 14px; color: var(--ink-2); }
+.hero--lead .hero-actions { margin-top: 30px; }
+.hero--lead .hero-tagline {
+  border-left: 0; padding-left: 0; margin-top: 26px;
+  border-top: 1px solid var(--line); padding-top: 14px; display: inline-block;
+}
+
+/* ---- the four ways ------------------------------------------------------ */
+.install { padding-bottom: 72px; }
+.ways {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px; align-items: stretch;
+}
+/* Each card wears the same artwork, cropped differently, under enough black
+   that a command stays readable on it. One file, four crops, one request. */
+.way {
+  display: flex; flex-direction: column; min-width: 0;
+  padding: 22px 20px 20px;
+  border: 1px solid var(--line);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.93)),
+    url("/static/card-abstract1.webp");
+  background-size: auto, 260% auto;
+  background-repeat: no-repeat, no-repeat;
+  transition: border-color 0.2s ease;
+}
+.way:hover { border-color: var(--line-2); }
+.way--a { background-position: 0 0, 6% 18%; }
+.way--b { background-position: 0 0, 38% 72%; }
+.way--c { background-position: 0 0, 66% 26%; }
+.way--d { background-position: 0 0, 98% 62%; }
+
+.way-name {
+  margin: 0 0 18px; font-family: var(--serif); font-weight: 400;
+  font-size: 25px; line-height: 1.14; letter-spacing: -0.015em; color: var(--ink);
+}
+.way-facts { margin: 0 0 18px; font-size: 13px; line-height: 1.5; }
+.way-facts > div { display: flex; gap: 8px; padding: 4px 0; }
+.way-facts dt { color: var(--ink-3); flex: 0 0 76px; }
+.way-facts dd { margin: 0; color: var(--ink-2); }
+.way-facts code { font-size: 12px; color: var(--ink-2); }
+
+/* The command is the last thing in the card, pushed to the foot, so the four
+   of them line up along the bottom of the row however tall the cards are.
+   It wraps rather than scrolling: a 276px column cannot hold a curl line, and
+   a sideways scrollbar inside a card is worse than a wrapped command. Without
+   min-width: 0 above, a wide <pre> widens its grid track instead and the
+   whole document scrolls sideways. */
+.way pre {
+  margin: auto 0 0; padding: 14px 0 0; max-width: 100%;
+  border-top: 1px solid var(--line);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.way code { font-family: var(--mono); font-size: 12px; line-height: 1.7; }
+.way-foot { margin: 14px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.install-note { margin: 26px 0 0; font-size: 14px; color: var(--ink-2); }
+
+@media (max-width: 1080px) {
+  .ways { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .ways { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* ---- centred bands ----------------------------------------------------- */
 .band--center { text-align: center; }
@@ -947,13 +947,19 @@ footer.shell {
 /* The product is a cycle, not a funnel: evidence leaves an agent, and comes
    back to a different one. The return path is the whole point, so it is drawn
    rather than described. */
-.loop { display: inline-block; margin: 8px 0 0; }
+/* One size for the circle, in one place, because the connectors and the
+   return path are measured from it. Four fixed 282px circles plus their gaps
+   are 1254px wide and did not shrink until 760px, so every window between
+   those two scrolled sideways -- on the whole document, not just the
+   diagram. */
+.loop { display: inline-block; margin: 8px 0 0; --node: clamp(168px, 18.5vw, 282px); }
 .loop-track {
   list-style: none; margin: 0; padding: 0;
-  display: flex; align-items: center; justify-content: center; gap: 34px;
+  display: flex; align-items: center; justify-content: center;
+  gap: clamp(10px, 2.4vw, 34px);
 }
 .loop-node {
-  flex: none; width: 282px; height: 282px; border-radius: 50%;
+  flex: none; width: var(--node); height: var(--node); border-radius: 50%;
   border: 1px dashed var(--line-2); background: transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; padding: 10px 20px; text-align: center;
@@ -1010,7 +1016,7 @@ footer.shell {
 }
 .loop-return {
   position: relative; margin: 0 auto 30px; height: 46px;
-  width: calc(100% - 282px);
+  width: calc(100% - var(--node));
   border: 1px dashed var(--line-2); border-top: 0;
 }
 .loop-return::before {
@@ -1060,13 +1066,12 @@ footer.shell {
     position: static; transform: none; display: block; padding: 0;
     text-align: center; white-space: normal;
   }
-  .loop-node { width: 176px; height: 176px; }
+  .loop { --node: 176px; }
 }
 
 @media (max-width: 640px) {
-  .hero--split { padding-block: 56px 48px; }
+  .hero--lead { padding-block: 52px 32px; }
   .statcards { grid-template-columns: minmax(0, 1fr); }
-  .install-panel { min-height: 240px; }
   /* 13.5px mono put the REST and agent snippets 40px over a 435px box, so
      both scrolled sideways on a phone. Smaller type fits them instead, and
      the two short panels lose their desktop bump for the same reason: the

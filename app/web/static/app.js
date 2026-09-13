@@ -338,38 +338,6 @@
     });
   }
 
-  // -- install tabs ------------------------------------------------------
-  // Three ways in, one card. Without JS the first panel is the visible one and
-  // /setup carries the rest, so nothing here is load-bearing.
-  function wireTabs() {
-    var tabs = document.querySelectorAll('[role="tab"]');
-    if (!tabs.length) return;
-
-    function select(tab) {
-      for (var i = 0; i < tabs.length; i++) {
-        var on = tabs[i] === tab;
-        tabs[i].setAttribute("aria-selected", on ? "true" : "false");
-        tabs[i].tabIndex = on ? 0 : -1;
-        var panel = el(tabs[i].getAttribute("aria-controls"));
-        if (panel) panel.hidden = !on;
-      }
-    }
-
-    select(tabs[0]);
-    for (var i = 0; i < tabs.length; i++) {
-      tabs[i].addEventListener("click", function () { select(this); });
-      tabs[i].addEventListener("keydown", function (event) {
-        var step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-        if (!step) return;
-        event.preventDefault();
-        var at = Array.prototype.indexOf.call(tabs, this);
-        var next = tabs[(at + step + tabs.length) % tabs.length];
-        select(next);
-        next.focus();
-      });
-    }
-  }
-
   // -- on-this-page rail ---------------------------------------------------
   // Which section you are in, marked as you scroll. Read off the sections'
   // own positions rather than an observer: the answer is then the same one
@@ -582,7 +550,6 @@
 
   addCopyButtons();
   wireCopyButtons();
-  wireTabs();
   wireRail();
   wireTopbar();
   wireMenus();

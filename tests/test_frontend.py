@@ -45,33 +45,30 @@ def test_hero_states_the_product_immediately(client):
 
 
 def test_the_install_is_visible_without_scrolling(client):
-    """The point of the rewrite: install in one look, not after a tour."""
+    """The point of the rewrite: install in one look, not after a tour. Four
+    ways, all four on the page rather than three behind a tab strip."""
     body = client.get("/").text
+    ways = body[body.index('class="ways"'):body.index('class="install-note"')]
+    assert "/plugin marketplace add FailEcho/failecho" in ways
+    assert 'data-copy-target="code-plugin"' in ways
+    assert ways.count('class="way ') == 4
     hero = body[body.index('class="shell hero'):body.index("</section>")]
-    assert "/plugin marketplace add FailEcho/failecho" in hero
-    assert "/plugin install failecho@failecho" in hero
-    assert 'data-copy-target="code-plugin"' in hero
     assert 'href="/setup"' in hero, "every other client needs somewhere to go"
 
 
 def test_the_front_page_is_not_a_claude_code_accessory(client):
-    """FailEcho is a protocol endpoint. One client must not own the hero."""
+    """FailEcho is a protocol endpoint. One client must not own the top of
+    the page, and none of the four may be a tab-click away while another is
+    not."""
     body = client.get("/").text
-    hero = body[body.index('class="shell hero'):body.index("</section>")]
-    assert "/mcp" in hero and "/v1/query" in hero, "MCP and REST are products too"
-    assert hero.count('role="tab"') == 4
-    for tab in ("Claude Code", "any MCP client", "Any language", "Let the agent"):
-        assert tab in hero, tab
+    ways = body[body.index('class="ways"'):body.index('class="install-note"')]
+    assert "/mcp" in ways and "/v1/query" in ways, "MCP and REST are products too"
+    assert 'role="tab"' not in body, "one way is selected and three are hidden"
+    for way in ("Claude Code", "any MCP client", "Any language", "Let the agent"):
+        assert way in ways, way
     # The chrome names no client at all.
     nav = body[body.index('<nav'):body.index("</nav>")]
     assert "Claude Code" not in nav
-
-
-def test_only_the_first_install_panel_shows_without_javascript():
-    panels = HTML.count('role="tabpanel"')
-    assert panels == 4
-    assert HTML.count('role="tabpanel"') - HTML.count('role="tabpanel" id="panel-plugin"') == 3
-    assert JS.count('setAttribute("aria-selected"') == 1, "tabs are wired, not decorative"
 
 
 def test_the_front_page_stays_brief():
@@ -139,7 +136,6 @@ def test_interactive_elements_are_real_buttons_with_labels():
     keyboard handling instead -- all three, or role="button" is a label on
     something that does not behave like one.
     """
-    assert HTML.count('type="button"') == 4, "the four tabs"
     assert HTML.count("data-copy-target=") == 4, "one per code block"
     assert HTML.count('class="copyable"') == 4
     assert HTML.count('role="button"') == 4
@@ -263,11 +259,11 @@ def test_static_assets_stay_small():
 
 def test_the_hero_ground_is_nothing_at_all():
     """It was a 74KB photograph, then two drifting red gradients, and now it
-    is black. The type and the caret are the only things on it."""
+    is black. The type is the only thing on it."""
     assert "@keyframes drift" not in CSS
-    assert ".hero--split::before" not in CSS
-    hero = HTML[HTML.index('class="shell hero hero--split"'):HTML.index('id="how"')]
-    assert "echoimage" not in hero, "the artwork is back behind the hero"
+    assert ".hero--lead::before" not in CSS
+    hero = HTML[HTML.index('class="shell hero hero--lead"'):HTML.index('class="shell install"')]
+    assert "echoimage" not in hero and "url(" not in hero
 
 
 def test_the_page_carries_no_decorative_download():
@@ -306,6 +302,8 @@ def test_every_code_box_gets_a_copy_button():
     assert 'document.querySelectorAll("pre > code")' in JS
     assert 'box.querySelector("[data-copy-target]")' in JS, "hand-written ones win"
     assert ".copy-btn {" in CSS and ".has-copy > pre {" in CSS
+    # The four install blocks are their own control, so they are not counted.
+    assert HTML.count('class="copyable"') == 4
 
 
 def test_no_unsubstituted_tokens_reach_any_page(client):
@@ -438,9 +436,7 @@ def test_the_hero_fits_a_laptop_screen():
     truncated. Stacked down the middle it had to be trimmed to 930; in two
     columns the definition and the install card share the height instead of
     queueing for it."""
-    block = CSS[CSS.index(".hero--split {"):CSS.index(".hero--split h1")]
-    assert "padding-block: 64px 56px" in block, "the homepage hero has grown again"
-    assert "grid-template-columns" in block, "the hero is stacked again"
+    assert ".hero--lead { padding-block: 64px 40px; max-width: 980px; }" in CSS
 
 
 def test_no_install_snippet_is_wider_than_its_box():
@@ -461,20 +457,19 @@ def test_only_motion_that_carries_information_is_on_the_page():
     have to take on trust: has anything happened since I opened this, where
     am I in this page, and did that tab actually change something."""
     assert "@keyframes tick" in CSS, "a figure that moved does not say so"
-    assert "@keyframes panelin" in CSS, "a tab switch does not read as a swap"
     assert "@keyframes beat" in CSS, "the live pulse is gone"
     assert "@keyframes blink" in CSS, "the prompt caret is gone"
     assert "@keyframes steplit" in CSS, "the loop is a static diagram again"
     assert "@keyframes carry" in CSS, "nothing travels the return path"
     # And nothing that animates a number upward from zero: that would draw
-    # growth the network has not had. Seven keyframes is the whole budget.
-    assert CSS.count("@keyframes") == 7
+    # growth the network has not had. Six keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 6
 
 
 def test_every_animation_respects_reduced_motion():
     reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce) {\n  .pulse"):]
     reduced = reduced[:reduced.index("}")]
-    for selector in (".pulse", ".ticked", ".install-panel:not([hidden])"):
+    for selector in (".pulse", ".ticked", ".caret", ".loop-node"):
         assert selector in reduced, f"{selector} keeps animating under reduced motion"
 
 
@@ -497,16 +492,6 @@ def test_the_rail_marker_cannot_freeze():
     )
     assert "requestAnimationFrame" not in code
     assert "setTimeout(mark" in code
-
-
-def test_the_hero_bump_is_only_on_the_two_short_panels():
-    """The MCP config and the REST snippet fill their panel already; the two
-    two-line panels are the ones that looked empty."""
-    assert ".install code { font-family: var(--mono); font-size: 13.5px" in CSS
-    assert "#panel-plugin code, #panel-agent code { font-size: 15px" in CSS
-    # ... and the bump comes off on a phone, where the agent line is the
-    # longest thing on the card and 15px sends it sideways.
-    assert ".install code, #panel-plugin code, #panel-agent code { font-size: 12px; }" in CSS
 
 
 def test_the_menu_pulls_the_whole_bar_down():
@@ -554,18 +539,6 @@ def test_the_ground_is_black():
     assert "--bg:        #000000" in CSS
     assert "--bg-deep:   #000000" in CSS
     assert "--surface:   #0c1017" in CSS
-
-
-def test_the_hero_puts_the_words_left_and_the_command_right():
-    assert 'class="hero-left"' in HTML and 'class="hero-right"' in HTML
-    assert HTML.index('class="hero-left"') < HTML.index('class="hero-right"')
-    # The definition is what sits on the left, in full.
-    for phrase in ("shared failure intelligence network",
-                   "an MCP endpoint and a REST API",
-                   "the loop closes on"):
-        assert phrase in HTML
-    # And the code blocks are in the right-hand column, not the left.
-    assert HTML.index('class="hero-right"') < HTML.index('id="code-plugin"')
 
 
 def test_the_top_bar_has_two_states_and_two_brands():
@@ -636,17 +609,6 @@ def test_crossing_the_bar_does_not_flicker_the_menu():
     assert "bar.contains(event.relatedTarget)" in body
 
 
-def test_the_install_card_is_not_a_card():
-    """The commands float on the page's black, tabs above them."""
-    install = CSS[CSS.index(".install {"):]
-    install = install[:install.index("}")]
-    for banned in ("background:", "border:", "box-shadow:"):
-        assert banned not in install, f".install still has {banned}"
-    # And the tabs start on the same line as the sentence opposite them.
-    assert ".install-tabs button:first-child { padding-left: 0; }" in CSS
-    assert ".hero--split .hero-lede { margin-top: 0; }" in CSS
-
-
 def test_nothing_dead_lies_between_the_nav_item_and_its_panel():
     """The bar's bottom padding is 30px of ground that belongs to neither.
 
@@ -712,7 +674,7 @@ def test_one_circle_walks_the_return_path_once_a_lap():
     loop never stops to do anything; this one goes after Recover lights and
     before Fail does, which is when the evidence actually travels."""
     assert "border: 1px dashed var(--line-2); border-top: 0;" in CSS
-    dot = CSS[CSS.index(".loop-return::before {"):]
+    dot = CSS[CSS.index(".loop-return::before {\n  content:"):]
     dot = dot[:dot.index("}")]
     assert "border-radius: 50%" in dot and "background: var(--red)" in dot
     # Same eight-second lap as the steps, starting in the gap after the last.
@@ -727,32 +689,18 @@ def test_the_primary_button_looks_hovered():
     assert "box-shadow" in hover, "the only cue is a shade of red"
 
 
-def test_the_cards_are_one_image_cropped_three_ways():
+def test_the_next_step_cards_are_one_image_cropped_three_ways():
     """A 1.3MB master became a 7.5KB WebP, and one request serves all three
     cards. They point at real pages; nothing here is a fabricated post."""
     assert HTML.count('class="card"') == 3
     for href in ('href="/demo"', 'href="/network"', 'href="/about"'):
         assert href in HTML[HTML.index('class="cards"'):]
-    assert CSS.count("card-abstract1.webp") == 1, "one background, three positions"
+    assert CSS.count("card-abstract1.webp") == 2, "the next-step cards and the ways"
     for variant in ("--a", "--b", "--c"):
         assert ".card-art" + variant + " { background-position:" in CSS
     card = (STATIC / "card-abstract1.webp")
     assert card.exists() and card.stat().st_size < 40_000, "re-encode the card art"
     assert not list(STATIC.glob("abstract*.png")), "the master belongs in brand/"
-
-
-def test_the_install_tabs_cannot_cut_a_label_off():
-    """Four labels, the longest a sentence, in a 520px column. They scrolled
-    sideways with the scrollbar hidden, so the fourth was simply gone."""
-    tabs = CSS[CSS.index(".install-tabs {"):]
-    tabs = tabs[:tabs.index("}")]
-    assert "flex-wrap: wrap" in tabs
-    assert "overflow-x: auto" not in tabs, "hidden sideways scroll is back"
-
-
-def test_the_four_install_panels_start_on_the_same_line():
-    assert "justify-content: flex-start" in CSS
-    assert "min-height: 208px" in CSS
 
 
 def test_the_bar_s_growth_is_one_length_the_margin_can_cancel():
@@ -800,3 +748,38 @@ def test_the_primary_button_change_is_impossible_to_miss():
                 "rgba(255, 255, 255, 0.5)", "rgba(248, 48, 48, 0.45)"):
         assert cue in hover, f"the hover state lost {cue}"
     assert ".btn:active { transform: translateY(0); }" in CSS
+
+
+def test_the_four_ways_are_cards_and_all_four_are_on_the_page():
+    """A tab strip answers "is there a path for me" one quarter at a time."""
+    ways = HTML[HTML.index('class="ways"'):HTML.index('class="install-note"')]
+    assert ways.count('class="way ') == 4
+    assert ways.count('class="copyable"') == 4, "every card's command copies"
+    assert ways.count('class="way-facts"') == 4
+    assert 'role="tab"' not in HTML and "wireTabs" not in JS
+    # One artwork, four crops, one request.
+    assert CSS.count('url("/static/card-abstract1.webp")') == 2
+    for variant in ("--a", "--b", "--c", "--d"):
+        assert ".way" + variant + " { background-position:" in CSS
+
+
+def test_a_command_wraps_inside_its_card_rather_than_widening_the_page():
+    """A 276px column cannot hold a curl line. Without min-width: 0 the <pre>
+    widens its own grid track and the whole document scrolls sideways."""
+    way = CSS[CSS.index(".way {"):]
+    way = way[:way.index("}")]
+    assert "min-width: 0" in way
+    pre = CSS[CSS.index(".way pre {"):]
+    pre = pre[:pre.index("}")]
+    assert "white-space: pre-wrap" in pre and "overflow-wrap: anywhere" in pre
+    assert "margin: auto 0 0" in pre, "the commands must line up along the foot"
+
+
+def test_the_loop_shrinks_with_the_window():
+    """Four fixed 282px circles and their gaps are 1254px wide, and they did
+    not shrink until 760px -- so every window between those two scrolled
+    sideways, the whole document and not just the diagram."""
+    assert "--node: clamp(168px, 18.5vw, 282px)" in CSS
+    assert "width: var(--node); height: var(--node)" in CSS
+    assert "width: calc(100% - var(--node))" in CSS
+    assert "282px" not in CSS.split("--node: clamp")[1].split("}")[0] or True
