@@ -294,3 +294,25 @@ def test_no_page_links_to_a_fragment_that_does_not_exist():
             assert frag in ids_of(target), f"{name} links to /{page}#{frag}, which does not exist"
 
     assert "/#" not in JS, "the script must not build a link into a homepage anchor"
+
+
+def test_the_solo_claim_says_recoveries_not_failures(client):
+    """An audit caught this: the page said five repeats of a failure start the
+    recommendations. Five failures with no outcomes return a null
+    recommendation and an empty action list, correctly -- a failure cannot
+    prove a fix. The threshold is five recovery attempts."""
+    body = client.get("/").text
+    assert "Recover from the same" in body
+    assert "Failures on their own are" in body
+    assert "Five repeats of your own" not in body, "the inaccurate wording is back"
+
+
+def test_every_get_started_button_goes_to_setup(client):
+    """/about sent Get started to /#how, which explains the product instead of
+    starting it. The fragment resolves, so the link checker was happy."""
+    import re
+
+    for page in ("/", "/network", "/demo", "/about", "/setup"):
+        html = client.get(page).text
+        for href in re.findall(r'<a[^>]+href="([^"]+)"[^>]*>Get started<', html):
+            assert href in ("/setup", "#claude-code"), f"{page} sends Get started to {href}"

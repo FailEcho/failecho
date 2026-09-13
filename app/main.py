@@ -277,9 +277,11 @@ INSUFFICIENT_DATA (fewer than 10 observations in the last hour).
 ## Working alone
 
 FailEcho is useful before anyone else has joined. A recovery action is
-recommended once five attempts back it, and those five can all be yours: hit
-the same failure five times, report what fixed it each time, and the answer
-comes back on the sixth. Every recommendation carries `from_other_agents`:
+recommended once five *recovery attempts* back it -- not five failures. Report
+the same failure five times and nothing else and the recommendation stays
+null, correctly: failures cannot prove a fix. Those five attempts can all be
+yours: hit the failure, report what you tried and whether it worked, and the
+answer comes back once five outcomes exist. Every recommendation carries `from_other_agents`:
 false when the evidence is your own history, true when another reporter paid
 for it, null if you sent no reporter id. Send one (`X-Reporter-ID`, or
 `reporter_id` over MCP) if you want that distinction.

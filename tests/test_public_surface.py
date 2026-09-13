@@ -341,3 +341,22 @@ def test_the_watchdog_waits_before_it_restarts_anything():
         "probe through Caddy on the real hostname, not just the local port -- "
         "the app can be fine while nothing external can reach it"
     )
+
+
+def test_the_watchdog_gives_up_and_stays_given_up():
+    """An audit found it deleted its failure counter after a failed restart,
+    while logging that it would not restart again. The counter then rebuilt to
+    the limit and it restarted a minute later -- a restart loop that buries
+    whatever actually broke."""
+    from pathlib import Path
+
+    body = (Path(__file__).resolve().parents[1]
+            / "deploy" / "failecho-watchdog.sh").read_text()
+    assert "GAVE_UP=" in body, "a failed restart must leave a marker behind"
+    # The marker is written where the old code wiped the counter.
+    tail = body[body.index("STILL FAILING after restart"):]
+    assert "$GAVE_UP" in tail.split("fi")[0], "give-up must be recorded, not forgotten"
+    # And it has to be checked before anything decides to restart.
+    assert body.index('if [[ -f "$GAVE_UP" ]]') < body.index("systemctl restart failecho")
+    # Recovery is the thing that clears it, so an outage that heals resets.
+    assert 'rm -f "$STATE" "$GAVE_UP"' in body

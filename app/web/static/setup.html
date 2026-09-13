@@ -287,10 +287,13 @@ if outcome.failed and outcome.decision.actionable:
       <p class="band-sub">A shared network is the goal. It is not the requirement.</p>
     </div>
     <p class="prose">
-      A recovery action is recommended once five attempts back it. Those five
-      can all be yours. Hit the same failure five times, let the hook record
-      what fixed it each time, and the sixth time FailEcho tells you — before
-      a single other agent has ever connected.
+      A recovery action is recommended once five <em>recovery attempts</em>
+      back it — not five failures. Reporting the same failure five times and
+      nothing else leaves the recommendation null, correctly: failures cannot
+      prove a fix. What counts is the outcome afterwards, and those five can
+      all be yours. Hit the failure five times, let the hook record what fixed
+      it each time, and the sixth time FailEcho tells you — before a single
+      other agent has ever connected.
     </p>
     <p class="prose">
       Every recommendation says which it is. <code>from_other_agents</code> is
