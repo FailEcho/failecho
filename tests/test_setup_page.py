@@ -144,6 +144,6 @@ def test_a_local_process_only_client_has_two_paths(client):
     `npx -y mcp-remote https://failecho.com/mcp`, each initializing, listing
     all four tools and relaying a live call."""
     body = client.get("/setup").text
-    assert '"uvx"' in body and '"failecho-mcp"' in body
-    assert "mcp-remote" in body and '"npx"' in body
-    assert "somebody else's software, not ours" in body, "say whose software it is"
+    assert '"uvx"' in body and '"npx"' in body
+    assert body.count('"failecho-mcp"') >= 2, "the PyPI and the npm relay"
+    assert "Both are ours" in body

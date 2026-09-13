@@ -581,19 +581,21 @@ The server package (`failecho-server`, this repository) pulls FastAPI,
 SQLAlchemy and uvicorn because it *is* the server; the relay imports none of
 them.
 
-With Node rather than Python, a third-party bridge does the same job with
-nothing installed:
+The same relay exists for Node, in `npm-relay/`:
 
 ```json
 {
   "mcpServers": {
     "failecho": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://failecho.com/mcp"]
+      "args": ["-y", "failecho-mcp"]
     }
   }
 }
 ```
+
+Zero dependencies, 6 KB, about a second from a cold npx cache. Same four
+tools, same evidence, stores nothing. Use whichever runtime you already have.
 
 To run the relay from a checkout while working on it:
 

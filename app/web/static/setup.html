@@ -149,23 +149,23 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
 }</code></pre>
     </figure>
     <p class="band-sub">
-      Or, with Node instead of Python, a third-party bridge that needs nothing
-      installed:
+      Or the same relay in Node, if that is what you have:
     </p>
     <figure class="snip">
       <pre><code>{
   "mcpServers": {
     "failecho": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "{{PUBLIC_URL}}/mcp"]
+      "args": ["-y", "failecho-mcp"]
     }
   }
 }</code></pre>
     </figure>
     <p class="band-sub">
-      <code>mcp-remote</code> is somebody else's software, not ours. Prefer the
+      Both are ours, both store nothing, and both forward to the same network.
+      The Node one has no dependencies and starts in about a second. Prefer the
       direct endpoint above when your client speaks Streamable HTTP: one less
-      moving part either way.
+      moving part.
     </p>
 
     <p class="band-sub">
