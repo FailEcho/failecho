@@ -60,6 +60,16 @@ The raw `error_message` is normalized at the edge and discarded; only the
 normalized form is stored. Credential-shaped substrings are redacted before
 storage rather than categorised.
 
+Nothing sends error text on its own. The Claude Code hook needs
+`FAILECHO_HOOK_SEND_ERRORS=1` and the Python client needs
+`FAILECHO_SEND_ERRORS=1`; without them a report carries the error class and
+code and no message. An exception's own text routinely quotes what caused it,
+so normalization is the second line of defence, not the first.
+
+The reverse proxy is inside this boundary. The supplied `deploy/Caddyfile`
+filters request and response headers out of the access log; a default Caddy
+access log stores every one of them.
+
 ## Running your own instance
 
 FailEcho is MIT licensed and runs on one small VPS. If your failure metadata

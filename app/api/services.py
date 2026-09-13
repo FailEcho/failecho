@@ -80,7 +80,8 @@ def _rollup(seconds: int):
 async def services(
     session: SessionDep,
     service: str | None = Query(
-        default=None, description="Optional exact-match filter on service name."
+        default=None, max_length=200,
+        description="Optional exact-match filter on service name.",
     ),
     limit: int = Query(
         default=settings.services_default_limit, ge=1, le=500, description="Max rows."

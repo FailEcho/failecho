@@ -13,8 +13,15 @@ invisible; recomputing it three hundred times is not.
 Deliberately not cached: `/v1/query`, `/v1/observe`, `/v1/outcome` and
 `/health`. Those answers belong to one caller and one failure.
 
-This is a dict with timestamps, not a cache server. One process, bounded key
-space (a handful of query-parameter combinations), no eviction policy needed.
+This is a dict with timestamps, not a cache server. One process, one dict.
+
+The key space is not as small as it looks, which is why there is a cap on it:
+`/v1/services` takes a caller-supplied `service` filter, and every distinct
+value became a key that nothing ever removed. A TTL is not a bound -- an
+expired entry is only dropped when that exact key is read again -- so an
+unauthenticated reader could grow the dict indefinitely on a box with a 400M
+memory ceiling. Entries are capped, expired ones are swept before anything is
+evicted, and the oldest goes first.
 """
 
 from __future__ import annotations
@@ -26,11 +33,18 @@ from typing import Any
 class TTLCache:
     """Single-process, time-boxed memoisation."""
 
-    def __init__(self, ttl_seconds: float) -> None:
+    #: Enough for every real combination of dashboard parameters several
+    #: times over, small enough that the dict cannot become the memory
+    #: problem the cache exists to avoid.
+    MAX_ENTRIES = 512
+
+    def __init__(self, ttl_seconds: float, max_entries: int | None = None) -> None:
         self.ttl = ttl_seconds
+        self.max_entries = max_entries or self.MAX_ENTRIES
         self._entries: dict[str, tuple[float, Any]] = {}
         self.hits = 0
         self.misses = 0
+        self.evictions = 0
 
     @property
     def enabled(self) -> bool:
@@ -52,9 +66,27 @@ class TTLCache:
         return value
 
     def set(self, key: str, value: Any) -> Any:
-        if self.enabled:
-            self._entries[key] = (time.monotonic(), value)
+        if not self.enabled:
+            return value
+        if key not in self._entries and len(self._entries) >= self.max_entries:
+            self._evict()
+        self._entries[key] = (time.monotonic(), value)
         return value
+
+    def _evict(self) -> None:
+        """Make room: expired entries first, then the oldest live one.
+
+        Python dicts keep insertion order and `set` always writes a fresh key
+        last, so the first key is the oldest.
+        """
+        now = time.monotonic()
+        stale = [k for k, (at, _) in self._entries.items() if now - at >= self.ttl]
+        for key in stale:
+            del self._entries[key]
+            self.evictions += 1
+        while len(self._entries) >= self.max_entries:
+            del self._entries[next(iter(self._entries))]
+            self.evictions += 1
 
     def clear(self) -> None:
         """Used by tests, and by anything that must observe a write instantly."""

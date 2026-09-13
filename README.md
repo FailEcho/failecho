@@ -795,6 +795,11 @@ and `client/failecho.py` into your agent (the package is not published yet).
 `failure_network`, which keeps working unchanged — the rename is additive, so
 no existing code breaks.
 
+Error text is opt-in. The wrapper's default classifier reports the exception
+class and status code and no message; set `FAILECHO_SEND_ERRORS=1` to send the
+text as well. `error_message` passed explicitly, as in the example below, is
+always sent -- that is your call, not a default.
+
 ```python
 from failecho import Client   # or: from failure_network import Client
 

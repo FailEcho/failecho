@@ -251,3 +251,41 @@ def test_proxy_headers_are_ignored_unless_trusted():
         assert client_key("10.0.0.1", headers) == "5.6.7.8"
     finally:
         object.__setattr__(settings, "trust_proxy_headers", False)
+
+
+def test_the_dashboard_cache_cannot_grow_without_a_bound():
+    """`/v1/services?service=<anything>` keyed the cache on caller input, and
+    a TTL is not a bound: an expired entry is only dropped when that same key
+    is read again. One unauthenticated reader could grow the dict until the
+    400M ceiling on the box killed the process."""
+    from app.core.cache import TTLCache
+
+    cache = TTLCache(ttl_seconds=300, max_entries=32)
+    for i in range(5000):
+        cache.set(f"services:attacker-{i}:50", [i])
+
+    assert len(cache._entries) <= 32
+    assert cache.evictions >= 5000 - 32
+    # The most recent write survives; the cache is still a cache.
+    assert cache.get("services:attacker-4999:50") == [4999]
+
+
+def test_eviction_takes_expired_entries_before_live_ones():
+    import time
+
+    from app.core.cache import TTLCache
+
+    cache = TTLCache(ttl_seconds=0.05, max_entries=4)
+    for i in range(4):
+        cache.set(f"old-{i}", i)
+    time.sleep(0.06)
+    cache.set("fresh", "kept")
+
+    assert cache.get("fresh") == "kept"
+    assert all(cache.get(f"old-{i}") is None for i in range(4))
+
+
+def test_a_service_filter_longer_than_a_service_name_is_rejected(client):
+    """Bounding the key space at the door, not only in the cache."""
+    body = client.get("/v1/services", params={"service": "x" * 5000})
+    assert body.status_code == 422

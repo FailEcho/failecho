@@ -36,6 +36,7 @@ standard library.
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol, runtime_checkable
@@ -46,7 +47,17 @@ __all__ = [
     "ToolOutcome",
     "classify_exception",
     "run_with_failure_intelligence",
+    "send_error_text",
 ]
+
+
+def send_error_text() -> bool:
+    """Whether this process is configured to send raw error text.
+
+    Read on every call rather than at import, so a test or a caller can turn
+    it on and off without reloading the module.
+    """
+    return os.environ.get("FAILECHO_SEND_ERRORS", "").strip() in {"1", "true", "yes"}
 
 
 @runtime_checkable
@@ -97,19 +108,27 @@ class ToolOutcome:
         return not self.ok
 
 
-def classify_exception(exc: BaseException) -> tuple[str, str | None, str]:
+def classify_exception(exc: BaseException) -> tuple[str, str | None, str | None]:
     """Default classifier: ``(error_type, error_code, error_message)``.
 
     Understands objects that carry a ``status_code`` / ``code`` attribute (most
     HTTP client errors do). Override it with the ``classify`` argument when
     your tool raises something richer.
 
-    PRIVACY: only the exception's own text is used. Never widen this to include
-    request bodies, arguments or responses.
+    PRIVACY: no error text by default. An exception's own message routinely
+    quotes the thing that caused it -- the row it could not parse, the path it
+    could not read, the argument it rejected -- so ``str(exc)`` is not
+    metadata and sending it automatically is not a promise this network can
+    keep. The class and the status code are, and they are what the
+    fingerprint is built from anyway. Set ``FAILECHO_SEND_ERRORS=1`` to send
+    the text as well, the way the Claude Code hook uses
+    ``FAILECHO_HOOK_SEND_ERRORS``; it is normalized server-side and the raw
+    string discarded, but the decision to send it is yours to make.
     """
     error_type = type(exc).__name__
     code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
-    return error_type, (str(code) if code is not None else None), str(exc)
+    message = str(exc) if send_error_text() else None
+    return error_type, (str(code) if code is not None else None), message
 
 
 async def run_with_failure_intelligence(

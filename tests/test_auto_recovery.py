@@ -198,6 +198,41 @@ def test_success_reporting_can_be_switched_off():
 
 def test_default_classifier_reads_status_code():
     error_type, code, message = classify_exception(ToolBroke("nope"))
-    assert (error_type, code, message) == ("ToolBroke", "422", "nope")
+    assert (error_type, code) == ("ToolBroke", "422")
     error_type, code, message = classify_exception(ValueError("plain"))
-    assert (error_type, code, message) == ("ValueError", None, "plain")
+    assert (error_type, code) == ("ValueError", None)
+
+
+def test_the_default_classifier_sends_no_error_text(monkeypatch):
+    """An exception message quotes whatever caused it. The hook has always
+    required FAILECHO_HOOK_SEND_ERRORS for the same reason; the Python client
+    was sending it automatically."""
+    monkeypatch.delenv("FAILECHO_SEND_ERRORS", raising=False)
+    leak = ValueError("row for alice@example.com rejected: {'token': 'sk-live-1'}")
+    assert classify_exception(leak)[2] is None
+
+
+def test_error_text_travels_only_when_the_caller_turns_it_on(monkeypatch):
+    monkeypatch.setenv("FAILECHO_SEND_ERRORS", "1")
+    assert classify_exception(ValueError("plain"))[2] == "plain"
+    monkeypatch.setenv("FAILECHO_SEND_ERRORS", "0")
+    assert classify_exception(ValueError("plain"))[2] is None
+
+
+def test_a_wrapped_call_reports_no_error_text_by_default(monkeypatch):
+    """The end of the path, not just the classifier: what actually goes out."""
+    monkeypatch.delenv("FAILECHO_SEND_ERRORS", raising=False)
+    network = FakeNetwork()
+
+    async def boom():
+        raise ValueError("contract 4471 for alice@example.com is void")
+
+    outcome = run(
+        run_with_failure_intelligence(
+            tool_call=boom, service="s", operation="o", network=network
+        )
+    )
+    assert outcome.failed
+    sent = repr(network.calls)
+    assert "alice@example.com" not in sent
+    assert "'error_type': 'ValueError'" in sent

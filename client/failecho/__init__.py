@@ -49,6 +49,7 @@ from auto_recovery import (  # noqa: F401  (re-exported for one obvious import)
     FailureDecision,
     ToolOutcome,
     classify_exception,
+    send_error_text,
     run_with_failure_intelligence,
 )
 from failure_network import (  # noqa: F401  (the original sync REST client)
@@ -64,6 +65,7 @@ __all__ = [
     "FailureDecision",
     "ToolOutcome",
     "classify_exception",
+    "send_error_text",
     "run_with_failure_intelligence",
     "UNKNOWN",
 ]
@@ -169,7 +171,7 @@ class FailEcho:
         call: Callable[[], Awaitable[Any]],
         version: str | None = None,
         schema_hash: str | None = None,
-        classify: Callable[[BaseException], tuple[str, str | None, str]] = classify_exception,
+        classify: Callable[[BaseException], tuple[str, str | None, str | None]] = classify_exception,
     ) -> ToolOutcome:
         """Run a tool call, report what happened, and on failure ask FailEcho.
 
