@@ -324,3 +324,20 @@ def test_the_pypi_relay_readme_carries_the_registry_token():
 
     builder = Path(__file__).resolve().parents[1] / "scripts" / "build_relay_package.py"
     assert "mcp-name: com.failecho/failecho" in builder.read_text()
+
+
+def test_the_watchdog_waits_before_it_restarts_anything():
+    """Restarting on a single failed probe turns one flaky network second into
+    a real outage, and a watchdog that keeps restarting a server broken for
+    some other reason hides the problem while looking busy."""
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parents[1] / "deploy" / "failecho-watchdog.sh"
+    body = script.read_text()
+    assert "LIMIT=2" in body, "one failure must not trigger a restart"
+    assert "STILL FAILING after restart" in body, "say so instead of looping"
+    assert "not restarting again" in body
+    assert "--resolve failecho.com:443:127.0.0.1" in body, (
+        "probe through Caddy on the real hostname, not just the local port -- "
+        "the app can be fine while nothing external can reach it"
+    )

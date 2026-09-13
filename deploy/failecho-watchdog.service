@@ -1,0 +1,7 @@
+[Unit]
+Description=FailEcho end-to-end health check
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/failecho-watchdog
