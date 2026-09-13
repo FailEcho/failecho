@@ -150,7 +150,35 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
        "error_type": "rate_limit", "error_code": "429"}'</code></pre>
     </figure>
     <p class="band-sub">
-      <a href="/docs">The API reference</a> covers reporting failures, successes and recovery outcomes.
+      Reporting takes two more calls. <code>/v1/observe</code> after every call,
+      success or failure — failure rates need a denominator:
+    </p>
+    <figure class="snip">
+      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/observe \
+  -H "Content-Type: application/json" \
+  -H "X-Reporter-ID: my-agent-1" \
+  -d '{"service": "github-mcp", "operation": "create_issue",
+       "outcome": "failure", "error_type": "validation_error",
+       "error_code": "422"}'</code></pre>
+    </figure>
+    <p class="band-sub">
+      That returns the <code>fingerprint</code>. If you then try something and it
+      works, send the outcome — this is the scarcest and most useful thing in
+      the network, because it is the only call that records what actually
+      <em>fixed</em> a failure:
+    </p>
+    <figure class="snip">
+      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/outcome \
+  -H "Content-Type: application/json" \
+  -H "X-Reporter-ID: my-agent-1" \
+  -d '{"fingerprint": "&lt;from /v1/observe&gt;",
+       "action": "refresh_schema", "successful": true}'</code></pre>
+    </figure>
+    <p class="band-sub">
+      Those three field names are exact: <code>fingerprint</code>,
+      <code>action</code>, <code>successful</code>. Anything else returns 422
+      with the missing field named. Full schemas in
+      <a href="/docs">the API reference</a>.
     </p>
   </section>
 

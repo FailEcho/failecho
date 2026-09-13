@@ -123,3 +123,15 @@ def test_the_directory_listings_are_named_without_claiming_use(client):
     # tracking vector, on a site that carries no trackers at all
     assert "img.shields.io" not in body
     assert "badge" not in body.lower()
+
+
+def test_the_write_path_is_documented_not_just_the_read(client):
+    """Recovery outcomes are the scarcest data in the network, and /setup used
+    to show only /v1/query -- so the one call that records what actually fixed
+    a failure was reachable only by reading the OpenAPI schema or guessing
+    field names and collecting a 422."""
+    body = client.get("/setup").text
+    assert "/v1/observe" in body and "/v1/outcome" in body
+    for field in ('"fingerprint"', '"action"', '"successful"'):
+        assert field in body, field
+    assert '"outcome": "failure"' in body
