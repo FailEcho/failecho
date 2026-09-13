@@ -25,7 +25,14 @@ JS = (STATIC / "app.js").read_text()
 
 
 def test_hero_states_the_product_immediately(client):
-    """Five to ten seconds: the problem, the category, the tagline, the CTA."""
+    """Five to ten seconds: the problem, the category, the tagline, the CTA.
+
+    The long definition moved out of the hero and into the section that
+    explains the loop -- the hero was too tall for a laptop screen, and a
+    paragraph nobody reads before the install card was the part to lose. The
+    definition still has to be on the page, for search and for anyone who
+    arrives not knowing what this is.
+    """
     body = client.get("/").text
     assert "AI agents shouldn't debug" in body and "the same failure twice." in body
     assert "Live failure and recovery intelligence for autonomous software." in body
