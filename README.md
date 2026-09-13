@@ -560,9 +560,29 @@ database and stores nothing. Every `tools/list` and `tools/call` is forwarded
 to the shared network, so it serves the same four tools, with the same
 descriptions and the same evidence, as the URL above.
 
-**Until this is on PyPI, use `mcp-remote` instead.** It needs nothing
-installed, starts immediately, and is the only local-process path currently
-worth giving anyone:
+```bash
+uvx failecho-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "failecho": {
+      "command": "uvx",
+      "args": ["failecho-mcp"]
+    }
+  }
+}
+```
+
+`failecho-mcp` is published separately from this repository and depends on
+`mcp` alone -- 29 packages, about 48 MB, roughly two seconds on a cold cache.
+The server package (`failecho-server`, this repository) pulls FastAPI,
+SQLAlchemy and uvicorn because it *is* the server; the relay imports none of
+them.
+
+With Node rather than Python, a third-party bridge does the same job with
+nothing installed:
 
 ```json
 {
@@ -575,26 +595,11 @@ worth giving anyone:
 }
 ```
 
-`mcp-remote` is a third-party bridge. Prefer the plain endpoint above when
-your client speaks Streamable HTTP.
-
-The relay can also be run straight from this repository, but only for
-development:
+To run the relay from a checkout while working on it:
 
 ```bash
-uvx --from git+https://github.com/FailEcho/failecho failecho-mcp
+uv run failecho-mcp
 ```
-
-Do not put that in a client config. It is not on PyPI yet, so `uvx` clones
-this repository and builds the whole server -- FastAPI, SQLAlchemy, uvicorn,
-cryptography -- 40 packages and about 100 MB, none of which the relay imports.
-Measured twice from a cold cache here: once it started in 4 seconds, once it
-had not started after 280 and was killed. An MCP client gives a server tens of
-seconds before it gives up, so a first run that lands on the slow end fails,
-and it is unpredictable which you get.
-
-Once `failecho-mcp` is on PyPI the config becomes `"command": "uvx", "args":
-["failecho-mcp"]`, pulling one small dependency instead of forty.
 
 | Variable | Default | Purpose |
 |---|---|---|

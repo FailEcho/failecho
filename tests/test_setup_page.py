@@ -137,12 +137,13 @@ def test_the_write_path_is_documented_not_just_the_read(client):
     assert '"outcome": "failure"' in body
 
 
-def test_a_local_process_only_client_has_a_path(client):
-    """Hosts that can only spawn a process cannot use the HTTP endpoint at all,
-    and that was every one of them until this. Verified working before it was
-    written down: npx -y mcp-remote against the live endpoint initializes and
-    lists all four tools."""
+def test_a_local_process_only_client_has_two_paths(client):
+    """Hosts that can only spawn a process cannot use the HTTP endpoint, and
+    had nothing until these. Both were run end to end against production
+    before being written down: `uvx failecho-mcp` from PyPI, and
+    `npx -y mcp-remote https://failecho.com/mcp`, each initializing, listing
+    all four tools and relaying a live call."""
     body = client.get("/setup").text
-    assert "mcp-remote" in body
-    assert '"npx"' in body
-    assert "third-party bridge, not ours" in body, "say whose software it is"
+    assert '"uvx"' in body and '"failecho-mcp"' in body
+    assert "mcp-remote" in body and '"npx"' in body
+    assert "somebody else's software, not ours" in body, "say whose software it is"

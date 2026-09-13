@@ -134,8 +134,23 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
 }</code></pre>
     </figure>
     <p class="band-sub">
-      If your client can only start a local process and cannot speak HTTP, put
-      a bridge in front of it. This needs nothing installed and nothing from us:
+      If your client can only start a local process and cannot speak HTTP, run
+      the relay. It is on PyPI, imports only the MCP SDK, and stores nothing
+      itself — every call is forwarded to the same network:
+    </p>
+    <figure class="snip">
+      <pre><code>{
+  "mcpServers": {
+    "failecho": {
+      "command": "uvx",
+      "args": ["failecho-mcp"]
+    }
+  }
+}</code></pre>
+    </figure>
+    <p class="band-sub">
+      Or, with Node instead of Python, a third-party bridge that needs nothing
+      installed:
     </p>
     <figure class="snip">
       <pre><code>{
@@ -148,8 +163,9 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
 }</code></pre>
     </figure>
     <p class="band-sub">
-      <code>mcp-remote</code> is a third-party bridge, not ours. Prefer the
-      direct endpoint above when your client supports it: one less moving part.
+      <code>mcp-remote</code> is somebody else's software, not ours. Prefer the
+      direct endpoint above when your client speaks Streamable HTTP: one less
+      moving part either way.
     </p>
 
     <p class="band-sub">
