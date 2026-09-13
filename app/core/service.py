@@ -59,6 +59,15 @@ from app.schemas.query import (
 )
 
 
+#: Authentication schemes that are plainly somebody else's credential. Seeing
+#: one means the caller is authenticating to something in front of us, not
+#: claiming to be us, and comparing it would push a genuine reporter out of the
+#: adoption count for no reason.
+_NOT_OUR_SCHEMES = frozenset({
+    "basic", "digest", "negotiate", "ntlm", "hoba", "mutual", "aws4-hmac-sha256",
+})
+
+
 def operator_token_from(
     header_value: str | None, authorization: str | None = None
 ) -> str | None:
@@ -73,15 +82,33 @@ def operator_token_from(
     returns "" so it is still checked and still fails to demo, because the
     alternative is that a malformed claim quietly counts as ordinary agent
     telemetry -- which is the adoption number.
+
+    A bare value with no scheme is treated as the token. Header fields in
+    client UIs are labelled "value", so a token gets pasted on its own, and
+    requiring the word Bearer means the claim is silently ignored and the
+    caller lands in adoption -- which is the failure this exists to prevent.
+    The cost of being permissive is the opposite mistake: an unrelated opaque
+    credential becomes a failed claim and that reporter is excluded from
+    adoption. Under-counting our own reach is the safer error of the two.
+    Recognised non-bearer schemes are still ignored, since Basic and Digest
+    are clearly somebody else's credential and not a claim to be us.
     """
     if header_value is not None:
         return header_value
     if authorization is None:
         return None
-    scheme, _, value = authorization.partition(" ")
-    if scheme.strip().lower() != "bearer":
+    candidate = authorization.strip()
+    scheme, space, value = candidate.partition(" ")
+    lowered = scheme.lower()
+    if lowered == "bearer":
+        # Including "Bearer" with nothing after it: an empty claim, which is
+        # a failed claim rather than a token that happens to spell Bearer.
+        return value.strip()
+    if lowered in _NOT_OUR_SCHEMES:
         return None
-    return value.strip()
+    if not space:
+        return candidate  # a bare token, pasted into a field labelled "value"
+    return None
 
 
 def source_from_kind(

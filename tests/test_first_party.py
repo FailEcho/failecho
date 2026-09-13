@@ -265,3 +265,27 @@ def test_an_empty_claim_is_a_failed_claim_not_an_absent_one(
 def test_the_custom_header_wins_when_both_are_sent(client, rows, operator_token):
     observe(client, headers={**bearer("wrong"), "X-FailEcho-Operator": TOKEN})
     assert sources(rows) == ["first_party"]
+
+
+def test_a_bare_token_with_no_scheme_is_still_a_claim(client, rows, operator_token):
+    """Claude Desktop sent the header, and the report still landed in the
+    adoption count: the field is labelled "value", so the token was pasted on
+    its own and `Bearer` never appeared. Requiring the word meant the claim was
+    ignored, which is the exact failure this is here to prevent."""
+    observe(client, headers={"Authorization": TOKEN})
+    assert sources(rows) == ["first_party"]
+
+
+def test_bearer_with_nothing_after_it_is_an_empty_claim(client, rows, operator_token):
+    """Not a token that happens to spell "Bearer"."""
+    observe(client, headers={"Authorization": "Bearer "})
+    assert sources(rows) == ["demo_agent"]
+
+
+def test_somebody_elses_auth_scheme_is_left_alone(client, rows, operator_token):
+    """Basic and friends mean the caller is authenticating to something in
+    front of us. Treating that as a failed claim would push a real reporter
+    out of the adoption count for no reason."""
+    for value in ("Basic dXNlcjpwYXNz", "Digest username=x", "NTLM abc"):
+        observe(client, headers={"Authorization": value})
+    assert sources(rows) == ["agent", "agent", "agent"]
