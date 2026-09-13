@@ -34,7 +34,7 @@
   --gutter: 24px;
   --max: 1200px;
   --band: 120px;
-  --r: 12px;
+  --r: 0px;   /* every panel is a rectangle; the corners were the only curve */
 }
 
 * { box-sizing: border-box; }
@@ -77,7 +77,7 @@ p a:hover, li a:hover, dd a:hover { text-decoration-color: var(--red); }
 a[rel~="external"]::after { content: " \2197"; font-size: .85em; color: var(--ink-3); }
 a[rel~="external"]:hover::after { color: var(--red); }
 
-:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; border-radius: 2px; }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
 
 .shell { max-width: var(--max); margin: 0 auto; padding-inline: var(--gutter); }
 
@@ -121,28 +121,22 @@ a[rel~="external"]:hover::after { color: var(--red); }
 .fineprint code { color: var(--ink-2); }
 
 /* ---- top bar ----------------------------------------------------------- */
-/* Two states. At the top of the page the bar is the page: black, no rule
-   under it, and the brand is the mark alone -- the name is already in the
-   headline underneath. Once you scroll it becomes a white bar that separates
-   itself from the content, and the mark gives way to the wordmark, which is
-   the version that has to say who this is when the headline is gone. */
+/* Black glass, and one hairline under it. At the top of the page the line is
+   not there -- the bar is the page. Once you scroll, a sharp white rule
+   separates the two, and the brand gives way from the mark to the wordmark,
+   which is what has to say who this is when the headline is gone. */
 .topbar {
-  position: sticky; top: 0; z-index: 10;
-  background: #000;
+  position: sticky; top: 0; z-index: 12;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: saturate(160%) blur(16px);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
   border-bottom: 1px solid transparent;
-  transition: background 0.22s ease, border-color 0.22s ease;
+  transition: border-color 0.22s ease, background 0.22s ease;
 }
 .topbar.is-stuck {
-  background: #fff;
-  border-bottom-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.82);
+  border-bottom-color: #fff;
 }
-.topbar.is-stuck .nav > a,
-.topbar.is-stuck .navitem > a,
-.topbar.is-stuck .nav a { color: #2b3038; }
-.topbar.is-stuck .nav > a:hover,
-.topbar.is-stuck .navitem > a:hover { color: #000; background: rgba(0, 0, 0, 0.06); }
-.topbar.is-stuck .nav .btn--red { color: #fff; }
-.topbar.is-stuck .skip-link { color: var(--ink); }
 
 .topbar-row {
   display: flex; align-items: center; gap: 14px 20px; flex-wrap: wrap;
@@ -162,7 +156,7 @@ a[rel~="external"]:hover::after { color: var(--red); }
   font-size: 14.5px;
 }
 .nav > a, .navitem > a {
-  padding: 8px 12px; border-radius: 8px; color: var(--ink-2);
+  padding: 8px 12px; color: var(--ink-2);
 }
 .nav > a:hover, .navitem > a:hover { color: var(--ink); background: var(--surface-2); }
 .nav .btn { margin-left: 10px; }
@@ -179,24 +173,56 @@ a[rel~="external"]:hover::after { color: var(--red); }
   border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
   transform: translateY(-2px) rotate(45deg);
 }
+/* Hovering a section pulls the whole bar down: the panel is the width of the
+   window, carries the bar's own glass, and takes the white rule with it, so
+   the bar reads as having grown rather than as having sprouted a dropdown. */
 .navpanel {
-  position: absolute; top: calc(100% + 10px); left: -8px; z-index: 20;
-  display: grid; gap: 2px; width: 320px; padding: 8px;
-  background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--r); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
-  opacity: 0; visibility: hidden; transform: translateY(-6px);
-  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s;
+  position: fixed; left: 0; right: 0; top: var(--bar-h, 76px); z-index: 11;
+  display: grid; gap: 2px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  width: auto; max-width: none;
+  padding: 26px max(var(--gutter), calc(50% - var(--max) / 2 + var(--gutter))) 34px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: saturate(160%) blur(16px);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  border: 0; border-bottom: 1px solid #fff;
+  opacity: 0; visibility: hidden; transform: translateY(-10px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s,
+              top 0.22s ease;
 }
+/* Leaves the bar's edge as the bar starts moving, not after it stops. */
+.topbar.is-open .navpanel { top: var(--bar-h-open, 101px); }
+.navpanel b { font-size: 16px; }
+.navpanel span { font-size: 13.5px; }
 .navitem:hover .navpanel, .navitem:focus-within .navpanel {
   opacity: 1; visibility: visible; transform: none;
 }
-/* The gap above the panel would end the hover halfway to it. This bridges
-   it: a descendant of .navitem, so the pointer never leaves the item. */
-.navpanel::before {
-  content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 10px;
+/* The bar's own line would draw across the open panel. */
+.topbar.is-open { border-bottom-color: transparent; }
+/* Measuring both bar heights means briefly wearing the open state; that
+   must not be a thing anyone sees move. */
+.topbar.is-measuring, .topbar.is-measuring * { transition: none !important; }
+/* The bar itself gives way: more air above and below, so the whole thing
+   comes down rather than only sprouting a panel. */
+.topbar-row { transition: padding 0.22s ease; }
+.topbar.is-open .topbar-row { padding-block: 28px; }
+/* The mark grows into the taller bar rather than sitting in the middle of it. */
+.brand-mark, .brand-word { transition: height 0.22s ease, transform 0.22s ease; }
+.topbar.is-open .brand-mark { height: 44px; }
+.topbar.is-open .brand-word { transform: scale(1.28); transform-origin: left center; }
+
+/* Everything below the bar goes soft while a menu is open, so the menu is
+   the only thing in focus. Fixed and behind the bar, never over it. */
+.scrim {
+  position: fixed; inset: 0; z-index: 9;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s;
 }
+.scrim.is-open { opacity: 1; visibility: visible; }
 .navpanel a {
-  display: grid; gap: 2px; padding: 10px 12px; border-radius: 8px; color: var(--ink);
+  display: grid; gap: 2px; padding: 10px 12px; color: var(--ink);
 }
 .navpanel a:hover { background: var(--surface-2); }
 .navpanel b { font-weight: 550; font-size: 14px; }
@@ -216,7 +242,7 @@ a[rel~="external"]:hover::after { color: var(--red); }
   background: transparent;
   color: var(--ink);
   cursor: pointer;
-  border-radius: 999px;
+  border-radius: 0;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .btn:hover { background: var(--surface-2); border-color: var(--ink-3); }
@@ -238,7 +264,7 @@ a[rel~="external"]:hover::after { color: var(--red); }
   font-family: var(--sans);
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em;
   color: var(--red); border: 1px solid var(--red-deep);
-  padding: 3px 8px; border-radius: 2px; white-space: nowrap;
+  padding: 3px 8px; white-space: nowrap;
 }
 
 .banner {
@@ -246,7 +272,6 @@ a[rel~="external"]:hover::after { color: var(--red); }
   margin: 20px 0 0; padding: 13px 16px;
   background: var(--red-dim);
   border: 1px solid var(--red-deep);
-  border-radius: 3px;
   color: var(--ink-2); font-size: 14px;
 }
 
@@ -327,8 +352,7 @@ h1 {
 @keyframes tick { 0% { color: var(--red); } 100% { color: inherit; } }
 .ticked { animation: tick 1.8s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .pulse, .ticked, .caret, .hero--split::before,
-  .install-panel:not([hidden]) { animation: none; }
+  .pulse, .ticked, .caret, .install-panel:not([hidden]) { animation: none; }
 }
 
 /* ---- metrics ----------------------------------------------------------- */
@@ -370,7 +394,6 @@ h1 {
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: 3px;
   background: var(--surface);
 }
 
@@ -396,7 +419,7 @@ td.num { font-family: var(--mono); }
 
 .status { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap;
           font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; }
-.status-mark { width: 9px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; flex: none; }
+.status-mark { width: 9px; height: 9px; border: 1.5px solid currentColor; flex: none; }
 .status--HEALTHY { color: var(--healthy); }
 .status--DEGRADED { color: var(--degraded); }
 .status--DEGRADED .status-mark { background: linear-gradient(to top, currentColor 50%, transparent 50%); }
@@ -408,14 +431,13 @@ td.num { font-family: var(--mono); }
 .tag {
   font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
   border: 1px solid var(--line-2); color: var(--ink-3);
-  padding: 2px 6px; border-radius: 2px; margin-left: 9px; vertical-align: 1px;
+  padding: 2px 6px; margin-left: 9px; vertical-align: 1px;
 }
 
 /* ---- recovery echoes --------------------------------------------------- */
 .echo {
   border: 1px solid var(--line);
   border-left: 2px solid var(--red-deep);
-  border-radius: 3px;
   background: var(--surface);
   padding: 22px 24px;
   margin-bottom: 14px;
@@ -454,7 +476,7 @@ td.num { font-family: var(--mono); }
 }
 
 /* ---- terminal ---------------------------------------------------------- */
-.terminal { border: 1px solid var(--line); border-radius: 3px; background: #0a0b0c; overflow: hidden; }
+.terminal { border: 1px solid var(--line); background: #0a0b0c; overflow: hidden; }
 .terminal-bar {
   padding: 9px 16px; border-bottom: 1px solid var(--line);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -471,7 +493,6 @@ td.num { font-family: var(--mono); }
 .endpoint {
   display: block;
   border: 1px solid var(--line-2);
-  border-radius: 3px;
   background: var(--surface);
   padding: 22px 24px;
 }
@@ -502,7 +523,7 @@ td.num { font-family: var(--mono); }
 @media (max-width: 760px) { .trouble { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---- snippets ---------------------------------------------------------- */
-.snip { margin: 0; border: 1px solid var(--line); border-radius: 3px;
+.snip { margin: 0; border: 1px solid var(--line);
         background: var(--surface); overflow: hidden; }
 .snip figcaption {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -589,7 +610,7 @@ footer.shell {
 
 /* ---- FAQ --------------------------------------------------------------- */
 .faq { margin: 0; display: grid; gap: 1px; background: var(--line);
-       border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+       border: 1px solid var(--line); overflow: hidden; }
 .faq > div { background: var(--surface); padding: 20px 22px; }
 .faq dt { font-size: 15.5px; font-weight: 600; margin-bottom: 7px; }
 .faq dd { margin: 0; color: var(--ink-2); font-size: 14.5px; max-width: 78ch; }
@@ -651,12 +672,12 @@ footer.shell {
   list-style: none; margin: 0 0 32px; padding: 0;
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
   background: var(--line); border: 1px solid var(--line);
-  border-radius: 3px; overflow: hidden;
+ overflow: hidden;
 }
 .story li { background: var(--surface); padding: 22px 20px; display: flex; gap: 14px; }
 .story-step {
   font-family: var(--mono); font-size: 12px; color: var(--red);
-  border: 1px solid var(--line-2); border-radius: 2px;
+  border: 1px solid var(--line-2);
   width: 24px; height: 24px; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
 }
@@ -709,37 +730,13 @@ footer.shell {
 }
 
 /* ---- hero: two columns ------------------------------------------------- */
-/* Two columns: what this is on the left, the line you paste on the right.
-   The artwork stays behind both, isolated so it cannot reach the bands
-   below and quiet enough that the type keeps its contrast on black. */
+/* What this is on the left, the line you paste on the right, the headline
+   across both. Nothing behind them: the ground is black, and the type and
+   the caret are the only things on it. */
 .hero--split {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
   gap: 0 64px; align-items: start;
   padding-block: 64px 56px;
-  position: relative; isolation: isolate; overflow: hidden;
-}
-/* Two red fields drifting past each other. It replaces a 74KB photograph of
-   roughly the same thing, and unlike the photograph it is never the wrong
-   shape for the viewport. Both layers are painted on the same element so the
-   whole thing is one composited layer, and it is a background-position
-   animation rather than a transform on a giant box: no layout, no repaint of
-   anything above it. */
-@keyframes drift {
-  0%   { background-position: 12% 34%, 84% 62%; }
-  50%  { background-position: 30% 58%, 62% 36%; }
-  100% { background-position: 12% 34%, 84% 62%; }
-}
-.hero--split::before {
-  content: "";
-  position: absolute; z-index: -1; pointer-events: none;
-  inset: -14% -6% -20% 12%;
-  background:
-    radial-gradient(38% 46% at 50% 50%, rgba(248, 48, 48, 0.30), transparent 68%),
-    radial-gradient(44% 38% at 50% 50%, rgba(192, 0, 16, 0.26), transparent 70%);
-  background-repeat: no-repeat;
-  background-size: 78% 74%, 66% 82%;
-  filter: blur(26px);
-  animation: drift 26s ease-in-out infinite;
 }
 .hero--split h1 { grid-column: 1 / -1; margin: 0 0 30px; max-width: none; }
 .hero-def {
@@ -756,7 +753,6 @@ footer.shell {
 
 @media (max-width: 980px) {
   .hero--split { grid-template-columns: minmax(0, 1fr); gap: 40px 0; }
-  .hero--split::before { inset: -10% -20% -10% -20%; filter: blur(34px); }
 }
 .hero--split .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 
@@ -993,7 +989,7 @@ section[id], h2[id] { scroll-margin-top: 100px; }
 .pagenav-links { display: flex; flex-direction: column; gap: 2px; }
 .pagenav a {
   font-size: 13.5px; line-height: 1.35; color: var(--ink-3);
-  padding: 6px 10px; border-left: 2px solid var(--line); border-radius: 0 4px 4px 0;
+  padding: 6px 10px; border-left: 2px solid var(--line);
   text-decoration: none;
   transition: color .15s ease, border-color .15s ease, background .15s ease;
 }

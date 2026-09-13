@@ -207,6 +207,8 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
+    # 18k -> 21k for the menu that pulls the bar down, measures its own
+    # height and blurs the page behind it.
     # 39k -> 41k, 16k -> 18k: the two states of the top bar, the drifting
     # hero ground that replaced a 74KB photograph, and the scramble. The
     # stylesheet grew by less than the image it removed.
@@ -219,7 +221,7 @@ def test_static_assets_stay_small():
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
     assert len(CSS) < 41_000
-    assert len(JS) < 18_000
+    assert len(JS) < 22_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -229,7 +231,7 @@ def test_static_assets_stay_small():
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
     # opening on top of the word that opened it, 65k -> 69k for the hero,
     # 69k -> 73k for the two-state bar and the drifting ground.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 73_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 76_000
 
     # The hero artwork used to be the single heaviest thing the homepage
     # loaded: a 74KB photograph, decorative, and the wrong shape at most
@@ -245,30 +247,16 @@ def test_static_assets_stay_small():
     )
     # 167k -> 116k: the photograph is gone, and both wordmarks are counted
     # because the bar and the footer each use one.
-    assert per_visit < 116_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 119_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
-def test_the_hero_art_stays_behind_the_hero():
-    """Decoration must not reach the bands below, or the text on top of it."""
-    assert ".hero--split::before" in CSS
-    block = CSS[CSS.index(".hero--split::before"):CSS.index(".hero--split h1")]
-    assert "z-index: -1" in block and "pointer-events: none" in block
-    frame = CSS[CSS.index(".hero--split {"):CSS.index("@keyframes drift")]
-    assert "overflow: hidden" in frame and "isolation: isolate" in frame
-
-
-def test_the_hero_ground_is_drawn_not_downloaded():
-    """It was a 74KB photograph that was the wrong shape at most viewport
-    sizes. Two drifting radial gradients say the same thing, weigh nothing,
-    and fit any window."""
-    assert "@keyframes drift" in CSS
-    assert "echoimage" not in CSS
-    block = CSS[CSS.index(".hero--split::before"):CSS.index(".hero--split h1")]
-    assert "radial-gradient" in block
-    # Animating background-position, not a transform on a huge box: the hero
-    # must not repaint the page every frame on a 400M VPS's visitors' laptops.
-    assert "background-position" in CSS[CSS.index("@keyframes drift"):]
+def test_the_hero_ground_is_nothing_at_all():
+    """It was a 74KB photograph, then two drifting red gradients, and now it
+    is black. The type and the caret are the only things on it."""
+    assert "echoimage" not in CSS and "echoimage" not in HTML
+    assert "@keyframes drift" not in CSS
+    assert ".hero--split::before" not in CSS
 
 
 def test_mobile_layout_rules_exist():
@@ -432,7 +420,7 @@ def test_the_hero_fits_a_laptop_screen():
     truncated. Stacked down the middle it had to be trimmed to 930; in two
     columns the definition and the install card share the height instead of
     queueing for it."""
-    block = CSS[CSS.index(".hero--split {"):CSS.index("@keyframes drift")]
+    block = CSS[CSS.index(".hero--split {"):CSS.index(".hero--split h1")]
     assert "padding-block: 64px 56px" in block, "the homepage hero has grown again"
     assert "grid-template-columns" in block, "the hero is stacked again"
 
@@ -458,10 +446,9 @@ def test_only_motion_that_carries_information_is_on_the_page():
     assert "@keyframes panelin" in CSS, "a tab switch does not read as a swap"
     assert "@keyframes beat" in CSS, "the live pulse is gone"
     assert "@keyframes blink" in CSS, "the prompt caret is gone"
-    assert "@keyframes drift" in CSS, "the hero ground is static again"
     # And nothing that animates a number upward from zero: that would draw
-    # growth the network has not had. Five keyframes is the whole budget.
-    assert CSS.count("@keyframes") == 5
+    # growth the network has not had. Four keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 4
 
 
 def test_every_animation_respects_reduced_motion():
@@ -502,24 +489,36 @@ def test_the_hero_bump_is_only_on_the_two_short_panels():
     assert ".install code, #panel-plugin code, #panel-agent code { font-size: 12px; }" in CSS
 
 
-def test_the_nav_panel_opens_below_the_word_that_opens_it():
-    """.navitem was an inline span, so its box was the line box and not the
-    padded link inside it. top: 100% then landed ten pixels up, over the
-    bottom of "Network" and "Developers"."""
-    item = CSS[CSS.index(".navitem { position: relative"):]
-    item = item[:item.index("}")]
-    assert "display: flex" in item, "the item box must match the link it wraps"
-    assert "top: calc(100% + 10px)" in CSS
+def test_the_menu_pulls_the_whole_bar_down():
+    """Not a dropdown hanging off a word: the panel is the width of the
+    window, wears the bar's own glass, and carries the white rule, so the bar
+    reads as having grown. It is measured against the bar's real height,
+    because the bar gets taller when its own logo grows."""
+    panel = CSS[CSS.index(".navpanel {"):]
+    panel = panel[:panel.index("}")]
+    assert "position: fixed" in panel and "left: 0" in panel and "right: 0" in panel
+    assert "top: var(--bar-h" in panel, "the panel guesses the bar's height"
+    assert "backdrop-filter" in panel, "the panel is not the same glass as the bar"
+    assert "border-bottom: 1px solid #fff" in panel
+    assert '--bar-h", bar.offsetHeight' in JS, "the height is guessed, not measured"
 
 
-def test_the_gap_above_the_nav_panel_does_not_break_the_hover():
-    """Ten pixels of nothing between the link and the panel would close the
-    panel halfway to it. The bridge is a child of .navitem, so the pointer
-    never leaves the item it is hovering."""
-    assert ".navpanel::before" in CSS
-    bridge = CSS[CSS.index(".navpanel::before"):]
-    bridge = bridge[:bridge.index("}")]
-    assert "top: -10px" in bridge and "height: 10px" in bridge, "bridge does not span the gap"
+def test_the_open_menu_takes_the_page_out_of_focus():
+    """The blur is behind the bar, never over it, or the menu blurs itself."""
+    scrim = CSS[CSS.index(".scrim {"):]
+    scrim = scrim[:scrim.index("}")]
+    assert "backdrop-filter: blur" in scrim
+    assert "z-index: 9" in scrim
+    bar = CSS[CSS.index(".topbar {"):CSS.index(".topbar.is-stuck")]
+    assert "z-index: 12" in bar, "the bar must sit above the blur"
+    assert "z-index: 11" in CSS[CSS.index(".navpanel {"):], "so must the panel"
+    # And Escape closes it, for anyone who opened it from the keyboard.
+    assert 'event.key === "Escape"' in JS
+
+
+def test_the_logo_grows_with_the_bar():
+    assert ".topbar.is-open .brand-mark { height: 44px; }" in CSS
+    assert "transition: height 0.22s ease" in CSS
 
 
 def test_the_ground_is_black():
@@ -545,20 +544,23 @@ def test_the_hero_puts_the_words_left_and_the_command_right():
 
 
 def test_the_top_bar_has_two_states_and_two_brands():
-    """Black while you are at the top -- the bar is the page, and the name is
-    already in the headline underneath. White once you have scrolled, where
-    the wordmark has to say who this is on its own."""
+    """Black glass throughout. At the top there is no rule under it -- the bar
+    is the page. Once you have scrolled a sharp white line separates the two,
+    and the brand gives way from the mark to the wordmark, which is what has
+    to say who this is when the headline is gone."""
     assert ".topbar.is-stuck" in CSS
     stuck = CSS[CSS.index(".topbar.is-stuck {"):]
     stuck = stuck[:stuck.index("}")]
-    assert "background: #fff" in stuck
+    # One sharp white rule, and nothing else changes: the bar stays black
+    # glass at both ends of the scroll.
+    assert "border-bottom-color: #fff" in stuck
+    assert "#fff;" not in stuck.replace("border-bottom-color: #fff;", "")
     rest = CSS[CSS.index(".topbar {"):CSS.index(".topbar.is-stuck {")]
-    assert "background: #000" in rest
-    # The mark alone at the top, the wordmark once the bar is white.
+    assert "backdrop-filter" in rest, "the glass is gone"
+    assert "border-bottom: 1px solid transparent" in rest, "the line shows at the top"
+    # The mark alone at the top, the wordmark once you have scrolled past it.
     assert ".topbar.is-stuck .brand-mark { display: none; }" in CSS
     assert ".topbar.is-stuck .brand-word { display: block; }" in CSS
-    # Nav links have to change with the ground or they vanish into the white.
-    assert ".topbar.is-stuck .nav a { color:" in CSS
 
 
 def test_the_bar_does_not_flicker_at_its_own_boundary():
@@ -578,3 +580,28 @@ def test_the_lede_scrambles_once_and_settles_on_the_real_sentence():
     assert "if (reduced) return;" in scramble
     # It ends on the text it started from, never on a frame of noise.
     assert "node.textContent = text;" in JS
+
+
+def test_the_panel_leaves_the_bar_when_the_bar_starts_moving():
+    """Both bar heights are measured at load, not after the transition.
+
+    Measuring the open height only once the bar had finished growing put the
+    panel at the closed height for 220ms and then snapped it down. The
+    measuring flash wears the open state for one frame, so it is done with
+    transitions off.
+    """
+    assert '--bar-h-open", bar.offsetHeight' in JS
+    assert 'bar.classList.add("is-measuring")' in JS
+    assert ".topbar.is-measuring, .topbar.is-measuring * { transition: none !important; }" in CSS
+    assert ".topbar.is-open .navpanel { top: var(--bar-h-open" in CSS
+
+
+def test_every_box_is_a_box():
+    """Sharp, as asked. The exceptions are the things that are not boxes: the
+    live dot, the loop's four circles, the return path's endpoint."""
+    import re
+
+    radii = re.findall(r"border-radius:\s*([^;]+);", CSS)
+    for value in radii:
+        assert value.strip() in ("0", "0px", "var(--r)", "50%"), f"soft corner: {value}"
+    assert "--r: 0px;" in CSS

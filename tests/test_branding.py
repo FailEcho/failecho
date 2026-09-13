@@ -141,20 +141,18 @@ def test_wordmark_ships_a_variant_for_each_theme():
     assert mean_glyph_luma(light) < 90, "light-theme wordmark should be near-ink"
 
 
-def test_both_wordmark_variants_are_used_on_the_ground_they_are_for(client):
-    """The white master on black, the dark master on white.
-
-    The top bar has two states now -- black at the top of the page, white once
-    you have scrolled -- so the header carries the dark-ink wordmark and the
-    footer, which is always on black, carries the white one. Getting these the
-    wrong way round makes the mark invisible rather than merely wrong.
-    """
+def test_the_wordmark_matches_the_ground_it_sits_on(client):
+    """The bar is black glass at both ends of the scroll, so the white-ink
+    master is the one it wears, and so does the footer. Getting this the wrong
+    way round makes the mark invisible rather than merely wrong."""
     body = client.get("/").text
-    assert body.count("/static/wordmark-light.png?v=") == 1, "the white bar"
-    assert body.count("/static/wordmark-dark.png?v=") == 1, "the footer, on black"
-    # The brand is the mark alone until the bar turns white.
+    assert body.count("/static/wordmark-dark.png?v=") == 2, "the bar and the footer"
+    assert "/static/wordmark-light.png?v=" not in body, "dark ink on a black bar"
+    # The brand is the mark alone until you scroll past the headline.
     assert body.count("/static/logo.png?v=") >= 1
     assert 'alt="FailEcho"' in body
+    # The light master still ships: the social card and any light context.
+    assert (STATIC / "wordmark-light.png").exists()
 
 
 def test_favicon_is_square_for_search_results():

@@ -446,6 +446,63 @@
     check();
   }
 
+  // -- the menu that pulls the bar down --------------------------------------
+  // The panels are fixed to the bottom edge of the bar, and the bar's height
+  // changes when its own logo grows, so the offset is measured rather than
+  // guessed. Hover and focus both open it; the scrim behind takes the page
+  // out of focus while it is open.
+  function wireMenus() {
+    var bar = document.querySelector(".topbar");
+    var items = document.querySelectorAll(".navitem");
+    if (!bar || !items.length) return;
+
+    var scrim = document.createElement("div");
+    scrim.className = "scrim";
+    scrim.setAttribute("aria-hidden", "true");
+    document.body.appendChild(scrim);
+
+    // Both heights, up front. The panel has to leave the bottom edge of the
+    // bar at the same moment the bar starts moving, so measuring after the
+    // transition is too late -- the panel would sit at the closed height for
+    // 220ms and then snap. The measuring flash is done with transitions off.
+    function measure() {
+      bar.classList.add("is-measuring");
+      var wasOpen = bar.classList.contains("is-open");
+      bar.classList.remove("is-open");
+      bar.style.setProperty("--bar-h", bar.offsetHeight + "px");
+      bar.classList.add("is-open");
+      bar.style.setProperty("--bar-h-open", bar.offsetHeight + "px");
+      bar.classList.toggle("is-open", wasOpen);
+      // Read once more so the browser cannot batch the class changes past
+      // the point where turning transitions back on would animate them.
+      void bar.offsetHeight;
+      bar.classList.remove("is-measuring");
+    }
+
+    function open(on) {
+      bar.classList.toggle("is-open", on);
+      scrim.classList.toggle("is-open", on);
+    }
+
+    Array.prototype.forEach.call(items, function (item) {
+      item.addEventListener("mouseenter", function () { open(true); });
+      item.addEventListener("mouseleave", function () { open(false); });
+      item.addEventListener("focusin", function () { open(true); });
+      item.addEventListener("focusout", function () {
+        // Focus moving inside the same menu is not leaving it.
+        window.setTimeout(function () {
+          if (!item.contains(document.activeElement)) open(false);
+        }, 0);
+      });
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") open(false);
+    });
+    window.addEventListener("resize", measure);
+    measure();
+  }
+
   // -- scrambled lede -------------------------------------------------------
   // The one line that says what this is, resolving out of noise. It runs
   // once, on load, and never again: an effect that repeats is a thing to
@@ -495,6 +552,7 @@
   wireTabs();
   wireRail();
   wireTopbar();
+  wireMenus();
   wireScramble();
   if (el("stat-real-24h")) {
     refresh();
