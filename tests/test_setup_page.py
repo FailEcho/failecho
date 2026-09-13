@@ -147,3 +147,21 @@ def test_a_local_process_only_client_has_two_paths(client):
     assert '"uvx"' in body and '"npx"' in body
     assert body.count('"failecho-mcp"') >= 2, "the PyPI and the npm relay"
     assert "Both are ours" in body
+
+
+def test_the_page_offers_to_let_the_agent_do_it(client):
+    """The shortest path on a page aimed at people who run agents all day."""
+    body = client.get("/setup").text
+    assert "Let your agent set it up" in body
+    assert "set yourself up to use FailEcho" in body
+    assert 'href="/llms.txt"' in body
+
+
+def test_a_broken_install_has_somewhere_to_go(client):
+    """A quiet failure and nobody trying look identical from the server, so
+    the troubleshooting section has to end in a person rather than a shrug."""
+    body = client.get("/setup").text
+    trouble = body[body.index("If nothing shows up"):]
+    assert "mailto:contact@failecho.com" in trouble
+    assert "mailto:security@failecho.com" in trouble
+    assert "that is a bug and I want to hear about it" in body

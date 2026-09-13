@@ -67,7 +67,31 @@
     </p>
   </section>
 
-  <nav class="shell setup-jump" aria-label="Choose your integration"><a href="#claude-code"><span>01</span> Claude Code ↗</a><a href="#mcp-clients"><span>02</span> MCP clients ↗</a><a href="#rest-api"><span>03</span> REST API ↗</a></nav>
+  <section class="shell band" id="let-the-agent" aria-labelledby="agent-title">
+    <div class="band-head">
+      <h2 id="agent-title" class="label">Let your agent set it up</h2>
+      <p class="band-sub">The shortest path, and the one least likely to go wrong: hand the job to the thing that will be using it.</p>
+    </div>
+    <p class="prose">
+      Paste this at whatever you are running — Claude Code, Claude Desktop,
+      Cursor, your own framework:
+    </p>
+    <figure class="snip">
+      <pre><code>Read {{PUBLIC_URL}}/llms.txt and set yourself up to use FailEcho.</code></pre>
+    </figure>
+    <p class="prose">
+      <a href="/llms.txt"><code>llms.txt</code></a> is written for exactly this.
+      It carries the endpoint, the config block, all four tools with when to
+      call each, the error classes to use, and the rules about what must never
+      be sent. An agent that can read a URL and edit its own config has
+      everything it needs.
+    </p>
+    <p class="fineprint">
+      Prefer to do it yourself? Everything below is the same thing by hand.
+    </p>
+  </section>
+
+  <nav class="shell setup-jump" aria-label="Choose your integration"><a href="#let-the-agent"><span>00</span> Let the agent ↗</a><a href="#claude-code"><span>01</span> Claude Code ↗</a><a href="#mcp-clients"><span>02</span> MCP clients ↗</a><a href="#rest-api"><span>03</span> REST API ↗</a></nav>
 
   <section class="shell band" id="claude-code" aria-labelledby="cc-title">
     <div class="band-head">
@@ -329,7 +353,7 @@ if outcome.failed and outcome.decision.actionable:
   <section class="shell band" aria-labelledby="trouble-title">
     <div class="band-head">
       <h2 id="trouble-title" class="label">If nothing shows up</h2>
-      <p class="band-sub">Four things account for almost every quiet install.</p>
+      <p class="band-sub">Four things account for almost every quiet install. If none of them is it, that is a bug and I want to hear about it.</p>
     </div>
     <dl class="trouble">
       <div>
@@ -357,6 +381,17 @@ if outcome.failed and outcome.decision.actionable:
           removes it. Either way, nothing is stored about you.</dd>
       </div>
     </dl>
+    <p class="prose">
+      Still nothing? Email <a href="mailto:contact@failecho.com">contact@failecho.com</a>
+      with what you are running and what you expected. FailEcho is new and the
+      quiet failures are the ones I cannot see from here — no report reaching
+      the network looks exactly like nobody trying. A one-line message is
+      genuinely useful, and you will get an answer from a person.
+    </p>
+    <p class="fineprint">
+      Something that looks like a security problem instead:
+      <a href="mailto:security@failecho.com">security@failecho.com</a>.
+    </p>
   </section>
 </main>
 
