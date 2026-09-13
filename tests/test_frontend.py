@@ -207,6 +207,8 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
+    # 21k -> 23k: closing the menu belongs to the bar rather than to each
+    # item, which took a listener per panel and one on the scrim.
     # 18k -> 21k for the menu that pulls the bar down, measures its own
     # height and blurs the page behind it.
     # 39k -> 41k, 16k -> 18k: the two states of the top bar, the drifting
@@ -220,8 +222,8 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 41_000
-    assert len(JS) < 22_000
+    assert len(CSS) < 42_000
+    assert len(JS) < 23_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -231,32 +233,52 @@ def test_static_assets_stay_small():
     # 60k -> 64k for the motion above, 64k -> 65k for the nav panel that was
     # opening on top of the word that opened it, 65k -> 69k for the hero,
     # 69k -> 73k for the two-state bar and the drifting ground.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 76_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 78_000
 
-    # The hero artwork used to be the single heaviest thing the homepage
-    # loaded: a 74KB photograph, decorative, and the wrong shape at most
-    # window sizes. It is two radial gradients now and weighs nothing, so the
-    # page carries the brand marks and its own source and that is all.
-    assert "echoimage" not in CSS and "echoimage" not in HTML
+    # The artwork is not behind the hero any more, where it was the wrong
+    # shape at most window sizes and blocked the first paint. It closes the
+    # page instead: below the fold, lazy, and one request for both halves.
+    assert "echoimage" not in CSS, "the stylesheet must not pull it in"
+
+    # 74KB at 800px when it was a full-bleed hero ground; 28KB at 480px and
+    # 24 colours now that it is a 210px band at 16% opacity behind a mask.
+    art = (STATIC / "echoimage.png").stat().st_size
+    assert art < 30_000, f"the closing artwork is {art} bytes; re-quantise it"
 
     per_visit = (
         sum(len(x) for x in (HTML, CSS, JS))
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-light.png").stat().st_size
         + (STATIC / "wordmark-dark.png").stat().st_size
+        + art
     )
-    # 167k -> 116k: the photograph is gone, and both wordmarks are counted
-    # because the bar and the footer each use one.
-    assert per_visit < 119_000, f"page weight crept to {per_visit} bytes"
+    # 119k -> 150k: the artwork is back, once, below the fold and lazy, as
+    # the closing band. Both halves of it are the same request.
+    assert per_visit < 150_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
 def test_the_hero_ground_is_nothing_at_all():
     """It was a 74KB photograph, then two drifting red gradients, and now it
     is black. The type and the caret are the only things on it."""
-    assert "echoimage" not in CSS and "echoimage" not in HTML
     assert "@keyframes drift" not in CSS
     assert ".hero--split::before" not in CSS
+    hero = HTML[HTML.index('class="shell hero hero--split"'):HTML.index('id="how"')]
+    assert "echoimage" not in hero, "the artwork is back behind the hero"
+
+
+def test_the_closing_artwork_is_decoration_and_says_so():
+    """Two halves of one image, above the footer. It is the only decorative
+    download on the page, so it earns its weight by being one request, lazy,
+    and invisible to anything that reads the page rather than looks at it."""
+    band = HTML[HTML.index('class="echoband"'):]
+    band = band[:band.index("</div>")]
+    assert band.count("echoimage.png") == 2, "two halves"
+    assert band.count('loading="lazy"') == 2
+    assert band.count('alt=""') == 2, "decoration is not described"
+    opener = HTML[HTML.index('<div class="echoband"'):]
+    assert opener[:opener.index(">")].count('aria-hidden="true"') == 1
+    assert ".echoband .flip { transform: scaleX(-1); }" in CSS
 
 
 def test_mobile_layout_rules_exist():
@@ -499,7 +521,7 @@ def test_the_menu_pulls_the_whole_bar_down():
     assert "position: fixed" in panel and "left: 0" in panel and "right: 0" in panel
     assert "top: var(--bar-h" in panel, "the panel guesses the bar's height"
     assert "backdrop-filter" in panel, "the panel is not the same glass as the bar"
-    assert "border-bottom: 1px solid #fff" in panel
+    assert ".navpanel::after" in CSS, "the open panel drops the horizon line"
     assert '--bar-h", bar.offsetHeight' in JS, "the height is guessed, not measured"
 
 
@@ -549,18 +571,20 @@ def test_the_top_bar_has_two_states_and_two_brands():
     and the brand gives way from the mark to the wordmark, which is what has
     to say who this is when the headline is gone."""
     assert ".topbar.is-stuck" in CSS
-    stuck = CSS[CSS.index(".topbar.is-stuck {"):]
-    stuck = stuck[:stuck.index("}")]
-    # One sharp white rule, and nothing else changes: the bar stays black
-    # glass at both ends of the scroll.
-    assert "border-bottom-color: #fff" in stuck
-    assert "#fff;" not in stuck.replace("border-bottom-color: #fff;", "")
-    rest = CSS[CSS.index(".topbar {"):CSS.index(".topbar.is-stuck {")]
+    rest = CSS[CSS.index(".topbar {"):CSS.index(".topbar::after")]
     assert "backdrop-filter" in rest, "the glass is gone"
-    assert "border-bottom: 1px solid transparent" in rest, "the line shows at the top"
-    # The mark alone at the top, the wordmark once you have scrolled past it.
-    assert ".topbar.is-stuck .brand-mark { display: none; }" in CSS
-    assert ".topbar.is-stuck .brand-word { display: block; }" in CSS
+    # The rule is a gradient that ends before the edges do, not a border.
+    rule = CSS[CSS.index(".topbar::after {"):]
+    rule = rule[:rule.index("}")]
+    assert "linear-gradient(90deg" in rule and "transparent," in rule
+    assert "opacity: 0;" in rule, "the rule shows at the top of the page"
+    assert ".topbar.is-stuck::after { opacity: 1; }" in CSS
+    # The brand trades places by opacity, in one grid cell, so neither the
+    # swap nor the bar's width jumps.
+    assert ".topbar.is-stuck .brand-mark { opacity: 0; }" in CSS
+    assert ".topbar.is-stuck .brand-word { opacity: 1; }" in CSS
+    assert "grid-area: 1 / 1" in CSS
+    assert "opacity 0.22s ease" in CSS
 
 
 def test_the_bar_does_not_flicker_at_its_own_boundary():
@@ -605,3 +629,28 @@ def test_every_box_is_a_box():
     for value in radii:
         assert value.strip() in ("0", "0px", "var(--r)", "50%"), f"soft corner: {value}"
     assert "--r: 0px;" in CSS
+
+
+def test_crossing_the_bar_does_not_flicker_the_menu():
+    """Closing on each item's own mouseleave meant that sliding from Network
+    to Developers -- or onto the bar's own background, or onto GitHub --
+    closed the menu. The bar is 25px shorter closed, so the pointer that had
+    just left an item was immediately back on it: open, close, open, for as
+    long as you held still. You are either inside the bar or you are not."""
+    menus = JS[JS.index("function wireMenus()"):]
+    body = menus[:menus.index("\n  function ") if "\n  function " in menus else len(menus)]
+    assert 'item.addEventListener("mouseleave"' not in body, "per-item close is back"
+    assert 'bar.addEventListener("mouseleave"' in body
+    # And coming back up out of the panel onto the bar is not leaving either.
+    assert "bar.contains(event.relatedTarget)" in body
+
+
+def test_the_install_card_is_not_a_card():
+    """The commands float on the page's black, tabs above them."""
+    install = CSS[CSS.index(".install {"):]
+    install = install[:install.index("}")]
+    for banned in ("background:", "border:", "box-shadow:"):
+        assert banned not in install, f".install still has {banned}"
+    # And the tabs start on the same line as the sentence opposite them.
+    assert ".install-tabs button:first-child { padding-left: 0; }" in CSS
+    assert ".hero--split .hero-lede { margin-top: 0; }" in CSS

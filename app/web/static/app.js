@@ -484,16 +484,37 @@
       scrim.classList.toggle("is-open", on);
     }
 
+    // Opening is per item; closing is not. Closing on the item's own
+    // mouseleave meant that crossing the bar from Network to Developers, or
+    // sliding off onto the bar's own background, closed the menu -- and the
+    // bar is 25px shorter closed, so the pointer that had just left an item
+    // was suddenly back on it. Open, close, open, for as long as you held
+    // still. The bar as a whole is the thing you are either inside or not.
     Array.prototype.forEach.call(items, function (item) {
       item.addEventListener("mouseenter", function () { open(true); });
-      item.addEventListener("mouseleave", function () { open(false); });
       item.addEventListener("focusin", function () { open(true); });
-      item.addEventListener("focusout", function () {
-        // Focus moving inside the same menu is not leaving it.
-        window.setTimeout(function () {
-          if (!item.contains(document.activeElement)) open(false);
-        }, 0);
+    });
+
+    bar.addEventListener("mouseleave", function () { open(false); });
+    // The panel is fixed, so it is outside the bar's own box even though it
+    // is inside it in the markup.
+    Array.prototype.forEach.call(document.querySelectorAll(".navpanel"),
+      function (panel) {
+        panel.addEventListener("mouseenter", function () { open(true); });
+        panel.addEventListener("mouseleave", function (event) {
+          // Back up into the bar is not leaving: the panel is a descendant
+          // of the bar in the markup even though it is outside its box.
+          if (bar.contains(event.relatedTarget)) return;
+          open(false);
+        });
       });
+    scrim.addEventListener("mouseenter", function () { open(false); });
+
+    bar.addEventListener("focusout", function () {
+      // Focus moving within the bar is not leaving it.
+      window.setTimeout(function () {
+        if (!bar.contains(document.activeElement)) open(false);
+      }, 0);
     });
 
     document.addEventListener("keydown", function (event) {

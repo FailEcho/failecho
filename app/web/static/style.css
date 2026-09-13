@@ -130,25 +130,36 @@ a[rel~="external"]:hover::after { color: var(--red); }
   background: rgba(0, 0, 0, 0.72);
   backdrop-filter: saturate(160%) blur(16px);
   -webkit-backdrop-filter: saturate(160%) blur(16px);
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.22s ease, background 0.22s ease;
+  transition: background 0.22s ease;
 }
-.topbar.is-stuck {
-  background: rgba(0, 0, 0, 0.82);
-  border-bottom-color: #fff;
+/* The rule is a gradient, not a border: solid in the middle and gone at both
+   edges, so it reads as a horizon rather than as a box's bottom side. */
+.topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(255, 255, 255, 0.75) 22%,
+    rgba(255, 255, 255, 0.75) 78%, transparent);
+  opacity: 0; transition: opacity 0.22s ease;
 }
+.topbar.is-stuck { background: rgba(0, 0, 0, 0.82); }
+.topbar.is-stuck::after { opacity: 1; }
 
 .topbar-row {
   display: flex; align-items: center; gap: 14px 20px; flex-wrap: wrap;
   padding-block: 18px;
 }
 
-.brand { display: inline-flex; align-items: center; gap: 10px; }
+.brand { display: inline-grid; align-items: center; justify-items: start; }
 .brand:hover { color: inherit; }
-.brand-mark { display: block; width: auto; height: 28px; }
-.brand-word { display: none; width: auto; height: 21px; }
-.topbar.is-stuck .brand-mark { display: none; }
-.topbar.is-stuck .brand-word { display: block; }
+/* Both are always laid out, in the same grid cell, and they trade places by
+   opacity. Toggling display makes the bar's width jump and the swap read as
+   a glitch; stacking them keeps the box the width of the wider of the two,
+   so nothing beside it moves either. */
+.brand-mark, .brand-word { grid-area: 1 / 1; display: block; width: auto; }
+.brand-mark { height: 28px; }
+.brand-word { height: 21px; opacity: 0; }
+.topbar.is-stuck .brand-mark { opacity: 0; }
+.topbar.is-stuck .brand-word { opacity: 1; }
 
 .nav {
   display: flex; align-items: center; gap: 4px;
@@ -185,20 +196,27 @@ a[rel~="external"]:hover::after { color: var(--red); }
   background: rgba(0, 0, 0, 0.82);
   backdrop-filter: saturate(160%) blur(16px);
   -webkit-backdrop-filter: saturate(160%) blur(16px);
-  border: 0; border-bottom: 1px solid #fff;
+  border: 0;
   opacity: 0; visibility: hidden; transform: translateY(-10px);
   transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s,
               top 0.22s ease;
 }
 /* Leaves the bar's edge as the bar starts moving, not after it stops. */
 .topbar.is-open .navpanel { top: var(--bar-h-open, 101px); }
+/* Same horizon under the open panel. */
+.navpanel::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(255, 255, 255, 0.75) 22%,
+    rgba(255, 255, 255, 0.75) 78%, transparent);
+}
 .navpanel b { font-size: 16px; }
 .navpanel span { font-size: 13.5px; }
 .navitem:hover .navpanel, .navitem:focus-within .navpanel {
   opacity: 1; visibility: visible; transform: none;
 }
-/* The bar's own line would draw across the open panel. */
-.topbar.is-open { border-bottom-color: transparent; }
+/* The open panel carries the rule, so the bar's own must not draw too. */
+.topbar.is-open::after { opacity: 0; }
 /* Measuring both bar heights means briefly wearing the open state; that
    must not be a thing anyone sees move. */
 .topbar.is-measuring, .topbar.is-measuring * { transition: none !important; }
@@ -207,7 +225,9 @@ a[rel~="external"]:hover::after { color: var(--red); }
 .topbar-row { transition: padding 0.22s ease; }
 .topbar.is-open .topbar-row { padding-block: 28px; }
 /* The mark grows into the taller bar rather than sitting in the middle of it. */
-.brand-mark, .brand-word { transition: height 0.22s ease, transform 0.22s ease; }
+.brand-mark, .brand-word {
+  transition: height 0.22s ease, transform 0.22s ease, opacity 0.22s ease;
+}
 .topbar.is-open .brand-mark { height: 44px; }
 .topbar.is-open .brand-word { transform: scale(1.28); transform-origin: left center; }
 
@@ -749,6 +769,7 @@ footer.shell {
   border-top: 1px solid var(--line); padding-top: 14px; display: inline-block;
 }
 .hero-right .install { margin: 0; max-width: none; }
+.hero--split .hero-lede { margin-top: 0; }
 .hero-right .install-note { margin: 16px 0 0; }
 
 @media (max-width: 980px) {
@@ -756,21 +777,42 @@ footer.shell {
 }
 .hero--split .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 
+/* ---- the echo, twice, closing the page ---------------------------------- */
+/* The mark's own artwork, mirrored, sitting between the last section and the
+   footer. One file and one request for both halves. Decorative and nothing
+   else: hidden from assistive technology, faded into the ground at every
+   edge, and loaded lazily because it is the last thing on the page. */
+.echoband {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter) 8px;
+  pointer-events: none;
+}
+.echoband img {
+  display: block; width: 100%; height: 210px; object-fit: cover; object-position: center;
+  opacity: 0.16;
+  -webkit-mask-image: radial-gradient(72% 78% at 50% 50%, #000 30%, transparent 78%);
+          mask-image: radial-gradient(72% 78% at 50% 50%, #000 30%, transparent 78%);
+}
+.echoband .flip { transform: scaleX(-1); }
+@media (max-width: 640px) {
+  .echoband img { height: 130px; }
+}
+
 /* ---- install card, one tab per way in ---------------------------------- */
+/* No card. The commands sit on the page's own black with the tabs above
+   them, so the only things in the hero are type and one caret. */
 .install {
   margin: 24px auto 12px; max-width: 700px; text-align: left;
-  background: var(--surface); border: 1px solid var(--line-2);
-  border-radius: var(--r); overflow: hidden;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
 .install-tabs {
   display: flex; overflow-x: auto; scrollbar-width: none;
-  background: var(--surface-2); border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .install-tabs::-webkit-scrollbar { display: none; }
+.install-tabs button:first-child { padding-left: 0; }
 .install-tabs button {
   flex: none; appearance: none; cursor: pointer; white-space: nowrap;
-  font-family: var(--sans); font-size: 12.5px; color: var(--ink-3);
+  font-family: var(--sans); font-size: 13.5px; color: var(--ink-3);
   background: transparent; border: 0; border-bottom: 2px solid transparent;
   padding: 12px 16px 10px;
 }
@@ -816,13 +858,13 @@ footer.shell {
 }
 .copyable:hover::after, .copyable:focus-visible::after { opacity: 1; }
 .copyable.is-copied::after { content: "copied"; color: var(--healthy); opacity: 1; }
-.install pre { margin: 0; padding: 20px 20px 10px; overflow-x: auto; }
+.install pre { margin: 0; padding: 22px 20px 10px 0; overflow-x: auto; }
 .install code { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; }
 /* Two lines of text in a card sized for the tallest panel reads as an
    empty card. These two get the room the others spend on content. */
 #panel-plugin code, #panel-agent code { font-size: 15px; line-height: 1.95; }
 .install-foot {
-  margin: 0; padding: 10px 20px 18px;
+  margin: 0; padding: 10px 20px 18px 0;
   font-size: 13.5px; color: var(--ink-3);
 }
 .install-note { margin: 0 0 22px; font-size: 14px; color: var(--ink-2); }
@@ -832,8 +874,8 @@ footer.shell {
 .band--center .band-head { display: block; margin-bottom: 40px; }
 .band--center .label {
   font-family: var(--serif); font-weight: 400;
-  font-size: clamp(26px, 3.4vw, 40px); letter-spacing: -0.015em;
-  text-transform: none; color: var(--ink);
+  font-size: clamp(32px, 4.4vw, 56px); letter-spacing: -0.018em;
+  line-height: 1.08; text-transform: none; color: var(--ink);
 }
 .band--center .band-sub {
   margin: 18px auto 0; max-width: 62ch; text-align: left; font-size: 16.5px;
@@ -853,10 +895,10 @@ footer.shell {
 .loop { display: inline-block; margin: 8px 0 0; }
 .loop-track {
   list-style: none; margin: 0; padding: 0;
-  display: flex; align-items: center; justify-content: center; gap: 44px;
+  display: flex; align-items: center; justify-content: center; gap: 34px;
 }
 .loop-node {
-  flex: none; width: 236px; height: 236px; border-radius: 50%;
+  flex: none; width: 282px; height: 282px; border-radius: 50%;
   border: 1px dashed var(--line-2); background: transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; padding: 10px 20px; text-align: center;
@@ -886,7 +928,7 @@ footer.shell {
 }
 .loop-return {
   position: relative; margin: 0 auto; height: 46px;
-  width: calc(100% - 236px);
+  width: calc(100% - 282px);
   border: 1px dashed var(--line-2); border-top: 0;
   border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
   margin-bottom: 30px;
