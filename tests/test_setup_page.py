@@ -135,3 +135,14 @@ def test_the_write_path_is_documented_not_just_the_read(client):
     for field in ('"fingerprint"', '"action"', '"successful"'):
         assert field in body, field
     assert '"outcome": "failure"' in body
+
+
+def test_a_local_process_only_client_has_a_path(client):
+    """Hosts that can only spawn a process cannot use the HTTP endpoint at all,
+    and that was every one of them until this. Verified working before it was
+    written down: npx -y mcp-remote against the live endpoint initializes and
+    lists all four tools."""
+    body = client.get("/setup").text
+    assert "mcp-remote" in body
+    assert '"npx"' in body
+    assert "third-party bridge, not ours" in body, "say whose software it is"

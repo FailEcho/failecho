@@ -134,6 +134,25 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
 }</code></pre>
     </figure>
     <p class="band-sub">
+      If your client can only start a local process and cannot speak HTTP, put
+      a bridge in front of it. This needs nothing installed and nothing from us:
+    </p>
+    <figure class="snip">
+      <pre><code>{
+  "mcpServers": {
+    "failecho": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "{{PUBLIC_URL}}/mcp"]
+    }
+  }
+}</code></pre>
+    </figure>
+    <p class="band-sub">
+      <code>mcp-remote</code> is a third-party bridge, not ours. Prefer the
+      direct endpoint above when your client supports it: one less moving part.
+    </p>
+
+    <p class="band-sub">
       The client then has four tools: <code>check_tool_failure</code> before a retry, and <code>report_tool_failure</code>, <code>report_tool_success</code> and <code>report_recovery_outcome</code> to contribute. Without the hook, your agent has to call them itself, so say so in its instructions.
     </p>
   </section>
