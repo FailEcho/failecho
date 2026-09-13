@@ -32,6 +32,21 @@ server, and keep `https://failecho.com` for reads (`check_tool_failure` and
 `POST /v1/query` store nothing). If you do need to write to production from a
 shell, export the token from `/etc/failecho.env` first.
 
+## Operator token from a host that filters header names
+
+Claude Desktop's custom connector only forwards header names on its allowlist,
+and `X-FailEcho-Operator` is not one -- nor is `X-Reporter-ID`. `Authorization`
+is, so the same operator token is accepted as:
+
+    Authorization: Bearer <FIN_FIRST_PARTY_TOKEN>
+
+Use that when connecting one of our own hosts through a client that will not
+send the custom header. Without it, anything that host reports is stored as
+`source: agent` and counted as independent adoption.
+
+Reporter identity needs nothing special: `reporter_id` is a tool argument, not
+a header, and works from any MCP client.
+
 ## Failures the hook does not see
 
 The hook only covers MCP tools. Report these yourself, as shared
