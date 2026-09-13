@@ -32,12 +32,12 @@ def test_seed_produces_visible_status_data(seeded):
     rows = seeded.get("/v1/services").json()
     by_service = {r["service"]: r for r in rows}
 
-    assert {"github-mcp", "search-api", "stripe-mcp", "example-agent-tool"} <= set(
+    assert {"github", "search-api", "stripe", "example-agent-tool"} <= set(
         by_service
     )
-    assert by_service["github-mcp"]["status"] == "MAJOR"
+    assert by_service["github"]["status"] == "MAJOR"
     assert by_service["search-api"]["status"] == "DEGRADED"
-    assert by_service["stripe-mcp"]["status"] == "HEALTHY"
+    assert by_service["stripe"]["status"] == "HEALTHY"
     assert rows[0]["status"] == "MAJOR", "worst service must sort first"
 
 

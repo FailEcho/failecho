@@ -28,6 +28,7 @@ from app.core.config import (
     SOURCE_FIRST_PARTY,
     settings,
 )
+from app.core.aliases import canonical_service
 from app.core.fingerprint import compute_fingerprint
 from app.core.intelligence import (
     bump_counter,
@@ -100,7 +101,7 @@ async def _touch_fingerprint(
     session.add(
         Fingerprint(
             fingerprint=fingerprint,
-            service=payload.service,
+            service=canonical_service(payload.service),
             operation=payload.operation,
             version=payload.version,
             schema_hash=payload.schema_hash,
@@ -132,6 +133,10 @@ async def record_observation(
     source: str = SOURCE_AGENT,
 ) -> ObserveResponse:
     """Store one tool-call outcome. Backs POST /v1/observe and the MCP tools."""
+    # One name for one service, decided once at the edge, so the fingerprint,
+    # the stored row and every count below all agree. Reading by the raw name
+    # after writing the canonical one is a silent miss.
+    service = canonical_service(payload.service)
     # PRIVACY: normalization happens here, at the edge. `payload.error_message`
     # (the raw string) is used for exactly one expression and then dropped -- it
     # is never assigned to a column and never logged.
@@ -145,7 +150,7 @@ async def record_observation(
     known = False
     if payload.outcome == OUTCOME_FAILURE:
         fingerprint = compute_fingerprint(
-            service=payload.service,
+            service=service,
             operation=payload.operation,
             version=payload.version,
             schema_hash=payload.schema_hash,
@@ -157,7 +162,7 @@ async def record_observation(
 
     session.add(
         Observation(
-            service=payload.service,
+            service=service,
             operation=payload.operation,
             version=payload.version,
             schema_hash=payload.schema_hash,
@@ -181,7 +186,7 @@ async def record_observation(
             (
                 await session.execute(
                     select(func.count()).where(
-                        Observation.service == payload.service,
+                        Observation.service == service,
                         Observation.operation == payload.operation,
                         Observation.version == payload.version,
                         Observation.schema_hash == payload.schema_hash,
@@ -286,8 +291,9 @@ async def query_intelligence(
     ``check_tool_failure`` tool.
     """
     normalized = normalize_error(payload.error_message)
+    service = canonical_service(payload.service)
     fingerprint = compute_fingerprint(
-        service=payload.service,
+        service=service,
         operation=payload.operation,
         version=payload.version,
         schema_hash=payload.schema_hash,
@@ -302,7 +308,7 @@ async def query_intelligence(
 
     short, long = await scope_counts(
         session,
-        service=payload.service,
+        service=service,
         operation=payload.operation,
         version=payload.version,
         schema_hash=payload.schema_hash,

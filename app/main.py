@@ -238,6 +238,14 @@ Stateless, no auth.
 - GET  /v1/recovery-intelligence  best evidenced recovery actions right now
 - GET  /health       liveness
 
+## Service naming
+
+`service` is part of the fingerprint, so FailEcho canonicalises it before
+matching: packaging affixes are stripped (`mcp-server-fetch`, `fetch-mcp` and
+`fetch` are one service) and a short explicit list handles genuine aliases.
+Hostnames are left alone: `api.github.com` never becomes `github`. Send the
+server's own name (`serverInfo.name`) or the API host and the rest is handled.
+
 ## Vocabulary
 
 Failure Echo    a normalized observed failure, shared by fingerprint

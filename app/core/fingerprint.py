@@ -4,7 +4,7 @@ A fingerprint is the join key of the whole network: it is what lets Agent B
 recognise that it is hitting the exact failure Agent A reported 40 seconds ago.
 
     fingerprint = sha256(
-        service | operation | version | schema_hash |
+        canonical_service | operation | version | schema_hash |
         error_type | error_code | normalized_error
     )
 
@@ -18,6 +18,8 @@ Properties we care about:
 from __future__ import annotations
 
 import hashlib
+
+from app.core.aliases import canonical_service
 
 #: Truncated SHA-256. 128 bits of digest is far more than enough at this scale
 #: and keeps URLs, logs and JSON payloads readable.
@@ -57,7 +59,7 @@ def compute_fingerprint(
     payload = _SEPARATOR.join(
         _canon(part)
         for part in (
-            service,
+            canonical_service(service),
             operation,
             version,
             schema_hash,

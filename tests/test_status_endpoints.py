@@ -25,7 +25,8 @@ def test_services_reports_status_and_rates(client):
     rows = client.get("/v1/services").json()
     assert len(rows) == 1
     row = rows[0]
-    assert row["service"] == "github-mcp"
+    # reported as "github-mcp", recorded under the canonical name
+    assert row["service"] == "github"
     assert row["operation"] == "create_issue"
     assert row["status"] == "DEGRADED"
     assert row["failure_rate_1h"] == 0.2
@@ -40,7 +41,7 @@ def test_services_sorts_worst_first_and_filters(client):
                 error_code=None, error_message=None)
 
     rows = client.get("/v1/services").json()
-    assert [r["service"] for r in rows] == ["github-mcp", "calm-api"]
+    assert [r["service"] for r in rows] == ["github", "calm-api"]
 
     filtered = client.get("/v1/services", params={"service": "calm-api"}).json()
     assert len(filtered) == 1

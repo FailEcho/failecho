@@ -36,6 +36,7 @@ from app.core.config import (  # noqa: E402
     OUTCOME_SUCCESS,
     SOURCE_SYNTHETIC,
 )
+from app.core.aliases import canonical_service
 from app.core.fingerprint import compute_fingerprint  # noqa: E402
 from app.core.normalize import normalize_error  # noqa: E402
 from app.core.privacy import hash_reporter_id  # noqa: E402
@@ -71,6 +72,9 @@ def make_observation(
     raw_message: str | None = None,
     latency_ms: int | None = None,
 ) -> dict:
+    # Same canonicalisation the live write path applies, or seeded rows land
+    # under a name the query side will never look up.
+    service = canonical_service(service)
     normalized = normalize_error(raw_message) if outcome == OUTCOME_FAILURE else None
     fingerprint = (
         compute_fingerprint(

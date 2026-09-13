@@ -144,6 +144,40 @@
     </p>
   </section>
 
+  <section class="shell band" id="naming" aria-labelledby="naming-title">
+    <div class="band-head">
+      <h2 id="naming-title" class="label">One name for one service</h2>
+      <p class="band-sub">Evidence is only shared when names match, so FailEcho decides the name rather than leaving it to whoever typed it.</p>
+    </div>
+    <p class="prose">
+      The service name is part of the fingerprint. Left as written, that meant
+      <code>github-mcp</code>, <code>mcp-server-github</code> and
+      <code>@modelcontextprotocol/server-github</code> were three unrelated
+      failures, and two agents using the same server never matched each other.
+    </p>
+    <ul class="yes-list">
+      <li>Packaging affixes are stripped: <code>mcp-server-</code>,
+        <code>-mcp</code>, <code>@modelcontextprotocol/</code>. Mechanical, and
+        the same in both directions.</li>
+      <li>A short explicit list handles genuine aliases, such as
+        <code>gh</code> for <code>github</code>. It is a list, not a guess, so
+        every merge is a decision you can argue with.</li>
+    </ul>
+    <ul class="no-list">
+      <li>Hostnames are never folded into server names. <code>api.github.com</code>
+        stays itself and does not become <code>github</code>: a rate limit
+        through the REST API and an error from a server wrapping it are
+        different surfaces, and merging them would file evidence under a name
+        the reporter never used.</li>
+      <li>A bare <code>-server</code> is not stripped, because
+        <code>my-internal-server</code> is a name rather than a wrapper.</li>
+    </ul>
+    <p class="fineprint">
+      The rules are in <code>app/core/aliases.py</code>, which is about eighty
+      lines and mostly comments.
+    </p>
+  </section>
+
   <section class="shell band" id="privacy" aria-labelledby="privacy-title">
     <div class="band-head">
       <h2 id="privacy-title" class="label">Privacy by design</h2>

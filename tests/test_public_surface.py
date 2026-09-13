@@ -90,7 +90,7 @@ def test_recovery_intelligence_lists_evidenced_actions(client):
     entries = client.get("/v1/recovery-intelligence").json()
     assert len(entries) == 1
     entry = entries[0]
-    assert entry["service"] == "github-mcp"
+    assert entry["service"] == "github"
     assert entry["operation"] == "create_issue"
     assert entry["action"] == "refresh_schema"
     assert entry["attempts"] == 6
