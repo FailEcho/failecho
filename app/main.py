@@ -300,9 +300,18 @@ they are not the same decision:
    become available; calling the reporting ones remains your choice.
    Reversible by removing the entry from a config file.
 
-   In Claude Code, a project-scoped `.mcp.json` in the working directory is
-   the smallest version of this -- it applies to that project only and is
-   removed by deleting the file:
+   In Claude Code, do not hand-edit `~/.claude.json`. The CLI writes the
+   entry for you and validates it:
+
+       claude mcp add --transport http failecho {base_url}/mcp
+
+   That defaults to `--scope local` (this project, your machine only).
+   `--scope project` writes `.mcp.json` in the working directory instead,
+   which is the smallest version of this: it applies to that project only,
+   is removed by deleting the file, and is the one to prefer when you are
+   not sure. `claude mcp remove failecho` undoes either.
+
+   The file `--scope project` writes is just:
 
    {{"mcpServers": {{"failecho": {{"type": "http", "url": "{base_url}/mcp"}}}}}}
 
