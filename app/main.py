@@ -311,10 +311,20 @@ options, and it is option 2 below:
 - **Query-only access, current project, remote MCP endpoint.** Register
   {base_url}/mcp for this project only, not user-wide.
 
-  Write `.mcp.json` in the working directory. That is the default mechanism,
-  not a fallback: it needs no CLI, works on every platform and in every
-  client that reads project config, is owned by no running process, and is
-  undone by deleting the file.
+  Write `.mcp.json` in the working directory -- but check first that the
+  working directory is the project you mean. A home directory, a Desktop or
+  Documents folder, or a folder that merely *contains* several repositories
+  is not a project: a `.mcp.json` there applies to far more than was asked
+  for, which is the user-wide outcome this default exists to avoid. If the
+  directory looks like one of those -- no repository, no project manifest,
+  many child projects -- say so and ask which project is meant rather than
+  guessing. Asking here is cheap; a config written in the wrong place is
+  found much later.
+
+  Given the right directory, `.mcp.json` is the default mechanism, not a
+  fallback: it needs no CLI, works on every platform and in every client
+  that reads project config, is owned by no running process, and is undone
+  by deleting the file.
 
       {{"mcpServers": {{"failecho": {{"type": "http", "url": "{base_url}/mcp"}}}}}}
 

@@ -1356,7 +1356,11 @@ def test_llms_txt_states_a_default_setup(client):
     assert "stop and say so rather than overwriting it" in default
     # the seventh test hand-edited ~/.claude.json after the CLI was missing
     assert "Never hand-edit `~/.claude.json`" in default
-    assert "That is the default mechanism, not a fallback" in default
+    assert "the default mechanism, not a fallback" in default
+    # the ninth test's cwd was a folder holding many repos, not a project
+    assert "check first that the working directory is the project you mean" in default
+    assert "is not a project" in default
+    assert "ask which project is meant rather than guessing" in default
     assert "A missing CLI is not this case: write the file." in default
     assert "Never do that to a file you did not create." in default
     assert "Do not install the hook or the plugin" in default
