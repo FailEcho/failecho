@@ -813,6 +813,15 @@ footer.shell {
 .terminal-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
+/* Says what the terminal is before the button invites you to press it. */
+.terminal-tag {
+  flex: 1 1 auto; text-align: right; margin-right: 2px;
+  font-family: var(--sans); font-size: 11px; letter-spacing: 0.04em;
+  color: var(--ink-3); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 560px) { .terminal-tag { display: none; } }
+
 .run-btn {
   appearance: none; cursor: pointer; flex: none;
   font-family: var(--sans); font-size: 11.5px; letter-spacing: 0.04em;

@@ -666,13 +666,13 @@
       timer = null;
       out.innerHTML = lines.join("\n");
       out.classList.remove("is-running");
-      button.textContent = "Run again";
+      button.textContent = "Play again";
       button.disabled = false;
     }
 
     function play() {
       button.disabled = true;
-      button.textContent = "Running";
+      button.textContent = "Playing";
       out.classList.add("is-running");
       var at = 0;
 

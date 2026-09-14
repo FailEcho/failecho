@@ -1025,3 +1025,18 @@ def test_nothing_can_leave_the_menu_stuck_open():
     assert '.navitem:hover, .navpanel:hover' in menus, "the restore guesses"
     assert 'document.addEventListener("mousemove"' in menus
     assert "if (bar.contains(event.target)) return;" in menus
+
+
+def test_the_demo_says_it_is_a_recording_before_it_invites_a_press():
+    """A button labelled Run on a page about a live network reads as running
+    against the live network. It replays a recording, and nothing on the page
+    executes anything."""
+    demo = (STATIC / "demo.html").read_text()
+    assert "A recorded run" in demo
+    assert "Nothing on this page executes" in demo
+    assert "recorded — nothing here executes" in demo
+    assert ">Play</button>" in demo and ">Run</button>" not in demo
+    assert '"Playing"' in JS and '"Play again"' in JS
+    # And it says where the real thing is, and what it will and will not show.
+    assert "Run it for real" in demo
+    assert "which today is not much" in demo

@@ -113,17 +113,20 @@
 
   <section class="shell band band--bleed" aria-labelledby="output-title">
     <div class="band-head">
-      <h2 id="output-title" class="label">Real output</h2>
+      <h2 id="output-title" class="label">A recorded run</h2>
       <p class="band-sub">
-        Not a mockup: this is what the script printed, kept exactly as it came
-        out. Press Run to watch it arrive at the speed it did, or read it as
-        it stands.
+        This is what the script printed on one run, kept exactly as it came
+        out. Nothing on this page executes: Play replays the recording at the
+        speed it arrived, and reading it as it stands tells you the same
+        thing. To run it against the live network yourself, the command is
+        below.
       </p>
     </div>
     <div class="terminal" id="run-terminal">
       <div class="terminal-bar">
         <span>examples/live_agent/run_demo.py — agent b</span>
-        <button class="run-btn" type="button" id="run-demo" hidden>Run</button>
+        <span class="terminal-tag">recorded — nothing here executes</span>
+        <button class="run-btn" type="button" id="run-demo" hidden>Play</button>
       </div>
 <pre><code id="run-output">Calling tool...
 <span class="t-red">x tool failed</span>
@@ -160,7 +163,9 @@ Reporting recovery outcome...
 <span class="t-green">+ accepted   (refresh_schema -> success)</span></code></pre>
     </div>
     <p class="fineprint">
-      Run it yourself: <code>python examples/live_agent/run_demo.py</code>.
+      Run it for real: <code>python examples/live_agent/run_demo.py</code>.
+      That one talks to the live network, and what it prints depends on what
+      the network holds when you run it — which today is not much.
     </p>
   </section>
 
