@@ -382,11 +382,18 @@ h1 {
 .hero-listed a { color: var(--ink-2); }
 
 .hero-meta {
-  margin: 0;
+  position: relative;
+  margin: 26px 0 0; padding-top: 17px;
   font-family: var(--mono);
   font-size: 12.5px;
   color: var(--ink-3);
   letter-spacing: 0.02em;
+}
+/* The same horizon the bar wears, fading out before the measure ends. */
+.hero-meta::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.42) 44%, transparent);
 }
 
 /* ---- bands ------------------------------------------------------------- */
@@ -923,14 +930,14 @@ footer.shell {
    it. All four are visible at once, which is the point: the question a first
    visitor has is "is there a path for me", and a tab strip answers it one
    quarter at a time. */
-.hero--lead { padding-block: 64px 40px; max-width: 1040px; }
-.hero--lead h1 { margin: 0 0 24px; max-width: none; }
+.hero--lead { padding-block: 56px 40px; max-width: 1040px; }
+.hero--lead h1 { margin: 0 0 14px; max-width: none; }
 .hero--lead .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 .hero-def {
   margin: 20px 0 0; max-width: 68ch;
   font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
 }
-.hero--lead .hero-actions { margin-top: 30px; }
+.hero--lead .hero-actions { margin-top: 22px; }
 
 /* ---- the four ways ------------------------------------------------------ */
 .install { padding-bottom: 72px; }

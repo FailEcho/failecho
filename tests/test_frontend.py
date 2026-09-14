@@ -439,7 +439,11 @@ def test_the_hero_fits_a_laptop_screen():
     truncated. Stacked down the middle it had to be trimmed to 930; in two
     columns the definition and the install card share the height instead of
     queueing for it."""
-    assert ".hero--lead { padding-block: 64px 40px; max-width: 1040px; }" in CSS
+    assert ".hero--lead { padding-block: 56px 40px; max-width: 1040px; }" in CSS
+    # The rule above the stack line costs 44px, and it is taken back out of
+    # the space above it rather than pushing the page down.
+    assert ".hero--lead h1 { margin: 0 0 14px" in CSS
+    assert ".hero--lead .hero-actions { margin-top: 22px; }" in CSS
 
 
 def test_no_install_snippet_is_wider_than_its_box():
