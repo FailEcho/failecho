@@ -226,7 +226,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 61_000
+    assert len(CSS) < 62_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -239,7 +239,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 106_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 109_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -257,7 +257,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 141_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 144_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -935,47 +935,6 @@ def test_all_four_cards_start_their_content_on_the_same_line():
     assert "justify-content: flex-start" in body
 
 
-def test_the_two_faces_never_share_a_frame():
-    """Overlapping them at all was the mistake: while both are partly visible
-    the card holds two sets of words on top of each other, and no amount of
-    blur stops that reading as mashed text.
-
-    Whichever face is leaving gets the first 0.26s to itself; the arriving one
-    starts at 0.28s, after the other is gone. Symmetrical, so the resting
-    rules are the leaving half for the code and the arriving half for the
-    facts -- which is why their delays look reversed.
-    """
-    import re
-
-    def transition(selector):
-        at = CSS.index(selector)
-        block = CSS[at:CSS.index("}", at)]
-        return re.search(r"transition:([^;]+);", block, re.S).group(1)
-
-    leaving = (transition(".way:hover .way-face"),
-               transition(".way-code {\n  position: absolute"))
-    arriving = (transition(".way:hover .way-code"),
-                transition(".way-face {\n  margin-top"))
-
-    for rule in leaving:
-        assert "0.26s ease," in rule, "a leaving face should not wait"
-        assert "0.28s" not in rule
-    for rule in arriving:
-        assert "0.34s ease 0.28s" in rule, "an arriving face must wait out the other"
-
-    # The leaving face is fully gone at 0.26s, before the other starts at 0.28s.
-    assert 0.26 < 0.28
-
-    style = CSS[CSS.index(".way:hover .way-face"):]
-    style = style[:style.index("}")]
-    assert "translateY(-12px)" in style and "blur(7px)" in style
-
-    # Motion off means off, and these are transitions.
-    reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce) {\n  .pulse"):]
-    reduced = reduced[:reduced.index("\n}")]
-    assert "transition-duration: 0s" in reduced
-
-
 def test_the_widening_actually_animates():
     """Grid tracks interpolate only when the track list has the same shape.
     Going from minmax(0, 1fr) to a bare 1fr is a different shape, so the
@@ -1122,22 +1081,52 @@ def test_the_two_inner_pages_lead_with_type_not_artwork():
 
 
 
-def test_every_card_is_in_the_effect_while_the_row_rearranges():
-    """The other three cards are resizing too. Three of them reflowing sharply
-    beside one doing something considered is what read as interference, so
-    they soften over the same 0.42s the widths take and settle sharp."""
-    assert "@keyframes settle" in CSS
+
+
+def test_the_row_hides_its_text_while_the_widths_move():
+    """Nobody should watch a paragraph re-wrap.
+
+    When one card widens the other three narrow, and narrowing re-flows their
+    text -- line breaks move, a two-line fact becomes three, and the eye
+    follows the words jumping rather than the card that opened. Blurring,
+    softening and snapping were all treating the motion as the problem. The
+    reflow is the problem: the content is gone while the widths move and comes
+    back already re-wrapped.
+    """
+    import re
+
     frames = CSS[CSS.index("@keyframes settle"):]
     frames = frames[:frames.index("\n}")]
-    assert "translateY(-12px)" in frames, "they arrive from above"
-    assert "blur(7px)" in frames and "blur(0)" in frames, "out of blur, into place"
+    stops = dict(re.findall(r"(\d+)%\s*\{([^}]*)\}", frames))
+    assert "opacity: 1" in stops["0"] and "blur(0)" in stops["0"]
+    assert "opacity: 0" in stops["27"], "the content must be gone before the widths move"
+    assert "opacity: 0" in stops["59"], "and still gone when they stop"
+    assert "opacity: 1" in stops["100"] and "blur(0)" in stops["100"]
+    # Up and out, then up and in: both movements go the same way.
+    assert "translateY(-12px)" in stops["27"] and "translateY(12px)" in stops["59"]
 
-    played = CSS[CSS.index(".ways:hover .way:not(:hover) .way-face,"):]
-    played = played[:played.index("}")]
-    assert "animation: settle 0.42s" in played, "same 0.42s the widths take"
-    assert ".ways:focus-within .way:not(:focus-within) .way-face" in CSS
+    # The hovered card's own content waits for the widths too.
+    arriving = CSS[CSS.index(".way:hover .way-code"):]
+    arriving = arriving[:arriving.index("}")]
+    assert "0.44s" in arriving, "the code must arrive after the widths settle"
 
-    # An animation rather than a transition, because it has to replay every
-    # time the row rearranges and a transition between two states it is
-    # already in does nothing.
-    assert "filter: blur(2.5px)" not in CSS, "they sit softened again"
+
+def test_the_rearrange_runs_when_the_pointer_leaves_as_well():
+    """A selector that has stopped matching cannot start an animation, and the
+    widths change back on the way out exactly as much as they changed on the
+    way in. So the class is driven from script, on every change of which card
+    is current -- including the change to none."""
+    assert ".ways.is-shifting .way:not(:hover):not(:focus-within) .way-face" in CSS
+    ways = JS[JS.index("function wireWays()"):]
+    assert 'ways.addEventListener("mouseleave"' in ways
+    assert "shiftTo(null)" in ways, "leaving the row is a change like any other"
+    assert "void ways.offsetWidth" in ways, "the animation will not restart without it"
+    assert 'if (card === current) return;' in ways, "re-entering the same card is not a change"
+
+
+def test_the_hero_endpoint_is_dressed_like_the_commands_below_it():
+    block = CSS[CSS.index(".hero-endpoint-copy {"):]
+    block = block[:block.index("}")]
+    assert "border-left: 2px solid var(--red-deep)" in block
+    assert "rgba(255, 255, 255, 0.04)" in block
+    assert "border: 0;" in block, "the chip outline is back"

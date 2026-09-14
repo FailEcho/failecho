@@ -714,11 +714,59 @@
     window.setTimeout(dropStaleFocus, 0);
   });
 
+  // -- the row of ways ------------------------------------------------------
+  // The two-phase rearrange is in the stylesheet; this only says *when*.
+  //
+  // CSS can start it on hover and cannot start it on un-hover: a selector
+  // that has stopped matching cannot run an animation, and the widths change
+  // back when you leave the row exactly as much as they changed when you
+  // arrived. So the class is put on for every change of which card is
+  // current -- including the change to none -- and taken off when the
+  // animation has finished, so the next one can restart it.
+  function wireWays() {
+    var ways = document.querySelector(".ways");
+    if (!ways) return;
+
+    var SHIFT_MS = 760; // the 0.74s animation, plus a frame
+    var current = null;
+    var timer = null;
+
+    function shiftTo(card) {
+      if (card === current) return;
+      current = card;
+      ways.classList.remove("is-shifting");
+      // Reading a layout property between the two makes the browser treat
+      // this as a stop and a start rather than as nothing happening.
+      void ways.offsetWidth;
+      ways.classList.add("is-shifting");
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(function () {
+        ways.classList.remove("is-shifting");
+      }, SHIFT_MS);
+    }
+
+    ways.addEventListener("mouseover", function (event) {
+      var card = event.target.closest && event.target.closest(".way");
+      if (card) shiftTo(card);
+    });
+    ways.addEventListener("mouseleave", function () { shiftTo(null); });
+    ways.addEventListener("focusin", function (event) {
+      var card = event.target.closest && event.target.closest(".way");
+      if (card) shiftTo(card);
+    });
+    ways.addEventListener("focusout", function () {
+      window.setTimeout(function () {
+        if (!ways.contains(document.activeElement)) shiftTo(null);
+      }, 0);
+    });
+  }
+
   addCopyButtons();
   wireCopyButtons();
   wireRail();
   wireTopbar();
   wireMenus();
+  wireWays();
   wireTypedLabels();
   wireRunner();
   if (el("stat-real-24h")) {
