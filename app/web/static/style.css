@@ -428,6 +428,11 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   .pulse, .ticked, .caret, .loop-node, .loop-node .loop-n,
   .loop-return::before { animation: none; }
+  /* Transitions, which the rule above does not reach. */
+  .way-face, .way-code, .way::before, .ways {
+    transition-duration: 0s; transition-delay: 0s;
+  }
+  .way-face, .way-code { filter: none; transform: none; }
 }
 
 /* ---- metrics ----------------------------------------------------------- */
@@ -1010,7 +1015,7 @@ footer.shell {
     url("/static/card-abstract1.webp");
   background-size: auto, 260% auto;
   background-repeat: no-repeat, no-repeat;
-  transition: opacity 0.28s ease;
+  transition: opacity 0.32s ease;
 }
 .way > * { position: relative; z-index: 1; }
 .way:hover, .way:focus-within { border-color: var(--line-2); }
@@ -1021,18 +1026,48 @@ footer.shell {
 .way--d::before { background-position: 0 0, 98% 62%; }
 
 /* Two faces, one box: the facts and the command occupy the same space, so
-   the card does not resize when they trade places. */
-.way-body { position: relative; flex: 1 1 auto; min-height: 252px; }
-.way-face, .way-code {
-  transition: opacity 0.22s ease, visibility 0.22s;
+   the card does not resize when they trade places. Both sit in the middle of
+   that space rather than at the top of it -- the title has the top of the
+   card, and everything under it is centred in what is left.
+
+   They cross-dissolve rather than cut. Both fading at once over 0.22s read as
+   a flicker: for a moment the card holds two half-visible sets of words on
+   top of each other, which is the worst frame either of them has. So the
+   facts leave first, rising and softening as they go, and the command
+   follows a beat later from just below and slightly out of focus. The blur
+   is what makes the overlap read as depth rather than as two things fighting
+   over the same space. */
+.way-body {
+  position: relative; flex: 1 1 auto; min-height: 252px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.way-face {
+  transform: none; filter: blur(0);
+  transition: opacity 0.2s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.2s ease, visibility 0s linear 0s;
 }
 .way-code {
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   opacity: 0; visibility: hidden;
+  transform: translateY(12px); filter: blur(7px);
+  transition: opacity 0.24s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.24s ease, visibility 0s linear 0.24s;
 }
-.way:hover .way-face, .way:focus-within .way-face { opacity: 0; visibility: hidden; }
-.way:hover .way-code, .way:focus-within .way-code { opacity: 1; visibility: visible; }
+.way:hover .way-face, .way:focus-within .way-face {
+  opacity: 0; visibility: hidden;
+  transform: translateY(-12px); filter: blur(7px);
+  transition: opacity 0.2s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.2s ease, visibility 0s linear 0.2s;
+}
+.way:hover .way-code, .way:focus-within .way-code {
+  opacity: 1; visibility: visible;
+  transform: none; filter: blur(0);
+  /* A beat behind the facts leaving, so the two never share a frame. */
+  transition: opacity 0.26s ease 0.1s,
+              transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.06s,
+              filter 0.26s ease 0.1s, visibility 0s linear 0.06s;
+}
 
 /* No pointer, no hover: a touch screen gets both at once rather than a card
    whose whole point never appears. */

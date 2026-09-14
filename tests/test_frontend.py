@@ -225,7 +225,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 56_000
+    assert len(CSS) < 58_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -238,7 +238,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 102_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 104_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -256,7 +256,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 135_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 137_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -909,7 +909,7 @@ def test_the_card_you_point_at_takes_the_room():
     """A command needs more width than three facts do. Taking it from the
     other three is cheaper than giving every card enough for the widest
     command it might hold: 303px at rest, 492px hovered at 1440."""
-    ways = CSS[CSS.index(".ways {"):]
+    ways = CSS[CSS.index(".ways {\n  display: grid;"):]
     ways = ways[:ways.index("}")]
     assert "transition: grid-template-columns" in ways
     for variant in ("--a", "--b", "--c", "--d"):
@@ -918,10 +918,30 @@ def test_the_card_you_point_at_takes_the_room():
     assert ".ways:has(.way:hover), .ways:has(.way:focus-within) {" in CSS
 
 
-def test_the_command_starts_where_the_facts_started():
+def test_the_two_faces_of_a_card_sit_in_the_same_place():
+    """The title has the top of the card; everything under it is centred in
+    what is left, and the command lands exactly where the facts were."""
+    body = CSS[CSS.index(".way-body {"):]
+    body = body[:body.index("}")]
+    assert "justify-content: center" in body
     code = CSS[CSS.index(".way-code {\n  position: absolute"):]
     code = code[:code.index("}")]
-    assert "justify-content: flex-start" in code
+    assert "justify-content: center" in code
+
+
+def test_the_two_faces_cross_dissolve_rather_than_cut():
+    """Both fading at once held two half-visible sets of words on top of each
+    other for a moment, which is the worst frame either of them has."""
+    leaving = CSS[CSS.index(".way:hover .way-face"):]
+    leaving = leaving[:leaving.index("}")]
+    assert "translateY(-12px)" in leaving and "blur(7px)" in leaving
+    arriving = CSS[CSS.index(".way:hover .way-code"):]
+    arriving = arriving[:arriving.index("}")]
+    assert "0.1s" in arriving, "the command arrives on the same beat it left on"
+    # Motion off means off, and these are transitions.
+    reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce) {\n  .pulse"):]
+    reduced = reduced[:reduced.index("\n}")]
+    assert "transition-duration: 0s" in reduced
 
 
 def test_the_widening_actually_animates():
