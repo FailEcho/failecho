@@ -226,7 +226,12 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 62_000
+    # 62k -> 63k for the line under the hero endpoint saying what to do with
+    # the URL you just copied, and for the column that holds it. An honest
+    # raise, as the note below predicted: the trims available were comments
+    # carrying the reasoning for the motion, which is worth more than the
+    # bytes.
+    assert len(CSS) < 63_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -1450,3 +1455,14 @@ def test_copied_label_fades_out_still_saying_copied(client):
     assert hold > fade * 1000, (
         f"the label reverts after {hold}ms but takes {fade * 1000:.0f}ms to fade"
     )
+
+
+def test_hero_endpoint_says_what_to_do_with_it(client):
+    """A bare URL in the hero is only useful to someone who already knows what
+    an MCP endpoint is. It carries one line of instruction and a way through."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/").text)
+    note = body[body.index("hero-endpoint-note"):][:220]
+    assert "Paste into your MCP client's config" in note
+    assert 'href="/setup"' in note, "no route to the actual steps"
