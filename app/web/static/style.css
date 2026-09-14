@@ -955,13 +955,12 @@ footer.shell {
 /* The endpoint an agent needs, at the far end of the buttons' row. It is a
    button because copying is what it is for. */
 .hero-endpoint {
-  margin-left: auto; display: inline-flex;
-  flex-direction: column; align-items: stretch; gap: 7px;
+  margin-left: auto; display: inline-flex; align-items: center; gap: 10px;
 }
-/* A bare URL says nothing about what to do with it. One line does. */
+/* Beside the button, not under it: the row keeps the button's own height. */
 .hero-endpoint-note {
-  font-size: 11.5px; line-height: 1.4; color: var(--ink-3);
-  font-family: var(--sans);
+  font-size: 11.5px; line-height: 1.35; color: var(--ink-3);
+  font-family: var(--sans); text-align: right; max-width: 15ch;
 }
 .hero-endpoint-note a { color: var(--ink-2); }
 .hero-endpoint-note a:hover { color: var(--ink); }

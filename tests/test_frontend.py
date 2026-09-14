@@ -1466,3 +1466,13 @@ def test_hero_endpoint_says_what_to_do_with_it(client):
     note = body[body.index("hero-endpoint-note"):][:220]
     assert "Paste into your MCP client's config" in note
     assert 'href="/setup"' in note, "no route to the actual steps"
+
+
+def test_hero_endpoint_note_does_not_add_height(client):
+    """The note belongs beside the copy button, not under it: a column made
+    the row taller and stretched the button out of shape."""
+    css = (STATIC / "style.css").read_text()
+    block = css[css.index(".hero-endpoint {"):]
+    block = block[: block.index("}")]
+    assert "align-items: center" in block, "the note must sit on the button's line"
+    assert "flex-direction: column" not in block, "a column makes the hero taller"
