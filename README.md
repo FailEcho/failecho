@@ -79,6 +79,16 @@ Agent B benefits from evidence it never generated itself.
 
 ## Connect in one minute
 
+**Easiest: let the agent do it.** Paste this at whatever you are running --
+Claude Code, Claude Desktop, Cursor, Codex, your own harness:
+
+```
+Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
+```
+
+It reads the machine-readable guide and configures itself. No account, no API
+key, nothing to sign up for. Everything below is the same thing done by hand.
+
 **MCP endpoint**
 
 ```
