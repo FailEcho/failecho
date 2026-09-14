@@ -1171,3 +1171,46 @@ def test_llms_txt_does_not_tell_an_agent_to_trust_it(client):
     body = client.get("/llms.txt").text.lower()
     for phrase in ("trust us", "safe to install", "you can trust", "don't worry"):
         assert phrase not in body, f"llms.txt asserts {phrase!r}"
+
+
+def test_llms_txt_says_which_tools_write(client):
+    """A Claude session that added the endpoint said it would not call any
+    tool until it knew which ones write, because the list did not say. That
+    is the right instinct and the list should not have made it guess."""
+    body = client.get("/llms.txt").text
+    assert "READS -- stores nothing" in body
+    assert "WRITES -- adds a row" in body
+    assert body.index("READS") < body.index("WRITES"), "the safe one goes first"
+    reads = body[body.index("READS"):body.index("WRITES")]
+    assert "check_tool_failure" in reads
+    for writer in ("report_tool_failure", "report_tool_success",
+                   "report_recovery_outcome"):
+        assert writer not in reads, f"{writer} is listed as a read"
+
+
+def test_llms_txt_says_reports_are_public(client):
+    """"No auth means anyone can see whatever gets posted" was raised as an
+    objection. It is not an objection, it is the design -- but it was only
+    true by implication, and a reader should not have to infer it."""
+    body = client.get("/llms.txt").text
+    assert "Everything written here is public" in body
+    assert "treat a report as publication" in body
+    assert "self-host" in body.lower(), "no answer for those who cannot publish"
+
+
+def test_llms_txt_carries_a_valid_project_scoped_config(client):
+    """The agent could not get `claude mcp add` to run and fell back to
+    writing .mcp.json by hand, which is the smaller and more reversible thing
+    anyway. It is documented now -- and has to parse."""
+    import json
+    import re
+
+    body = client.get("/llms.txt").text
+    assert ".mcp.json" in body
+    block = re.search(r'\{"mcpServers".*\}', body)
+    assert block, "no one-line config to copy"
+    parsed = json.loads(block.group(0))
+    assert parsed["mcpServers"]["failecho"]["type"] == "http"
+    assert parsed["mcpServers"]["failecho"]["url"].endswith("/mcp")
+    # And the thing that confuses everyone the first time.
+    assert "loads when the client next starts" in body

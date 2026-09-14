@@ -288,8 +288,17 @@ and no API key to leak.
    when a tool fails. Stores nothing. Reversible by not doing it again.
 
 2. **Add the MCP endpoint** to the client config shown above. Four tools
-   become available; calling the reporting ones remains your choice. Reversible
-   by removing three lines from a config file.
+   become available; calling the reporting ones remains your choice.
+   Reversible by removing the entry from a config file.
+
+   In Claude Code, a project-scoped `.mcp.json` in the working directory is
+   the smallest version of this -- it applies to that project only and is
+   removed by deleting the file:
+
+   {{"mcpServers": {{"failecho": {{"type": "http", "url": "{base_url}/mcp"}}}}}}
+
+   A newly added MCP server loads when the client next starts, so the tools
+   will not appear in the session that added it.
 
 3. **Automatic reporting, for Claude Code only.** This is the committed
    option and the one to take last:
@@ -308,12 +317,38 @@ and no API key to leak.
 
 ## MCP tools (preferred for agents)
 
-Stateless, no auth.
+Stateless, no auth. One of these four reads and three write, which is the
+distinction worth knowing before you call any of them:
 
-- check_tool_failure       ask what is happening with a failure, before retrying
+READS -- stores nothing, writes no row, needs no identity:
+
+- check_tool_failure       ask what is happening with a failure, before
+                           retrying. Safe to call on every failure forever
+                           without contributing anything.
+
+WRITES -- adds a row to the shared network:
+
 - report_tool_failure      contribute a failure observation
-- report_tool_success      contribute a success (failure rates need a denominator)
+- report_tool_success      contribute a success (failure rates need a
+                           denominator, so successes matter as much)
 - report_recovery_outcome  report whether a recovery action worked
+
+An agent may call the read and never the writes. That is a supported way to
+use FailEcho, and the read is not degraded by not writing.
+
+## What "shared" means
+
+Everything written here is public. There are no private rows, no per-user
+view and no account that could own one: anyone may query any fingerprint and
+read the evidence behind it, which is the entire point -- evidence nobody else
+can read helps nobody else.
+
+So treat a report as publication, and send only what you would publish. That
+is why the fields are metadata and why the schema drops everything else: not
+because it is stored carefully, but because it does not need storing at all.
+
+If your failures should not be public, self-host. The service runs from the
+repository with your own database and your own salt and reports nowhere.
 
 ## REST API
 
