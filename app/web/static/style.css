@@ -151,17 +151,15 @@ a[rel~="external"]:hover::after { color: var(--red); }
   padding-block: 18px;
 }
 
-.brand { display: inline-grid; align-items: center; justify-items: start; }
+.brand { display: inline-flex; align-items: center; gap: 11px; }
 .brand:hover { color: inherit; }
-/* Both are always laid out, in the same grid cell, and they trade places by
-   opacity. Toggling display makes the bar's width jump and the swap read as
-   a glitch; stacking them keeps the box the width of the wider of the two,
-   so nothing beside it moves either. */
-.brand-mark, .brand-word { grid-area: 1 / 1; display: block; width: auto; }
+/* The mark and the name, side by side, at every scroll position. They used
+   to trade places -- mark at the top of the page, wordmark once you had
+   scrolled past the headline -- which meant the site never said its own name
+   above the fold. */
+.brand-mark, .brand-word { display: block; width: auto; }
 .brand-mark { height: 28px; }
-.brand-word { height: 21px; opacity: 0; }
-.topbar.is-stuck .brand-mark { opacity: 0; }
-.topbar.is-stuck .brand-word { opacity: 1; }
+.brand-word { height: 19px; }
 
 .nav {
   display: flex; align-items: center; gap: 4px;
@@ -258,7 +256,7 @@ a[rel~="external"]:hover::after { color: var(--red); }
    the bar's growth is its padding, which the margin matches exactly. */
 .brand { transition: transform 0.22s ease; transform-origin: left center; }
 .brand-mark, .brand-word { transition: opacity 0.22s ease; }
-.topbar.is-open .brand { transform: scale(1.5); }
+.topbar.is-open .brand { transform: scale(1.28); }
 
 /* Everything below the bar goes soft while a menu is open, so the menu is
    the only thing in focus. Fixed and behind the bar, never over it. */

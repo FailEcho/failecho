@@ -545,7 +545,7 @@ def test_the_logo_grows_without_changing_the_bar_s_layout():
     content box only grows once the mark passes the nav links, a clamped
     curve, while the margin compensating for the bar's growth eases linearly.
     They did not cancel, so the page drifted up and back on every open."""
-    assert ".topbar.is-open .brand { transform: scale(1.5); }" in CSS
+    assert ".topbar.is-open .brand { transform: scale(1.28); }" in CSS
     assert ".topbar.is-open .brand-mark { height:" not in CSS
     assert ".brand { transition: transform 0.22s ease" in CSS
 
@@ -574,12 +574,11 @@ def test_the_top_bar_has_two_states_and_two_brands():
     assert "linear-gradient(90deg" in rule and "transparent," in rule
     assert "opacity: 0;" in rule, "the rule shows at the top of the page"
     assert ".topbar.is-stuck::after { opacity: 1; }" in CSS
-    # The brand trades places by opacity, in one grid cell, so neither the
-    # swap nor the bar's width jumps.
-    assert ".topbar.is-stuck .brand-mark { opacity: 0; }" in CSS
-    assert ".topbar.is-stuck .brand-word { opacity: 1; }" in CSS
-    assert "grid-area: 1 / 1" in CSS
-    assert "opacity 0.22s ease" in CSS
+    # The brand is the mark and the name together, at every scroll position:
+    # the bar used to show one or the other, so the site never said its own
+    # name above the fold.
+    assert ".brand { display: inline-flex" in CSS
+    assert ".topbar.is-stuck .brand" not in CSS, "the brand no longer changes on scroll"
 
 
 def test_the_bar_does_not_flicker_at_its_own_boundary():
@@ -730,7 +729,7 @@ def test_the_bar_s_growth_is_one_length_the_margin_can_cancel():
     assert ".topbar.is-open .topbar-row { padding-block: 28px; }" in CSS
     assert ".topbar.is-open { margin-bottom: calc(var(--bar-h" in CSS
     # Nothing else in the bar may change its own height.
-    assert ".topbar.is-open .brand { transform: scale(1.5); }" in CSS
+    assert ".topbar.is-open .brand { transform: scale(1.28); }" in CSS
 
 
 def test_a_button_label_types_itself_rather_than_scrambling():
