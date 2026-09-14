@@ -225,7 +225,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 59_000
+    assert len(CSS) < 60_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -256,7 +256,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 137_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 139_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -1116,3 +1116,18 @@ def test_the_two_inner_pages_lead_with_type_not_artwork():
     for page in ("network.html", "demo.html"):
         assert "hero--art" not in (STATIC / page).read_text(), page
     assert "hero--art" not in CSS, "the rule outlived its only two users"
+
+
+def test_only_the_card_under_the_pointer_animates():
+    """Moving from one card to the next is the case the handover does not
+    cover on its own. The card you left has a full 0.62s to perform -- code
+    out, facts back in -- and performs it while its width is shrinking, beside
+    the card you are actually reading. Two cards mid-swap is the same mashing
+    as before, spread across the row."""
+    assert ".ways:hover .way:not(:hover):not(:focus-within) .way-face" in CSS
+    snap = CSS[CSS.index(".ways:hover .way:not(:hover)"):]
+    snap = snap[:snap.index("}")]
+    assert "transition-duration: 0.12s" in snap
+    assert "transition-delay: 0s" in snap
+    # The artwork goes back with it, or the card returns in two pieces.
+    assert ":not(:focus-within)::before" in CSS

@@ -1096,6 +1096,26 @@ footer.shell {
               filter 0.34s ease 0.28s, visibility 0s linear 0.24s;
 }
 
+/* Moving from one card to the next is the case the handover above does not
+   cover. The card you left has a full 0.62s of its own to perform -- code
+   out, facts back in -- and it performs it while its width is shrinking,
+   beside the card you are actually reading. Two cards mid-swap at once is
+   the same mashing as before, just spread across the row.
+
+   So only the card under the pointer animates. Any other card in a row that
+   has one snaps back: 0.12s, no delay, including its artwork. You are not
+   looking at it, and a card quietly returning to rest is not something that
+   needs a performance. */
+.ways:hover .way:not(:hover):not(:focus-within) .way-face,
+.ways:hover .way:not(:hover):not(:focus-within) .way-code,
+.ways:hover .way:not(:hover):not(:focus-within)::before,
+.ways:focus-within .way:not(:hover):not(:focus-within) .way-face,
+.ways:focus-within .way:not(:hover):not(:focus-within) .way-code,
+.ways:focus-within .way:not(:hover):not(:focus-within)::before {
+  transition-duration: 0.12s;
+  transition-delay: 0s;
+}
+
 /* No pointer, no hover: a touch screen gets both at once rather than a card
    whose whole point never appears. */
 @media (hover: none) {
