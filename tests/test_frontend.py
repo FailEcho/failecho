@@ -898,6 +898,6 @@ def test_the_card_you_point_at_takes_the_room():
 
 
 def test_the_command_starts_where_the_facts_started():
-    code = CSS[CSS.index(".way-code {"):]
+    code = CSS[CSS.index(".way-code {\n  position: absolute"):]
     code = code[:code.index("}")]
     assert "justify-content: flex-start" in code
