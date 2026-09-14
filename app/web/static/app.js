@@ -291,7 +291,13 @@
           : "Copy failed. Select the text manually.");
         if (!isBlock) return say(control, ok);
         control.classList.toggle("is-copied", ok);
-        setTimeout(function () { control.classList.remove("is-copied"); }, 1600);
+        setTimeout(function () {
+          control.classList.remove("is-copied");
+          // The pointer is usually still on the control here. Letting the
+          // "click to copy" hint come straight back reads as a flicker, so
+          // hold it until the pointer or focus actually leaves.
+          control.classList.add("is-quiet");
+        }, 1600);
         // Clicking the block copies, but the block cannot say so without
         // rewriting the command. The button next to it says it instead.
         // A block that is itself a button -- the hero's endpoint -- is its own
@@ -303,6 +309,10 @@
         );
         if (partner && partner !== control) say(partner, ok);
       }
+
+      function unquiet() { control.classList.remove("is-quiet"); }
+      control.addEventListener("mouseleave", unquiet);
+      control.addEventListener("blur", unquiet);
 
       function copy() {
         var source = el(control.getAttribute("data-copy-target"));
@@ -731,7 +741,7 @@
     var ways = document.querySelector(".ways");
     if (!ways) return;
 
-    var SHIFT_MS = 540; // the 0.52s animation, plus a frame
+    var SHIFT_MS = 320; // the 0.30s settle, plus a frame
     var current = null;
     var timer = null;
 

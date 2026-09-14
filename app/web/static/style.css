@@ -923,6 +923,9 @@ footer.shell {
 }
 .copyable:hover::after, .copyable:focus-visible::after { opacity: 1; }
 .copyable.is-copied::after { content: "copied"; color: var(--healthy); opacity: 1; }
+/* "copied" times out while the pointer is still on the control, so the hint
+   would return at full opacity and read as a flicker. Quiet until it leaves. */
+.copyable.is-quiet::after { opacity: 0; }
 
 /* ---- hero: one column, the ways underneath ------------------------------ */
 /* Spacing down the hero, top to bottom, all of it in this block:
@@ -1057,7 +1060,7 @@ footer.shell {
    pointer *leaves* the row as well -- the widths change back then too, and
    CSS cannot start an animation on a selector that has stopped matching. */
 .ways.is-shifting .way:not(:hover):not(:focus-within) .way-face {
-  animation: settle 0.74s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: settle 0.30s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 .way::before {
   content: ""; position: absolute; inset: 0; z-index: 0;
@@ -1108,31 +1111,30 @@ footer.shell {
 .way-face {
   margin-top: 52px;
   transform: none; filter: blur(0);
-  transition: opacity 0.22s ease 0.3s,
-              transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) 0.28s,
-              filter 0.22s ease 0.3s, visibility 0s linear 0.28s;
+  transition: opacity 0.18s ease 0.12s,
+              transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s,
+              filter 0.18s ease 0.12s, visibility 0s linear 0.12s;
 }
 .way-code {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   justify-content: flex-start; padding-top: 52px;
   opacity: 0; visibility: hidden;
   transform: translateY(12px); filter: blur(7px);
-  transition: opacity 0.14s ease, transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.14s ease, visibility 0s linear 0.14s;
+  transition: opacity 0.12s ease, transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.12s ease, visibility 0s linear 0.12s;
 }
 .way:hover .way-face, .way:focus-within .way-face {
   opacity: 0; visibility: hidden;
   transform: translateY(-12px); filter: blur(7px);
-  transition: opacity 0.14s ease, transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.14s ease, visibility 0s linear 0.14s;
+  transition: opacity 0.12s ease, transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.12s ease, visibility 0s linear 0.12s;
 }
 .way:hover .way-code, .way:focus-within .way-code {
   opacity: 1; visibility: visible;
   transform: none; filter: blur(0);
-  /* Starts after the widths have finished, not merely after the facts. */
-  transition: opacity 0.22s ease 0.3s,
-              transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) 0.28s,
-              filter 0.22s ease 0.3s, visibility 0s linear 0.28s;
+  transition: opacity 0.18s ease 0.12s,
+              transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s,
+              filter 0.18s ease 0.12s, visibility 0s linear 0.12s;
 }
 
 /* Moving from one card to the next is the case the handover above does not
@@ -1169,7 +1171,9 @@ footer.shell {
 .way-name {
   margin: 0 0 20px; min-height: 2.28em;
   font-family: var(--serif); font-weight: 400;
-  font-size: 25px; line-height: 1.14; letter-spacing: -0.015em; color: var(--ink);
+  /* Longest name is two lines; at a fixed 25px it became three when narrow,
+     pushing that one card's body below the others. */
+  font-size: clamp(19px, 1.88vw, 25px); line-height: 1.14; letter-spacing: -0.015em; color: var(--ink);
 }
 .way-facts { margin: 0 0 18px; font-size: 13px; line-height: 1.5; }
 .way-facts > div { display: flex; gap: 8px; padding: 4px 0; }

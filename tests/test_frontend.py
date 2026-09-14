@@ -1105,10 +1105,16 @@ def test_the_row_hides_its_text_while_the_widths_move():
     # Up and out, then up and in: both movements go the same way.
     assert "translateY(-12px)" in stops["25"] and "translateY(12px)" in stops["58"]
 
-    # The hovered card's own content waits for the widths too.
+    # The handover is a cross-fade, not a pause: the arriving face starts at
+    # exactly the moment the leaving one has finished, with no dead gap.
     arriving = CSS[CSS.index(".way:hover .way-code"):]
     arriving = arriving[:arriving.index("}")]
-    assert "0.3s" in arriving, "the code must arrive after the widths settle"
+    leaving = CSS[CSS.index(".way:hover .way-face"):]
+    leaving = leaving[:leaving.index("}")]
+    assert "opacity 0.12s ease," in leaving, "the leaving face sets the handover point"
+    assert "opacity 0.18s ease 0.12s" in arriving, (
+        "the arriving code must start when the leaving face ends"
+    )
 
 
 def test_the_rearrange_runs_when_the_pointer_leaves_as_well():
@@ -1389,3 +1395,19 @@ def test_setup_page_is_not_only_claude_code(client):
     body = re.sub(r"[ \t]+", " ", client.get("/setup").text)
     for row in [".cursor/mcp.json", ".vscode/mcp.json", '"servers"', "url only, no type"]:
         assert row in body, f"{row} missing from the setup page"
+
+
+def test_settle_animation_is_not_cut_off_by_its_own_timer(client):
+    """`is-shifting` is removed by a JS timer. If that timer is shorter than
+    the animation it gates, the animation is truncated mid-flight and the text
+    jumps at the end -- which is what "mashing on the last second" was."""
+    import re
+
+    css = (STATIC / "style.css").read_text()
+    js = (STATIC / "app.js").read_text()
+    anim = float(re.search(r"animation: settle ([\d.]+)s", css).group(1))
+    shift = float(re.search(r"SHIFT_MS = (\d+)", js).group(1))
+    assert shift >= anim * 1000, (
+        f"SHIFT_MS {shift}ms cuts off a {anim}s animation"
+    )
+    assert shift - anim * 1000 <= 60, "the row stays locked well after it has settled"
