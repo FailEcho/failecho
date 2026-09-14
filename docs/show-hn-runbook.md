@@ -15,28 +15,52 @@ in the thread falls off /new without ever reaching the front page.
 - [ ] HN account exists and can post. New accounts can post Show HN with zero
       karma, but an account created minutes before the post looks like a
       throwaway. If the account is brand new, make it now and leave it.
-- [ ] `https://failecho.com` loads, `https://failecho.com/mcp` answers
-      `tools/list`, `https://failecho.com/v1/stats` returns JSON.
-- [ ] The GitHub repo is public and the README's first screen answers "what is
-      this and how do I connect" without scrolling.
+- [x] Verified 2026-09-14: `https://failecho.com` 200, `/mcp` answers
+      `tools/list` 200, `/v1/stats` returns JSON. Re-check on the morning.
+- [x] Repo is public (verified 2026-09-14). Re-read the README's first screen
+      before posting and check it still answers "what is this and how do I
+      connect" without scrolling.
 - [x] The install commands in the post were run end to end on 2026-09-12:
       `claude plugin marketplace add FailEcho/failecho` then
       `claude plugin install failecho@failecho` installs and loads both the
       MCP server and the hook. Re-check if either manifest changes.
-- [x] Load tested 2026-09-12 on the launch build, on a throwaway copy on the
-      production box (50 concurrent, 20s per profile, zero failures):
-      homepage 287 req/s, p50 108 ms, p99 987 ms; `/v1/query` 60 req/s,
-      p50 815 ms, p99 1.1 s; mixed traffic 195 req/s, with 429s where the
-      write rate limit is meant to bite. /setup answers in ~2 ms. At 200
-      concurrent (measured 09-11) nothing failed, but p99 rose to ~5 s
-      (homepage) and ~6.5 s (query). Re-run
+- [x] Load tested again 2026-09-14, against production for reads and a
+      throwaway instance for writes. Reads, through Cloudflare: 10 concurrent
+      539 req/s p99 50 ms; 50 concurrent 277 req/s p99 905 ms; 200 concurrent
+      167 req/s p99 7.0 s. Zero failures at every level, memory flat at ~80 MB
+      of a 400 MB ceiling, no restarts. Writes serialise at ~100/s (SQLite has
+      one writer) and memory stayed at 123 MB under 120 concurrent writers
+      with the limiter off. With the production limiter on, a mixed flood
+      returned 1380 × 200 and 132 × 429 with reads still answering in 1.6 ms:
+      excess writes are shed and readers are not starved. It degrades, it does
+      not fall over. The bottleneck is CPU (2 cores), not memory. Re-run
       `.venv/bin/python scripts/loadtest.py` if the code changes again.
+- [x] Penetration tested 2026-09-14. Four findings, all fixed: no request body
+      limit (a 32 MB body was parsed, taking the worker to 100 MB), no
+      security headers at all, `/docs` executing Swagger UI from a CDN, and
+      control characters accepted into stored metadata. Reads only against
+      production; every write test ran on a throwaway instance so the adoption
+      number stayed honest.
 - [ ] Read the current stats and be ready to say them out loud, split by
-      source: `real_observations_total` (independent agents) and
-      `first_party_observations` (your own agents). On 2026-09-11 both were 0.
+      source. As of 2026-09-14: `real_observations_total` 0,
+      `real_reporters_24h` 0, `first_party_observations` 20, and 9 of 44
+      queries in the last 24 hours were answerable from evidence. The last
+      number is the interesting one — there is demand and no corpus — and it
+      is a better answer to "is anyone using this" than the zero alone.
 - [ ] Never seed the database to look busier. Your own agents' real calls,
       labelled first-party with the operator token, are fine: they are
       disclosed on the page and in every answer. Synthetic rows are not.
+
+## 1b. Blocking, as of 2026-09-14
+
+Three things gate the post, and none of them are code:
+
+- [ ] **The three blanks in §5 are still blank.** They get asked every time.
+- [ ] **The warm-up post is unpublished** (`published: false` in
+      `docs/devto-post-warmup.md`). It exists so the author is not a stranger.
+- [ ] **`real_observations_total` is 0.** See `docs/posting-calendar.md` for
+      the argument that this should move the date rather than be explained
+      away in the thread.
 
 ## 2. Submitting
 
