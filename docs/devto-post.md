@@ -11,15 +11,21 @@ Tags: `#ai` `#llm` `#opensource` `#python`
 Title:
 
 ```
-AI agents retry failures that can never succeed. I built a shared log so they stop.
+Your agent has already solved this error. It just doesn't remember.
 ```
 
 Backups:
 
 ```
-Your agent has hit this error before. It just doesn't know that.
+AI agents retry failures that can never succeed. I gave mine a memory.
 The retry is the default and it is usually wrong
 ```
+
+The title deliberately says *your agent*, not *other people's agents*. The
+first version led with the shared network, which asks the reader to bet on
+strangers turning up. Nobody wants to be the first one in an empty room, and
+the honest thing is that they do not have to be: the memory works on one
+person's own history. The network is the upside, not the entry fee.
 
 ---
 
@@ -195,43 +201,59 @@ code, how long the call took. That's it. No prompts, no tool arguments, no
 results, no headers, no keys. Error text is normalised server-side and the
 original thrown away. MIT, no account, no key.
 
-## The honest part
+## The part that works with nobody else involved
 
-Before you install anything: that example output above is from the runnable
-demo. It is not live traffic.
+Here is the thing I got wrong when I started building this. I thought the
+whole value was other people. It isn't, and it took me a while to notice.
 
-The network is empty. Zero independent agents have reported anything to it.
-That counter is on the front page and it says zero, because a shared log with
-one person in it is just a log :3
+Your agent hits the same failure across different sessions. Not other
+people's agents — yours. Monday's session works out that the field is
+`content` now, and Monday's session is gone. Thursday's session starts from
+`422 validation_error` again, with nothing.
 
-So I won't pretend it helps you today. It doesn't. It needs five to ten people
-running it for a week before any fingerprint has enough behind it to read.
+So the first thing this fixes is your own amnesia.
 
-That's the ask. If you run agents against MCP servers, leave this on for a week
-and see what it catches. It runs after the call with a two second timeout, so
-the worst case when my server falls over is your agent waits two seconds.
-`FAILECHO_DISABLED=1` kills it entirely.
+A recovery action gets recommended once **five recovery attempts** back it.
+Note attempts, not failures — reporting the same failure five times gets you
+nothing, correctly, because a failure cannot prove a fix. What counts is what
+happened *after*. And those five can all be yours. Hit the thing five times,
+let the hook record what fixed it each time, and the sixth time it tells you,
+before another agent has ever connected.
 
-I'll publish whatever it sees afterwards — including if the answer is "different
-people's failures barely overlap", which is honestly what I most want to know.
+Every answer says which kind of evidence it is:
 
-## Why it is worth being early
+```
+from_other_agents: false   -> your own history, coming back to you
+from_other_agents: true    -> somebody else already paid for this one
+from_other_agents: null    -> you sent no reporter_id, so it cannot be known
+```
 
-Here's the part I like. Contributing costs you nothing you weren't already
-paying. Those failures are happening to your agents this week regardless. The
-only question is whether they evaporate or turn into something the next person
-can read — and since the hook does the reporting, "contributing" means leaving
-a switch on and forgetting about it.
+Confidence is discounted below three distinct reporters, so your own evidence
+counts for less than a crowd's. It just doesn't count for nothing.
 
-And the bar is way lower than it sounds. An action needs five observed
-attempts before it gets recommended, and three separate reporters before it
-carries full weight. Five and three. Not five thousand. If ten of us point
-this at the popular MCP servers for a week, the failures we all share cross
-those numbers, and after that none of us is paying for the same mistake
-alone anymore.
+## And then the part that needs other people
 
-That's the whole bet. Either it works at ten people or the overlap isn't
-there, and either way we find out in a week :3
+The shared layer is new. I'm not going to put a fake number on it — the live
+counter is on the front page and you can read it yourself before you install
+anything.
+
+What I'll say instead is that the bar is lower than it sounds. Five attempts
+for a recommendation, three reporters for full weight. Five and three, not
+five thousand. The failures on popular MCP servers are not exotic; they are
+the same handful of renamed fields and rate limits hitting everyone, which is
+exactly why they cross those numbers quickly once more than one person is
+looking.
+
+And contributing costs nothing you weren't already paying. Those failures are
+happening to your agents this week regardless. The hook does the reporting, so
+"contributing" is leaving a switch on and forgetting about it. It runs after
+the call with a two second timeout — worst case, my server falls over and your
+agent waits two seconds. `FAILECHO_DISABLED=1` kills it entirely.
+
+I'll publish what it sees, including if the answer turns out to be "different
+people's failures barely overlap". That is genuinely the thing I most want to
+know, and it is the kind of result that only exists if somebody runs the
+experiment :3
 
 https://failecho.com
 
@@ -257,5 +279,14 @@ Then the rest:
   an author who does not use his own product.
 - Do not add a user count, a star count, or a "trusted by". There are none.
 - Weekday morning UTC. Answer every comment for the first few hours.
-- Expect "so it does nothing yet?" as the top comment. The answer is yes, said
-  plainly, in one line, without arguing.
+- Expect "so it does nothing yet?" as the top comment. The answer is **not**
+  yes any more, and it was wrong when the earlier draft said so. The answer is:
+  "It works on your own agent's history from the fifth recovery — that part
+  needs nobody. The cross-agent part needs other people and is new." One line,
+  no arguing, no defensiveness.
+- Do not write "be the first" or "help me get started" anywhere. It is a
+  deterrent: nobody wants to be the only person in the room, and the product
+  does not actually require it. Say what it does for one person, let the
+  network be the upside.
+- If asked directly how many people use it, say the number. It is on the front
+  page and a reader who checks and finds you dodged is worse than any number.
