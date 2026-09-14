@@ -75,11 +75,60 @@ from a VPS in the US. One round trip either way, and the hook gives up after
 2 seconds regardless -- which is the answer to "what happens when your server
 is slow".
 
+## Hide the prompt before you record anything
+
+The default prompt renders `root@arbitrage:/root/agentwebsite#`. That is the
+server's hostname, the fact that you are root on it, and the absolute path,
+published to everyone who watches. None of it is a secret exactly, and none of
+it belongs in a video either -- a hostname plus "root" is a free hint for
+anyone scanning.
+
+**Open a clean shell for the recording:**
+
+```bash
+env -i PATH=/usr/bin:/bin:/usr/local/bin HOME="$HOME" TERM=xterm-256color \
+  bash --noprofile --norc
+```
+
+`env -i` starts with nothing inherited, so no aliases, no history, no leftover
+environment variables in the frame. Then set a prompt that says nothing:
+
+```bash
+PS1='$ '
+cd ~/agentwebsite
+clear
+```
+
+`$ ` is what a reader expects and carries no information. Use `~` rather than
+the absolute path, which is why `cd ~/agentwebsite` rather than `cd
+/root/agentwebsite`.
+
+**Or record with no prompt at all.** If you use asciinema, `-c` runs one
+command and captures only its output:
+
+```bash
+asciinema rec demo.cast -c ".venv/bin/python examples/live_agent/run_demo.py --network-url http://127.0.0.1:8099"
+```
+
+No shell, no prompt, no path, nothing to redact afterwards. This is the
+safest option and the one to prefer.
+
+**Check the frame before you publish**, not after: hostname, username, path,
+any `.env` or token in scrollback, browser tabs if the terminal is not
+fullscreen, and anything in a notification. A cast file is plain text, so you
+can grep it:
+
+```bash
+grep -iE "root@|arbitrage|/root/|token|salt|password" demo.cast
+```
+
 ## Tools
 
-- **asciinema** — `asciinema rec demo.cast`, then `agg demo.cast demo.gif`.
-  Best quality-to-size for a terminal, and the text stays selectable if you
-  embed the player.
+- **asciinema** — not installed here yet: `pipx install asciinema` or
+  `apt install asciinema`, and `agg` (from the asciinema project) converts a
+  cast to a GIF. Best quality-to-size for a terminal, the file is plain text
+  you can inspect before publishing, and the text stays selectable if you
+  embed the player instead of a GIF.
 - **Plain screen capture** to MP4 works everywhere and Reddit prefers native
   video uploads to links.
 - A **GIF under 5MB** embeds directly in the README. Trim aggressively; nobody
