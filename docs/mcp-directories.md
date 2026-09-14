@@ -11,6 +11,24 @@ Two kinds of listing, and they work completely differently:
 
 Do the official registry first. It is the one that propagates.
 
+## Status, 2026-09-14
+
+| Where | State |
+|---|---|
+| Official MCP registry | listed, `com.failecho/failecho` v0.2.0, active |
+| Glama | claimed and hosted via the stdio relay |
+| Smithery | published, `failecho/failecho` |
+| mcpservers.org | listed under Development |
+| PulseMCP | nothing to do -- submissions paused, ingests the registry |
+| `awesome-mcp-servers` | PR #14162 open, not yet merged |
+| Claude community marketplace | submitted 2026-09-14, pending review |
+| `awesome-remote-mcp-servers` | not eligible -- requires OAuth or an API key |
+| mcp.so | skipped, $39 |
+
+Everything that can be done without waiting on someone else is done. What
+remains is two review queues and a merge queue, none of which are worth
+chasing.
+
 ---
 
 ## 1. Official MCP registry
@@ -173,6 +191,17 @@ where `listing.json` carries `displayName`, `description`, `homepage`,
 and enumerated all four tools on publish, which doubles as a live check that
 the MCP surface works from outside.
 
+### mcpservers.org — listed ✅
+
+Live under **Development**, with the description:
+
+> Live failure intelligence for AI agents. Check whether other agents are
+> hitting the same tool failure and see which recovery actions actually worked
+> before retrying.
+
+The site returns 403 to scripted requests, so its state cannot be checked from
+a shell -- open it in a browser to verify or edit.
+
 ### mcp.so — skipped, paid
 
 Listing costs $39. Not worth it while the network has no real reporters and no
@@ -233,6 +262,13 @@ What the form is asking about, in one place:
 | What it installs | the FailEcho MCP server (`https://failecho.com/mcp`, no auth, no key) and `PostToolUse` / `PostToolUseFailure` hooks matching `mcp__.*` |
 | What it sends | the server's public name, the tool name, a coarse error class and code, and latency. Never tool arguments, results, prompts, paths or session ids; error text only with `FAILECHO_HOOK_SEND_ERRORS=1`. Servers it cannot name publicly are skipped |
 | Off switch | `FAILECHO_DISABLED=1` |
+
+**Submitted 2026-09-14, pending review.** Check for the name in
+`anthropics/claude-plugins-community`'s `.claude-plugin/marketplace.json`:
+
+```bash
+curl -s https://raw.githubusercontent.com/anthropics/claude-plugins-community/main/.claude-plugin/marketplace.json | grep -c failecho
+```
 
 After approval the plugin is pinned to a commit SHA in the community catalog
 and CI bumps the pin as we push. The public catalog syncs nightly, so there is

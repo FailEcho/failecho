@@ -46,12 +46,12 @@ Best window: **Tue–Thu, 13:00–15:00 UTC** (morning US, afternoon Europe).
 Cross-post the same article to Hashnode and Medium — dev.to permits it and
 the canonical tag keeps search clean.
 
-**Wed 16 Sep — the durable listings, which have no timing at all**
-These keep paying out for months and cost nothing to place:
-- `mcpservers.org/submit`
-- A PR to `punkpeye/awesome-mcp-servers` on GitHub
-- Glama (already listed — verify the entry is current)
-- The official registry (already listed — verify v0.2.0 is showing)
+**Wed 16 Sep — nothing. The listings are done.**
+Every directory that can be placed without waiting on someone else already is:
+official registry, Glama, Smithery, mcpservers.org. What is outstanding is a
+merge queue (`awesome-mcp-servers` PR #14162) and a review queue (the Claude
+community marketplace, submitted 2026-09-14) — neither is worth chasing, and
+both propagate on their own. See `docs/mcp-directories.md` for the table.
 
 **Thu 17 Sep — the MCP Discord**
 `docs/mcp-discord-post.md`. Small audience, exactly the right one, and the
