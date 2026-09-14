@@ -137,17 +137,9 @@ a[rel~="external"]:hover::after { color: var(--red); }
      the instant a menu opens and then eases back down. */
   transition: background 0.22s ease, margin-bottom 0.22s ease;
 }
-/* The rule is a gradient, not a border: solid in the middle and gone at both
-   edges, so it reads as a horizon rather than as a box's bottom side. */
-.topbar::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
-  background: linear-gradient(90deg,
-    transparent, rgba(255, 255, 255, 0.42) 22%,
-    rgba(255, 255, 255, 0.42) 78%, transparent);
-  opacity: 0; transition: opacity 0.22s ease;
-}
+/* No rule under the bar. The glass and the page are the same black, and the
+   line was the only thing insisting they were two surfaces. */
 .topbar.is-stuck { background: rgba(0, 0, 0, 0.82); }
-.topbar.is-stuck::after { opacity: 1; }
 
 .topbar-row {
   display: flex; align-items: center; gap: 14px 20px; flex-wrap: wrap;
@@ -217,13 +209,6 @@ a[rel~="external"]:hover::after { color: var(--red); }
   content: ""; position: absolute; left: 0; right: 0; top: -30px; height: 30px;
 }
 
-/* Same horizon under the open panel. */
-.navpanel::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
-  background: linear-gradient(90deg,
-    transparent, rgba(255, 255, 255, 0.42) 22%,
-    rgba(255, 255, 255, 0.42) 78%, transparent);
-}
 .navpanel b { font-size: 16px; }
 .navpanel a[data-leads] b::after {
   content: " \2197"; font-size: .8em; color: var(--ink-3);
@@ -233,8 +218,6 @@ a[rel~="external"]:hover::after { color: var(--red); }
 .navitem:hover .navpanel, .navitem:focus-within .navpanel {
   opacity: 1; visibility: visible; transform: none;
 }
-/* The open panel carries the rule, so the bar's own must not draw too. */
-.topbar.is-open::after { opacity: 0; }
 /* Measuring both bar heights means briefly wearing the open state; that
    must not be a thing anyone sees move. */
 .topbar.is-measuring, .topbar.is-measuring * { transition: none !important; }
@@ -1018,7 +1001,18 @@ footer.shell {
   display: flex; flex-direction: column;
   padding: 22px 20px 20px;
   border: 1px solid var(--line); background: #000;
-  transition: border-color 0.22s ease;
+  filter: blur(0);
+  transition: border-color 0.22s ease,
+              filter 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+/* While the row is rearranging, every card is in the effect, not just the one
+   under the pointer. The other three are resizing too, and three cards
+   reflowing sharply beside one doing something considered is what read as
+   interference. They soften over the same 0.42s the widths take, so the whole
+   row moves as one thing and settles sharp. */
+.ways:hover .way:not(:hover),
+.ways:focus-within .way:not(:focus-within) {
+  filter: blur(2.5px);
 }
 .way::before {
   content: ""; position: absolute; inset: 0; z-index: 0;

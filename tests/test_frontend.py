@@ -523,7 +523,7 @@ def test_the_menu_pulls_the_whole_bar_down():
     assert "position: fixed" in panel and "left: 0" in panel and "right: 0" in panel
     assert "top: var(--bar-h" in panel, "the panel guesses the bar's height"
     assert "backdrop-filter" in panel, "the panel is not the same glass as the bar"
-    assert ".navpanel::after" in CSS, "the open panel drops the horizon line"
+    assert "border: 0;" in panel
     assert '--bar-h", bar.offsetHeight' in JS, "the height is guessed, not measured"
 
 
@@ -562,18 +562,18 @@ def test_the_ground_is_black():
 
 def test_the_top_bar_has_two_states_and_two_brands():
     """Black glass throughout. At the top there is no rule under it -- the bar
-    is the page. Once you have scrolled a sharp white line separates the two,
-    and the brand gives way from the mark to the wordmark, which is what has
-    to say who this is when the headline is gone."""
+    is the page, and it stays that way: the glass and the page are the same
+    black and the rule that used to insist they were two surfaces is gone.
+    What still changes on scroll is the background's opacity, nothing else."""
     assert ".topbar.is-stuck" in CSS
-    rest = CSS[CSS.index(".topbar {"):CSS.index(".topbar::after")]
+    rest = CSS[CSS.index(".topbar {"):CSS.index(".topbar.is-stuck")]
     assert "backdrop-filter" in rest, "the glass is gone"
-    # The rule is a gradient that ends before the edges do, not a border.
-    rule = CSS[CSS.index(".topbar::after {"):]
-    rule = rule[:rule.index("}")]
-    assert "linear-gradient(90deg" in rule and "transparent," in rule
-    assert "opacity: 0;" in rule, "the rule shows at the top of the page"
-    assert ".topbar.is-stuck::after { opacity: 1; }" in CSS
+    # No rule under it at all now: the glass and the page are the same black,
+    # and the line was the only thing insisting they were two surfaces.
+    assert ".topbar::after" not in CSS and ".navpanel::after" not in CSS
+    # The hero keeps its own rule above the stack line. That one was asked
+    # for, sits on the page rather than under the chrome, and is unrelated.
+    assert ".hero-meta::before" in CSS
     # The brand is the mark and the name together, at every scroll position:
     # the bar used to show one or the other, so the site never said its own
     # name above the fold.
@@ -1118,16 +1118,18 @@ def test_the_two_inner_pages_lead_with_type_not_artwork():
     assert "hero--art" not in CSS, "the rule outlived its only two users"
 
 
-def test_only_the_card_under_the_pointer_animates():
-    """Moving from one card to the next is the case the handover does not
-    cover on its own. The card you left has a full 0.62s to perform -- code
-    out, facts back in -- and performs it while its width is shrinking, beside
-    the card you are actually reading. Two cards mid-swap is the same mashing
-    as before, spread across the row."""
-    assert ".ways:hover .way:not(:hover):not(:focus-within) .way-face" in CSS
-    snap = CSS[CSS.index(".ways:hover .way:not(:hover)"):]
-    snap = snap[:snap.index("}")]
-    assert "transition-duration: 0.12s" in snap
-    assert "transition-delay: 0s" in snap
-    # The artwork goes back with it, or the card returns in two pieces.
-    assert ":not(:focus-within)::before" in CSS
+
+
+def test_every_card_is_in_the_effect_while_the_row_rearranges():
+    """The other three cards are resizing too. Three of them reflowing sharply
+    beside one doing something considered is what read as interference, so
+    they soften over the same 0.42s the widths take and settle sharp."""
+    assert ".ways:hover .way:not(:hover)" in CSS
+    soft = CSS[CSS.index(".ways:hover .way:not(:hover),"):]
+    soft = soft[:soft.index("}")]
+    assert "filter: blur(2.5px)" in soft
+    assert ".ways:focus-within .way:not(:focus-within)" in soft
+    # And the blur is transitioned on the card, matching the width move.
+    card = CSS[CSS.index(".way {"):]
+    card = card[:card.index("}")]
+    assert "filter 0.42s" in card
