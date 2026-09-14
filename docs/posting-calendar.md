@@ -53,10 +53,14 @@ merge queue (`awesome-mcp-servers` PR #14162) and a review queue (the Claude
 community marketplace, submitted 2026-09-14) — neither is worth chasing, and
 both propagate on their own. See `docs/mcp-directories.md` for the table.
 
-**Thu 17 Sep — the MCP Discord**
-`docs/mcp-discord-post.md`. Small audience, exactly the right one, and the
-only channel here where "the network is empty, help me fill it" is a
-*reasonable ask* rather than a weak pitch.
+**Thu 17 Sep — the MCP Contributor Discord, but not as a launch**
+Read `docs/mcp-contributor-discord.md` first. That server bans self-promotion
+outside #introductions and bans AI-generated messages outright, so the
+showcase post that used to live in this slot would have been a bannable
+offence twice over. What goes there is you, in your own words, on protocol
+questions you have genuine experience of — server identity, error taxonomy,
+schema versioning. The product appears once, in #introductions, and after that
+only if someone asks.
 
 **Fri 18 – Sun 21 Sep — direct asks, which is the actual work**
 Ten individual messages beat any broadcast. Find people already running agents

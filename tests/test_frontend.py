@@ -963,7 +963,7 @@ def test_clicking_the_block_says_so_somewhere():
     """The block cannot report a copy without rewriting the command it just
     copied, so the button beside it reports it instead."""
     assert 'button[data-copy-target="' in JS
-    assert "if (partner) say(partner, ok);" in JS
+    assert "if (partner && partner !== control) say(partner, ok);" in JS
 
 
 def test_the_bar_button_hovers_like_the_hero_button():
@@ -1099,16 +1099,16 @@ def test_the_row_hides_its_text_while_the_widths_move():
     frames = frames[:frames.index("\n}")]
     stops = dict(re.findall(r"(\d+)%\s*\{([^}]*)\}", frames))
     assert "opacity: 1" in stops["0"] and "blur(0)" in stops["0"]
-    assert "opacity: 0" in stops["27"], "the content must be gone before the widths move"
-    assert "opacity: 0" in stops["59"], "and still gone when they stop"
+    assert "opacity: 0" in stops["25"], "the content must be gone before the widths move"
+    assert "opacity: 0" in stops["58"], "and still gone when they stop"
     assert "opacity: 1" in stops["100"] and "blur(0)" in stops["100"]
     # Up and out, then up and in: both movements go the same way.
-    assert "translateY(-12px)" in stops["27"] and "translateY(12px)" in stops["59"]
+    assert "translateY(-12px)" in stops["25"] and "translateY(12px)" in stops["58"]
 
     # The hovered card's own content waits for the widths too.
     arriving = CSS[CSS.index(".way:hover .way-code"):]
     arriving = arriving[:arriving.index("}")]
-    assert "0.44s" in arriving, "the code must arrive after the widths settle"
+    assert "0.3s" in arriving, "the code must arrive after the widths settle"
 
 
 def test_the_rearrange_runs_when_the_pointer_leaves_as_well():

@@ -294,10 +294,14 @@
         setTimeout(function () { control.classList.remove("is-copied"); }, 1600);
         // Clicking the block copies, but the block cannot say so without
         // rewriting the command. The button next to it says it instead.
+        // A block that is itself a button -- the hero's endpoint -- is its own
+        // match here, and saying it on itself replaces the URL with the word
+        // "Copied" in the wrong typeface. Its own ::after label already says
+        // it, which is what the label is for.
         var partner = document.querySelector(
           'button[data-copy-target="' + control.getAttribute("data-copy-target") + '"]'
         );
-        if (partner) say(partner, ok);
+        if (partner && partner !== control) say(partner, ok);
       }
 
       function copy() {
@@ -727,7 +731,7 @@
     var ways = document.querySelector(".ways");
     if (!ways) return;
 
-    var SHIFT_MS = 760; // the 0.74s animation, plus a frame
+    var SHIFT_MS = 540; // the 0.52s animation, plus a frame
     var current = null;
     var timer = null;
 

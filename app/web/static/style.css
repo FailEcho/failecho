@@ -1049,8 +1049,8 @@ footer.shell {
    facts, narrower. Same timing, so the row moves as one thing. */
 @keyframes settle {
   0%   { opacity: 1; transform: none;             filter: blur(0); }
-  27%  { opacity: 0; transform: translateY(-12px); filter: blur(7px); }
-  59%  { opacity: 0; transform: translateY(12px);  filter: blur(7px); }
+  25%  { opacity: 0; transform: translateY(-12px); filter: blur(7px); }
+  58%  { opacity: 0; transform: translateY(12px);  filter: blur(7px); }
   100% { opacity: 1; transform: none;             filter: blur(0); }
 }
 /* Driven by a class rather than :hover, because it has to run when the
@@ -1108,31 +1108,31 @@ footer.shell {
 .way-face {
   margin-top: 52px;
   transform: none; filter: blur(0);
-  transition: opacity 0.3s ease 0.44s,
-              transform 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) 0.42s,
-              filter 0.3s ease 0.44s, visibility 0s linear 0.42s;
+  transition: opacity 0.22s ease 0.3s,
+              transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) 0.28s,
+              filter 0.22s ease 0.3s, visibility 0s linear 0.28s;
 }
 .way-code {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   justify-content: flex-start; padding-top: 52px;
   opacity: 0; visibility: hidden;
   transform: translateY(12px); filter: blur(7px);
-  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.2s ease, visibility 0s linear 0.2s;
+  transition: opacity 0.14s ease, transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.14s ease, visibility 0s linear 0.14s;
 }
 .way:hover .way-face, .way:focus-within .way-face {
   opacity: 0; visibility: hidden;
   transform: translateY(-12px); filter: blur(7px);
-  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.2s ease, visibility 0s linear 0.2s;
+  transition: opacity 0.14s ease, transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.14s ease, visibility 0s linear 0.14s;
 }
 .way:hover .way-code, .way:focus-within .way-code {
   opacity: 1; visibility: visible;
   transform: none; filter: blur(0);
   /* Starts after the widths have finished, not merely after the facts. */
-  transition: opacity 0.3s ease 0.44s,
-              transform 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) 0.42s,
-              filter 0.3s ease 0.44s, visibility 0s linear 0.42s;
+  transition: opacity 0.22s ease 0.3s,
+              transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) 0.28s,
+              filter 0.22s ease 0.3s, visibility 0s linear 0.28s;
 }
 
 /* Moving from one card to the next is the case the handover above does not
