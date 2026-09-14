@@ -41,7 +41,7 @@ def test_hero_states_the_product_immediately(client):
     assert "what actually worked, before you retry" in body
     assert "Get started" in body
     assert "See it work" in body
-    assert "MCP · REST · OpenAPI · No account required" in body
+    assert "Claude Code · MCP · REST · OpenAPI · No account required" in body
 
 
 def test_the_install_is_visible_without_scrolling(client):
@@ -79,7 +79,7 @@ def test_the_front_page_stays_brief():
     # 13k -> 14k when the definition moved back into the hero's left column,
     # 14k -> 15k for the three cards that close the page, 15k -> 16k for the
     # four install cards carrying two faces each.
-    assert len(HTML) < 16_000
+    assert len(HTML) < 17_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -160,7 +160,9 @@ def test_palette_is_committed_and_explicit():
     assert 'name="color-scheme" content="dark"' in HTML
     assert 'name="theme-color"' in HTML
     assert "--bg:" in CSS and "background: var(--bg)" in CSS
-    assert CSS.count("background: var(--red-deep)") <= 1
+    # Twice: the primary button, and the bar's copy of it holding still on
+    # hover. Red stays scarce -- the logo, one action, real failure signal.
+    assert CSS.count("background: var(--red-deep)") <= 2
 
 
 def test_hidden_elements_actually_hide():
@@ -225,7 +227,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 48_000
+    assert len(CSS) < 50_000
     assert len(JS) < 27_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -238,7 +240,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 90_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 92_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -256,7 +258,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 123_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 125_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -837,3 +839,45 @@ def test_no_long_sentence_wears_the_nowrap_meta_class():
         for found in re.findall(r'class="band-meta"[^>]*>(.*?)</p>', body, re.S):
             words = len(re.sub(r"<[^>]+>", " ", found).split())
             assert words <= 12, f"{words} words in a nowrap line: {found[:60]}"
+
+
+def test_every_card_reserves_the_two_line_title():
+    """One of the four titles wraps, so without a reserved second line
+    everything under the four sat at four different heights."""
+    name = CSS[CSS.index(".way-name {"):]
+    name = name[:name.index("}")]
+    assert "min-height: 2.28em" in name
+
+
+def test_a_card_command_has_nothing_to_scroll():
+    """pre carries overflow-x: auto everywhere else on the site. Here the text
+    wraps, so that rule can only produce a scrollbar with nothing behind it."""
+    pre = CSS[CSS.index(".way pre {"):]
+    pre = pre[:pre.index("}")]
+    assert "overflow: visible" in pre
+
+
+def test_copying_with_the_mouse_hands_the_focus_back():
+    """A card shows its command while something inside it has focus, and
+    clicking the command focuses it -- so the card stayed open after a copy,
+    with the pointer somewhere else. A keyboard press keeps the focus,
+    because that is how you got there."""
+    assert "if (isBlock && event.detail > 0) control.blur();" in JS
+
+
+def test_each_card_says_where_the_full_steps_are():
+    links = ("/setup#claude-code", "/setup#mcp-clients",
+             "/setup#rest-api", "/setup#let-the-agent")
+    for href in links:
+        assert 'href="%s"' % href in HTML, href
+    assert HTML.count('class="way-more"') == 4
+    # And those fragments have to exist on the page they point at.
+    setup = (STATIC / "setup.html").read_text()
+    for href in links:
+        assert 'id="%s"' % href.split("#")[1] in setup, href
+
+
+def test_the_stack_line_sits_above_the_cards_it_describes():
+    assert 'class="ways-meta"' in HTML
+    assert HTML.index('class="ways-meta"') < HTML.index('class="ways"')
+    assert "hero-meta" not in HTML

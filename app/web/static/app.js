@@ -256,7 +256,15 @@
         );
       }
 
-      control.addEventListener("click", copy);
+      control.addEventListener("click", function (event) {
+        copy();
+        // A card shows its command while something inside it has focus, and
+        // clicking the command focuses it -- so the card stayed open after a
+        // copy, with the pointer somewhere else entirely. A click with a
+        // pointer behind it hands the focus back; a keyboard press
+        // (event.detail === 0) keeps it, because that is how you got here.
+        if (isBlock && event.detail > 0) control.blur();
+      });
       if (!isBlock) return;
       // role="button" on a pre buys the announcement, not the behaviour.
       control.addEventListener("keydown", function (event) {

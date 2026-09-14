@@ -317,6 +317,13 @@ a[rel~="external"]:hover::after { color: var(--red); }
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.28), 0 10px 26px rgba(0, 0, 0, 0.5);
 }
 .btn:active { transform: translateY(0); }
+/* The bar's primary button stays exactly the colour it is. It sits on glass
+   at 13px, where the hero button's ring and lift read as a different control
+   rather than as the same one. */
+.nav .btn--red:hover {
+  background: var(--red-deep); border-color: var(--red-deep);
+  transform: none; box-shadow: none;
+}
 
 .btn--sm { padding: 8px 15px; font-size: 13px; }
 
@@ -869,6 +876,12 @@ footer.shell {
 
 /* ---- the four ways ------------------------------------------------------ */
 .install { padding-bottom: 72px; }
+/* The line that says what this connects to belongs above the four cards that
+   connect to it, not at the bottom of the hero. */
+.ways-meta {
+  margin: 0 0 18px; font-family: var(--mono); font-size: 12.5px;
+  letter-spacing: 0.02em; color: var(--ink-3);
+}
 .ways {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px; align-items: stretch;
@@ -903,7 +916,7 @@ footer.shell {
 
 /* Two faces, one box: the facts and the command occupy the same space, so
    the card does not resize when they trade places. */
-.way-body { position: relative; flex: 1 1 auto; min-height: 218px; }
+.way-body { position: relative; flex: 1 1 auto; min-height: 252px; }
 .way-face, .way-code {
   transition: opacity 0.22s ease, visibility 0.22s;
 }
@@ -923,8 +936,12 @@ footer.shell {
   .way::before { opacity: 1 !important; }
 }
 
+/* "Cursor, Desktop, any MCP client" is two lines and the other three are
+   one, so everything below them sat at four different heights. Every title
+   reserves both lines. */
 .way-name {
-  margin: 0 0 18px; font-family: var(--serif); font-weight: 400;
+  margin: 0 0 20px; min-height: 2.28em;
+  font-family: var(--serif); font-weight: 400;
   font-size: 25px; line-height: 1.14; letter-spacing: -0.015em; color: var(--ink);
 }
 .way-facts { margin: 0 0 18px; font-size: 13px; line-height: 1.5; }
@@ -944,10 +961,23 @@ footer.shell {
   flex: 0 0 auto;
   margin: 0; padding: 0; max-width: 100%;
   white-space: pre-wrap; overflow-wrap: anywhere;
+  /* pre carries overflow-x: auto everywhere else on the site. Here the text
+     wraps, so the only thing that rule can produce is a scrollbar with
+     nothing to scroll. */
+  overflow: visible;
 }
 .way code { font-family: var(--mono); font-size: 12px; line-height: 1.7; }
 .way-foot { margin: 14px 0 0; font-size: 12.5px; color: var(--ink-3); }
-.way .copyable::after { top: auto; bottom: -18px; }
+.way .copyable::after { top: -20px; bottom: auto; right: 0; }
+/* Where this way in is written out in full. */
+.way-more {
+  margin-top: 14px; align-self: flex-start;
+  font-size: 12.5px; color: var(--ink-2);
+  border-bottom: 1px solid var(--line-2); padding-bottom: 2px;
+}
+.way-more::after { content: " \2197"; color: var(--ink-3); }
+.way-more:hover { color: var(--ink); border-bottom-color: var(--red); }
+.way-more:hover::after { color: var(--red); }
 .install-note { margin: 26px 0 0; font-size: 14px; color: var(--ink-2); }
 
 @media (max-width: 1080px) {
