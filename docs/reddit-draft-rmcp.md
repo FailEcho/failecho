@@ -1,17 +1,12 @@
 # Reddit draft — r/mcp
 
-Written to the rules in `docs/engagement-guide.md`. Target: **r/mcp first**,
-flair Discussion if the sub has one.
+Short version. The long one was three screens; nobody reads three screens from
+a stranger. Target **r/mcp** first, Discussion flair if the sub has one.
 
-**Two things to fix before posting:**
-
-1. `[YOUR NUMBER]` in the first line. Use a real figure from a real session or
-   cut the number entirely — "watching this happen" works fine. A made-up
-   anecdote is the one thing in here that cannot be defended.
-2. The recording. Record `/demo` playing, 30–60 seconds, and attach it. Reddit
-   weights posts with media, and this post's whole argument is two lines of
-   terminal output that are far better seen than described. Post it without
-   the video only if you have decided not to make one.
+**Before posting:** replace `[N]` with a real number from a real session, or
+cut the number. And attach the recording — see `docs/record-the-demo.md`. The
+whole argument is two lines of terminal output, and they are far better seen
+than described.
 
 ---
 
@@ -21,159 +16,111 @@ flair Discussion if the sub has one.
 Your agent has already solved this error. It just doesn't remember.
 ```
 
-Backups, if that reads too much like a headline:
-
-```
-Does anyone else's agent keep rediscovering the same tool failure?
-The retry is the default and it's usually wrong
-```
-
 ## Body
 
 ---
 
-I lost [YOUR NUMBER] minutes last week watching this:
+I lost [N] minutes last week watching my agent retry a `422` three times with
+slightly different arguments, fail all three, and apologise.
 
-```
-> create_issue
-  x 422 validation_error
-
-> create_issue        (retry)
-  x 422 validation_error
-
-> create_issue        (retry, arguments tweaked slightly)
-  x 422 validation_error
-```
-
-Three attempts, three identical failures, then it apologised to me, which
-somehow made it worse.
-
-The thing is it wasn't being stupid. Look at what it had:
+It wasn't being stupid. This is everything it had:
 
 ```
 422 validation_error
 ```
 
-Tell me from that string whether retrying is worth it. Renamed field, or a
-service having a bad ten minutes? Same six characters either way. One of those
-fixes itself in thirty seconds; the other burns your budget while the real
-answer was "the field is called `content` now, refresh your schema."
+Renamed field, or a service having a bad ten minutes? Same six characters. One
+fixes itself in thirty seconds, the other eats your budget while the real
+answer was "the field is called `content` now."
 
-So it guesses. And it guesses retry, because that's what nearly all the code
-it ever read does.
+So it guesses. It guesses retry, because that's what nearly all the code it
+ever read does. And a retry that works *occasionally* is a variable-ratio
+schedule, which is the thing you use when you want a behaviour to survive
+everything you throw at it. Your agent is on one.
 
-**Why "don't retry blindly" in the system prompt does nothing**
+**The annoying part isn't even that.** It's that my agent worked this out on
+Monday and started from zero again on Thursday, because the session that knew
+was gone.
 
-I tried that first. It doesn't work, for a boring reason: the instruction
-doesn't contain the missing information either. You've told it to consider
-whether the failure is transient. It still has no way to find out. You've asked
-for the same guess, more thoughtfully.
+So I built it a memory. It reports the failure and whatever fixed it, and asks
+before retrying next time.
 
-And a retry that works *occasionally* is the worst case — that's a
-variable-ratio schedule, which is the thing psychologists reach for when they
-want a behaviour to resist extinction. The agent is on it. So are you, at 1am,
-hammering the same test.
+**Install is one line — paste it at your agent:**
 
-**What I built**
+```
+Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
+```
 
-A shared endpoint the agent can ask before it retries. It reports the failure
-as metadata and the outcome of whatever it tried next, and asks what worked for
-anyone else who hit the same thing.
+It reads that and configures itself. No account, no API key, nothing to sign
+up for. Or `claude mcp add --transport http failecho https://failecho.com/mcp`
+if you'd rather do it yourself.
 
-The part I got wrong for months is that I thought the value was other people.
-It isn't, or not only. **Your own agent forgets between sessions.** Monday's
-session works out that the field is `content` now and Monday's session is gone.
-Thursday starts from `422` again.
+**What it costs you:** nothing you weren't already paying. It runs after the
+call with a 2-second timeout, so if my server dies your agent waits 2 seconds
+and carries on. `FAILECHO_DISABLED=1` turns it off. Metadata only — service,
+operation, error class, what fixed it. No prompts, no arguments, no results,
+no keys.
 
-So the first thing it fixes is your own amnesia, and that part needs nobody. An
-action is recommended once **five recovery attempts** back it — attempts, not
-failures, because a failure can't prove a fix — and those five can all be
-yours. Every answer says which kind of evidence it is: `from_other_agents:
-false` means it's your own history coming back to you.
+**What you get back, alone:** five recovery attempts and it starts answering,
+and those five can all be yours. Thresholds are 5 attempts and 3 reporters for
+full weight — not five thousand. Confidence is a Wilson lower bound, not a
+model's opinion: 5/5 scores 0.57, 117/124 scores 0.89, and you can recompute
+it by hand when you don't believe it. Below the threshold it returns
+`INSUFFICIENT_DATA` instead of a guess.
 
-**Specifics, since they're the only thing worth trusting**
+**The limit, before anyone asks:** the shared layer is new. The counter is on
+the front page — check it before you install anything rather than taking my
+word. The single-agent part works today; the cross-agent part needs other
+people and doesn't yet.
 
-- Recommendation threshold: 5 observed attempts. Full confidence weight: 3
-  distinct reporters. Not 5,000.
-- Confidence is a Wilson score lower bound, not a model's opinion — 5/5 scores
-  0.57, 117/124 scores 0.89. Ten floating-point operations and you can
-  recompute it by hand when you don't believe it.
-- Below the evidence threshold it returns `INSUFFICIENT_DATA` rather than a
-  guess with a low number bolted on.
-- Metadata only: service, operation, error class and code, latency, and what
-  fixed it. No prompts, no tool arguments, no results, no keys. Error text is
-  off unless you turn it on.
-- Runs after the call with a 2-second timeout, so if my server falls over your
-  agent waits 2 seconds and carries on. `FAILECHO_DISABLED=1` kills it.
+**Here's what I actually want from this thread.**
 
-**The limit, before anyone asks**
+Do different people's agent failures overlap at all?
 
-The shared layer is new and the counter is on the front page, so check it
-before you install anything rather than taking my word. The single-agent part
-above works today. The cross-agent part needs other people and doesn't yet.
+The theory says obviously — we're all calling the same twenty MCP servers, and
+when GitHub renames a field it renames it for everyone. But "obviously" is
+where most wrong ideas live. Maybe every interesting failure is local: your
+auth setup, my rate limit, their internal service. Then this is worthless and
+I'd like to know.
 
-I'm not going to dress that up. What I'll say is that the bar is lower than it
-sounds — five and three — and that the failures on popular MCP servers aren't
-exotic. They're the same handful of renamed fields and rate limits hitting
-everyone, which is why they'd cross those numbers quickly if more than one
-person were looking.
+**So: what failure does your agent keep rediscovering?** The specific one
+you've explained to it four times in four sessions. And would anyone else
+calling that service have hit the same one — or is it yours?
 
-**The question I actually can't answer**
+If enough answers turn out to be the same failure, that settles it. I'll
+publish what it shows either way, including "they barely overlap", which is
+the result that kills the idea.
 
-Do different people's agent failures actually overlap?
-
-The theory says yes. We're all calling the same twenty MCP servers, and when
-GitHub renames a field it renames it for everyone at once. But "obviously true"
-is where most wrong ideas live. It's equally plausible that the interesting
-failures are all local — your auth setup, my rate limit, their internal
-service — and the shared surface is too thin for any of this to matter.
-
-I don't know which world we're in, and I don't think anyone has measured it.
-
-So, genuinely: **what failure does your agent keep rediscovering?** The
-specific one you've explained to it four times in four sessions. And would
-anyone else calling that service have hit the same one, or is it yours?
-
-I'll publish whatever the answer turns out to be, including "different people's
-failures barely overlap", which is the result I most want to know and the one
-that would make this whole thing pointless.
-
-MIT, no account, no API key. `https://failecho.com/mcp` is the endpoint,
-repo is at github.com/FailEcho/failecho.
+MIT, self-hostable. github.com/FailEcho/failecho
 
 ---
 
-## Why it's built this way
+## The moves in it
 
-- **The 422 comes before the product.** Everyone in that sub has had that
-  afternoon; nobody has been waiting for a failure network.
-- **It gives something up early** — "the part I got wrong for months" — which
-  is the Kiln move, and it's true.
-- **The numbers are checkable.** 5, 3, 0.57, 0.89, 2 seconds. Real thresholds
-  read differently from round ones.
-- **The limit is stated before it's challenged.** Said first it's integrity;
-  said after being caught it's damage control, and the same words score
-  completely differently.
-- **The ask is free and reversible.** No signup, and an off switch named in the
-  post.
-- **It ends on a question they can answer from experience**, which is the only
-  reliable way to get comments instead of upvotes — and it worked on dev.to,
-  where the top comment was a stranger explaining where the overlap actually
-  breaks down.
-- **It names the result that would kill the idea.** That is the strongest
-  credibility move available to someone with no users.
+- **Effortless install.** One line, near the top, before any explanation of
+  how it works. `llms.txt` means they do not even read the docs.
+- **Cheap.** The 2-second timeout and the off switch are in the post, because
+  "what if your thing breaks my agent" is the real objection and answering it
+  before it is asked is worth more than answering it after.
+- **Long-term benefit.** Five and three, not five thousand, and the memory pays
+  off on your own history — no waiting for a crowd.
+- **A challenge, not a pitch.** "Maybe this is worthless and I'd like to know"
+  invites a reader to prove something rather than to buy something.
+- **Does not burn tokens on errors** is the actual value proposition and it is
+  stated as a cost saved, not a feature.
+- **The engagement topic is the last thing they read**, and it is answerable
+  from experience in one comment.
 
 ## In the comments
 
-- Expect **"so it does nothing yet?"** as the top comment. The answer is not
-  yes: "It works on your own agent's history from the fifth recovery — that
-  part needs nobody. The cross-agent part needs other people and is new." One
-  line, no arguing.
-- Expect **"how is this different from a status page / Sentry?"** A status page
-  says a service is down. Sentry records that you failed. Neither records what
+- **"So it does nothing yet?"** — "It works on your own agent's history from
+  the fifth recovery. That part needs nobody. The cross-agent part is new."
+  One line, no arguing.
+- **"How is this different from Sentry / a status page?"** — A status page says
+  a service is down. Sentry records that you failed. Neither records what
   fixed it, which is the only part another agent can use.
-- Expect **"why would I send you my data?"** Answer with the contract, not
-  reassurance: metadata only, error text off by default, reporter IDs hashed,
-  MIT and self-hostable if the answer is still no.
-- **Don't argue with the first critical comment.** It's usually the best one in
-  the thread and everyone is watching how you take it.
+- **"Why would I send you anything?"** — Answer with the contract, not
+  reassurance: metadata only, error text off by default, reporter IDs hashed
+  before storage, MIT and self-hostable if the answer is still no.
+- **Do not argue with the first critical comment.** It is usually the best one
+  in the thread, and everyone is watching how you take it.
