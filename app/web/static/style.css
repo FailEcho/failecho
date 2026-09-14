@@ -210,10 +210,6 @@ a[rel~="external"]:hover::after { color: var(--red); }
 }
 
 .navpanel b { font-size: 16px; }
-.navpanel a[data-leads] b::after {
-  content: " \2197"; font-size: .8em; color: var(--ink-3);
-}
-.navpanel a[data-leads]:hover b::after { color: var(--red); }
 .navpanel span { font-size: 13.5px; }
 .navitem:hover .navpanel, .navitem:focus-within .navpanel {
   opacity: 1; visibility: visible; transform: none;

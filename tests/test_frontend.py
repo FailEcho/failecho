@@ -678,13 +678,27 @@ def test_opening_a_menu_never_moves_the_page():
     assert "menu-open" not in JS
 
 
-def test_only_the_entries_that_leave_the_site_proper_are_marked():
-    """The API reference and llms.txt hand you a document rather than another
-    page of the site; the other four entries are just pages."""
-    assert ".navpanel a[data-leads] b::after" in CSS
-    assert HTML.count("data-leads") == 2
-    for href in ('href="/docs" data-leads', 'href="/llms.txt" data-leads'):
-        assert href in HTML
+def test_the_arrow_means_one_thing_only():
+    """↗ means the link leaves the site. The nav panel used to put it on
+    /llms.txt and /docs as well, to mean "hands you a document" -- two
+    meanings for one mark, on links that never leave failecho.com."""
+    import re
+
+    assert "data-leads" not in CSS, "the second arrow mechanism is back"
+    assert "data-leads" not in HTML
+
+    # the only arrow left is the external one, and it is earned
+    assert 'a[rel~="external"]::after' in CSS
+    for tag in re.findall(r"<a\b[^>]*>", HTML):
+        if re.search(r'rel="[^"]*\bexternal\b', tag):
+            href = re.search(r'href="([^"]*)"', tag)
+            target = href.group(1) if href else ""
+            # HTML is the unrendered source, so the GitHub href is still a
+            # placeholder; it is substituted with an absolute URL or the whole
+            # block is stripped.
+            assert target.startswith("http") or target == "{{GITHUB_URL}}", (
+                f"marked external but stays on the site: {tag}"
+            )
 
 
 def test_the_light_goes_round_the_loop():
