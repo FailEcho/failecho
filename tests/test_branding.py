@@ -610,3 +610,14 @@ def test_the_square_icons_are_centred():
         assert min(left, top, width - right, height - bottom) >= 4, (
             f"{name} touches its edge; a rounded crop would clip it"
         )
+
+
+def test_the_favicon_link_does_not_move_between_deploys(client):
+    """Google fetches the favicon on its own schedule and caches it hard. A
+    cache-busted URL changes on every deploy, which gives it a new thing to
+    fetch each time rather than a stable one to refresh. The file's ETag and
+    a four-hour max-age keep browsers current without it."""
+    body = client.get("/").text
+    assert '<link rel="icon" href="/static/favicon.png" type="image/png"' in body
+    assert "favicon.png?v=" not in body, "the icon URL moves on every deploy"
+    assert '<link rel="shortcut icon" href="/favicon.ico">' in body
