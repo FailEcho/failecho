@@ -741,7 +741,7 @@
     var ways = document.querySelector(".ways");
     if (!ways) return;
 
-    var SHIFT_MS = 320; // the 0.30s settle, plus a frame
+    var SHIFT_MS = 500; // the 0.48s settle, plus a frame
     var current = null;
     var timer = null;
 

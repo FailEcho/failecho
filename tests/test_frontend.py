@@ -1112,8 +1112,10 @@ def test_the_row_hides_its_text_while_the_widths_move():
     leaving = CSS[CSS.index(".way:hover .way-face"):]
     leaving = leaving[:leaving.index("}")]
     assert "opacity 0.12s ease," in leaving, "the leaving face sets the handover point"
-    assert "opacity 0.18s ease 0.12s" in arriving, (
-        "the arriving code must start when the leaving face ends"
+    # Content shown while a column is still moving re-wraps in full view, so
+    # the arrival is delayed by exactly the column transition, not a literal.
+    assert "opacity 0.18s ease var(--shift)" in arriving, (
+        "the arriving code must wait for the widths, via --shift"
     )
 
 
@@ -1411,3 +1413,20 @@ def test_settle_animation_is_not_cut_off_by_its_own_timer(client):
         f"SHIFT_MS {shift}ms cuts off a {anim}s animation"
     )
     assert shift - anim * 1000 <= 60, "the row stays locked well after it has settled"
+
+
+def test_arriving_content_never_shows_while_the_columns_move(client):
+    """The columns take --shift to move. Content revealed before that finishes
+    re-wraps in front of the reader -- "no key" dropping onto its own line was
+    exactly this. One number drives both, so they cannot drift apart."""
+    import re
+
+    css = (STATIC / "style.css").read_text()
+    shift = re.search(r"--shift:\s*([\d.]+)s", css)
+    assert shift, "--shift is gone; the delay and the column timing have split"
+    assert f"grid-template-columns var(--shift)" in css, (
+        "the columns no longer use the same number as the arrival delay"
+    )
+    # every arrival delay is the variable, never a hard-coded duration
+    for block in re.findall(r"\.way[^{]*\{[^}]*opacity 0\.18s ease ([^,]+),", css):
+        assert block.strip() == "var(--shift)", f"arrival delayed by {block!r}"

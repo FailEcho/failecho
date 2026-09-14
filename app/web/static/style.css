@@ -984,10 +984,8 @@ footer.shell {
   font-size: clamp(21px, 2.2vw, 29px); letter-spacing: -0.012em;
   color: var(--ink-2);
 }
-/* The card you are pointing at takes the room. A command needs more width
-   than three facts do, and taking it from the other three is cheaper than
-   giving every card enough for the widest command it might hold. Grid tracks
-   interpolate as long as the count does not change, so this is one
+/* The card you point at takes the room: a command needs more width than three
+   facts do. Grid tracks interpolate while the count holds, so this is one
    transition on one property. */
 .ways {
   display: grid;
@@ -996,7 +994,10 @@ footer.shell {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)
                          minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px; align-items: stretch;
-  transition: grid-template-columns 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* --shift times the columns AND delays the arriving content. Content shown
+     while a column still moves re-wraps in view. Never split these two. */
+  --shift: 0.30s;
+  transition: grid-template-columns var(--shift) cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .ways:has(.way--a:hover), .ways:has(.way--a:focus-within) {
   grid-template-columns: minmax(0, 2.05fr) minmax(0, 1fr)
@@ -1060,7 +1061,7 @@ footer.shell {
    pointer *leaves* the row as well -- the widths change back then too, and
    CSS cannot start an animation on a selector that has stopped matching. */
 .ways.is-shifting .way:not(:hover):not(:focus-within) .way-face {
-  animation: settle 0.30s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: settle 0.48s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 .way::before {
   content: ""; position: absolute; inset: 0; z-index: 0;
@@ -1111,9 +1112,9 @@ footer.shell {
 .way-face {
   margin-top: 52px;
   transform: none; filter: blur(0);
-  transition: opacity 0.18s ease 0.12s,
-              transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s,
-              filter 0.18s ease 0.12s, visibility 0s linear 0.12s;
+  transition: opacity 0.18s ease var(--shift),
+              transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) var(--shift),
+              filter 0.18s ease var(--shift), visibility 0s linear var(--shift);
 }
 .way-code {
   position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -1132,16 +1133,14 @@ footer.shell {
 .way:hover .way-code, .way:focus-within .way-code {
   opacity: 1; visibility: visible;
   transform: none; filter: blur(0);
-  transition: opacity 0.18s ease 0.12s,
-              transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s,
-              filter 0.18s ease 0.12s, visibility 0s linear 0.12s;
+  transition: opacity 0.18s ease var(--shift),
+              transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) var(--shift),
+              filter 0.18s ease var(--shift), visibility 0s linear var(--shift);
 }
 
-/* Moving from one card to the next is the case the handover above does not
-   cover. The card you left has a full 0.62s of its own to perform -- code
-   out, facts back in -- and it performs it while its width is shrinking,
-   beside the card you are actually reading. Two cards mid-swap at once is
-   the same mashing as before, just spread across the row.
+/* Moving card to card is what the handover above does not cover: the card you
+   left performs its own swap while shrinking, beside the one you are reading.
+   Two cards mid-swap at once is the same mashing, spread across the row.
 
    So only the card under the pointer animates. Any other card in a row that
    has one snaps back: 0.12s, no delay, including its artwork. You are not
