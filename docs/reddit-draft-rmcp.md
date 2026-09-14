@@ -6,7 +6,41 @@ draft I produce, and Reddit is unusually good at spotting text written to be
 posted rather than written to be read. Do not let anyone (me included) smooth
 this into marketing prose.
 
-Target **r/mcp** first, Discussion flair if the sub has one.
+Target **r/mcp** first.
+
+## Flair: `discussion`
+
+The sub offers: no flair, resource, question, server, article, discussion,
+events, job, showcase, connector.
+
+Take **discussion**. The flair is read as a declaration of intent before a
+word of the post is, and this post's intent is a question you cannot answer
+alone. Discussion is also the only flair on that list that does not promise
+the reader something to consume, which is right, because what you want back
+is their failure, not their attention.
+
+The two that will tempt you are the wrong ones:
+
+- **`showcase`** frames it as "look at my thing". The post then has to earn
+  attention it has already asked for, and every reader arrives primed to
+  judge rather than answer.
+- **`server`** is literally accurate -- it is an MCP server -- and that is the
+  trap. It files the post next to every other server announcement, where the
+  question at the end reads as a device rather than the point.
+
+`question` is the honourable fallback if a mod moves you or discussion is
+somehow unavailable. It is slightly worse only because it undersells that
+there is a working thing behind the question.
+
+Do not post with **no flair** in a sub that offers them. In most subs it
+reads as someone who did not read the sidebar, and some filter it outright.
+
+## Tags
+
+Reddit has no tags beyond flair, so there is nothing else to fill in here.
+For the cross-posts later: dev.to takes four, and `#mcp #ai #devtools
+#opensource` is the set that matches this post. Hacker News takes none --
+the title is the whole surface.
 
 **Before posting:** attach the recording if you make one
 (`docs/record-the-demo.md`). Everything else below is ready.

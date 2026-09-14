@@ -26,10 +26,11 @@ Smallest, most relevant, most forgiving of a new project. The readers already
 know what an MCP server is, so the post can be about the *idea* rather than
 spending four paragraphs explaining the protocol.
 
-Flair: whatever the sub uses for a project or a discussion. If there is a
-"Show" or "Project" flair and also a "Discussion" one, **take Discussion** —
-the post is a question, and the flair should match the post rather than the
-intention.
+Flair: **discussion**. The sub's list is no flair, resource, question,
+server, article, discussion, events, job, showcase, connector — and the flair
+should match the post rather than the intention. `showcase` and `server` both
+announce a thing; this post asks something. See `docs/reddit-draft-rmcp.md`
+for the reasoning and the fallback.
 
 ### 2. r/AI_Agents — second, a day or two later
 
