@@ -1378,3 +1378,14 @@ def test_llms_txt_default_is_stated_before_the_options(client):
     assert body.index("this is the default") < body.index(
         "Setting it up, least committal first"
     )
+
+
+def test_setup_page_is_not_only_claude_code(client):
+    """The install path was advertised as a Claude Code CLI command, which
+    four of nine test machines did not even have. The config shape differs per
+    client, so the page names the differences it has actually checked."""
+    import re
+
+    body = re.sub(r"[ \t]+", " ", client.get("/setup").text)
+    for row in [".cursor/mcp.json", ".vscode/mcp.json", '"servers"', "url only, no type"]:
+        assert row in body, f"{row} missing from the setup page"

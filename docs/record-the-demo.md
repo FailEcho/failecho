@@ -29,15 +29,14 @@ back.
 
 **Shot 1 — the install, so people see it is one line**
 
-```bash
-claude mcp add --transport http failecho https://failecho.com/mcp
-```
-
-Or, better, the one that makes the point about effort:
-
 ```
 Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
 ```
+
+Record this one, not a CLI command. It is the only install that is the same
+on every client, it makes the point about effort better than a flag-laden
+command does, and a Claude-specific command in the first frame tells everyone
+not using Claude that the post is not for them.
 
 **Shot 2 — the whole loop, six agents, one failure**
 

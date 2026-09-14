@@ -53,8 +53,20 @@ it do the work:
 Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
 ```
 
-It reads that and configures itself. Or `claude mcp add --transport http
-failecho https://failecho.com/mcp` if you'd rather do it by hand.
+It reads that and configures itself, whatever client you're on. If you'd
+rather do it by hand, it's the usual MCP config block:
+
+```json
+{"mcpServers": {"failecho": {"type": "http", "url": "https://failecho.com/mcp"}}}
+```
+
+And if you don't want MCP at all, it's one POST:
+
+```
+curl -sX POST https://failecho.com/v1/query -H 'Content-Type: application/json' \
+  -d '{"service":"api.github.com","operation":"create_issue",
+       "error_type":"rate_limit","error_code":"429"}'
+```
 
 **The part I can't answer alone** is whether it's worth sharing between
 people.

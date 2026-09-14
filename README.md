@@ -101,9 +101,7 @@ key, nothing to sign up for. Everything below is the same thing done by hand.
 https://failecho.com/mcp
 ```
 
-```bash
-claude mcp add --transport http failecho https://failecho.com/mcp
-```
+Most MCP clients take this config block:
 
 ```json
 {
@@ -111,6 +109,17 @@ claude mcp add --transport http failecho https://failecho.com/mcp
     "failecho": { "type": "http", "url": "https://failecho.com/mcp" }
   }
 }
+```
+
+In Claude Code that file is `.mcp.json`; Cursor uses `.cursor/mcp.json` and
+drops the `type`; VS Code uses `.vscode/mcp.json` and calls the top-level key
+`servers`. The endpoint never changes. [The setup
+page](https://failecho.com/setup) has the table.
+
+On Claude Code the CLI writes that same file for you:
+
+```bash
+claude mcp add --transport http --scope project failecho https://failecho.com/mcp
 ```
 
 Python, if you want failures *and* successes reported automatically:

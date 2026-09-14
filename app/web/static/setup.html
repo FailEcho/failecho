@@ -178,6 +178,19 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
 }</code></pre>
     </figure>
     <p class="band-sub">
+      Where it goes, and what changes, in the clients we have checked:
+    </p>
+    <figure class="snip">
+      <pre><code>Claude Code   .mcp.json               "mcpServers"   type + url
+Cursor        .cursor/mcp.json        "mcpServers"   url only, no type
+VS Code       .vscode/mcp.json        "servers"      type + url</code></pre>
+    </figure>
+    <p class="band-sub">
+      The endpoint is the same in all of them. Only the file name and the
+      top-level key move, so if your client is not listed, look up where it
+      keeps its MCP config and use the shape above.
+    </p>
+    <p class="band-sub">
       If your client can only start a local process and cannot speak HTTP, run
       the relay. It is on PyPI, imports only the MCP SDK, and stores nothing
       itself — every call is forwarded to the same network:
