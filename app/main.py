@@ -342,10 +342,14 @@ options, and it is option 2 below:
   not enable anything that reports in the background. Those are option 3 and
   they need to be asked for explicitly. Registering the endpoint makes four
   tools available; calling the three writing ones stays a per-call decision.
-- **Then verify, and only in ways that store nothing.** List the tools, and
-  make one metadata-only lookup -- `check_tool_failure`, or the curl under
-  "A minimal query" below. A lookup writes no observation, so this is safe to
-  do without asking.
+- **Then verify, and only in ways that store nothing.** In the session that
+  just registered the server you almost certainly cannot call its tools yet
+  -- see the next point -- so verify over REST instead: one `POST
+  {base_url}/v1/query`, the curl under "A minimal query" below. On an empty
+  network the right answer is `INSUFFICIENT_DATA` with `known: false`; that
+  is a working connection, not a failure. A query writes no observation, so
+  this is safe to run without asking. If the tools *are* already live, listing
+  them and calling `check_tool_failure` once does the same job.
 - **Say if a restart is needed.** A newly registered MCP server usually loads
   when the client next starts, so the tools will not appear in the session
   that added them. Say that plainly rather than reporting success and leaving

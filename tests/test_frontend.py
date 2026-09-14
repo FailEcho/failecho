@@ -1360,7 +1360,10 @@ def test_llms_txt_states_a_default_setup(client):
     assert "A missing CLI is not this case: write the file." in default
     assert "Never do that to a file you did not create." in default
     assert "Do not install the hook or the plugin" in default
-    assert "make one metadata-only lookup" in default
+    assert "verify over REST instead" in default
+    # do not ask an agent to list tools that cannot exist until a restart
+    assert "cannot call its tools yet" in default
+    assert "`INSUFFICIENT_DATA` with `known: false`" in default
     assert "Say if a restart is needed" in default
     assert "/v1/query` for this session" in default
 
