@@ -316,7 +316,7 @@
         // copy, with the pointer somewhere else entirely. A click with a
         // pointer behind it hands the focus back; a keyboard press
         // (event.detail === 0) keeps it, because that is how you got here.
-        if (isBlock && event.detail > 0) control.blur();
+        if (event.detail > 0) control.blur();
       });
       if (!isBlock) return;
       // role="button" on a pre buys the announcement, not the behaviour.
@@ -674,6 +674,20 @@
       play();
     });
   }
+
+  // A card opens while anything inside it has focus, and a page restored by
+  // back-navigation restores the focus with it -- so the card came back open,
+  // black, showing its command, with no pointer anywhere near it. Same shape
+  // as the bar arriving open. Both let go on the way in.
+  function dropStaleFocus() {
+    var active = document.activeElement;
+    if (active && active !== document.body && active.closest
+        && active.closest(".way")) {
+      active.blur();
+    }
+  }
+
+  window.addEventListener("pageshow", dropStaleFocus);
 
   addCopyButtons();
   wireCopyButtons();

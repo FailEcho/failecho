@@ -926,6 +926,16 @@ footer.shell {
 .copyable.is-copied::after { content: "copied"; color: var(--healthy); opacity: 1; }
 
 /* ---- hero: one column, the ways underneath ------------------------------ */
+/* Spacing down the hero, top to bottom, all of it in this block:
+     .hero--lead padding-block  air above the headline, and below the last line
+     h1 margin-bottom           headline to lede
+     .hero-lede                 its own size; the gap under it is the next rule
+     .hero-actions margin-top   lede to the two buttons
+     .hero-meta margin/padding  buttons to the rule, and rule to the stack line
+     .hero-listed margin-top    stack line to the distribution line
+   The rule above the stack line costs 44px (26 margin + 17 padding + 1px).
+   If you add to it, take the same amount off .hero--lead's first number and
+   the page below the rule will not move. */
 /* The four ways in are four cards below the hero rather than four tabs beside
    it. All four are visible at once, which is the point: the question a first
    visitor has is "is there a path for me", and a tab strip answers it one

@@ -225,8 +225,8 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 55_000
-    assert len(JS) < 30_000
+    assert len(CSS) < 56_000
+    assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -238,7 +238,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 100_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 102_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -256,7 +256,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 133_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 135_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -864,7 +864,11 @@ def test_copying_with_the_mouse_hands_the_focus_back():
     clicking the command focuses it -- so the card stayed open after a copy,
     with the pointer somewhere else. A keyboard press keeps the focus,
     because that is how you got there."""
-    assert "if (isBlock && event.detail > 0) control.blur();" in JS
+    assert "if (event.detail > 0) control.blur();" in JS
+    # And a page restored by back-navigation restores the focus with it, so
+    # the card came back open with no pointer near it.
+    assert 'window.addEventListener("pageshow", dropStaleFocus)' in JS
+    assert 'active.closest(".way")' in JS
 
 
 def test_each_card_says_where_the_full_steps_are():
