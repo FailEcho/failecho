@@ -1337,3 +1337,32 @@ def test_llms_txt_explains_the_recovery_outcome_call_shape(client):
     assert "`service`/`operation` are not accepted" in body
     assert "it comes back in the response from `check_tool_failure`" in body
     assert "It is not `report_tool_recovery_outcome`" in body
+
+
+def test_llms_txt_states_a_default_setup(client):
+    """Six install tests, four of which stalled asking which option was meant.
+    The file now answers that question up front, and the answer is the
+    smallest option: project scope, endpoint only, no hook, verify with a
+    read, fall back to REST."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+    default = body[body.index("If you were told to set this up"):]
+    default = default[: default.index("Setting it up, least committal first")]
+
+    assert "Query-only access, current project, remote MCP endpoint" in default
+    assert "Not the user-wide config." in default
+    assert "Preserve existing configuration" in default
+    assert "stop and say so rather than overwriting it" in default
+    assert "Do not install the hook or the plugin" in default
+    assert "make one metadata-only lookup" in default
+    assert "Say if a restart is needed" in default
+    assert "/v1/query` for this session" in default
+
+
+def test_llms_txt_default_is_stated_before_the_options(client):
+    """A default that appears after the menu is not a default."""
+    body = client.get("/llms.txt").text
+    assert body.index("this is the default") < body.index(
+        "Setting it up, least committal first"
+    )

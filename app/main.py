@@ -300,6 +300,42 @@ they are not the same decision:
 - The Claude Code plugin: a local hook that runs after every MCP tool call,
   in every future session, until disabled.
 
+## If you were told to set this up, this is the default
+
+"Set yourself up to use FailEcho" is ambiguous, and an agent that stops to
+ask which of three options was meant is being careful rather than difficult.
+So that the question does not have to be asked every time, here is what the
+plain request means by default. It is deliberately the smallest of the
+options, and it is option 2 below:
+
+- **Query-only access, current project, remote MCP endpoint.** Register
+  {base_url}/mcp for this project -- `claude mcp add --transport http
+  --scope project`, or a `.mcp.json` in the working directory. Not the
+  user-wide config.
+- **Preserve existing configuration.** Add an entry; do not rewrite, reorder
+  or remove anything already there. If a `failecho` entry already exists,
+  stop and say so rather than overwriting it.
+- **No automatic reporting.** Do not install the hook or the plugin, and do
+  not enable anything that reports in the background. Those are option 3 and
+  they need to be asked for explicitly. Registering the endpoint makes four
+  tools available; calling the three writing ones stays a per-call decision.
+- **Then verify, and only in ways that store nothing.** List the tools, and
+  make one metadata-only lookup -- `check_tool_failure`, or the curl under
+  "A minimal query" below. A lookup writes no observation, so this is safe to
+  do without asking.
+- **Say if a restart is needed.** A newly registered MCP server usually loads
+  when the client next starts, so the tools will not appear in the session
+  that added them. Say that plainly rather than reporting success and leaving
+  someone to find an empty tool list.
+- **If you cannot register it at all** -- no CLI, no writable config, a host
+  that does not do MCP -- do not force it. Use `POST {base_url}/v1/query`
+  for this session and say that is what you did. That path needs no setup and
+  gives the same evidence.
+
+Anything beyond that default is a larger ask, so confirm it first. That
+includes user-wide or global scope, the stdio relay, the hook, and the
+plugin.
+
 ## Setting it up, least committal first
 
 1. **Query only, nothing installed.** `POST {base_url}/v1/query`
