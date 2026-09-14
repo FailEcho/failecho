@@ -909,10 +909,11 @@ def test_the_widening_actually_animates():
     browser swapped instead of animating -- which is the jump you could see."""
     import re
 
-    for block in re.findall(r"grid-template-columns:([^;]+);", CSS):
-        if "fr" not in block:
-            continue
-        assert "minmax(0," in block or "minmax(0, " in block, block.strip()
+    # Only the tracks that animate: the ones the :has() rules swap between.
+    animated = re.findall(r"\.ways[^{]*\{[^}]*grid-template-columns:([^;]+);", CSS)
+    assert len(animated) >= 5, "the rest state and the four hovered states"
+    for block in animated:
+        assert block.count("minmax(0,") == 4 or block.count("minmax(0, ") == 4, block.strip()
 
 
 def test_the_command_panels_are_one_size():
