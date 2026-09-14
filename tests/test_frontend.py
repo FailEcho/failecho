@@ -867,8 +867,10 @@ def test_copying_with_the_mouse_hands_the_focus_back():
     assert "if (event.detail > 0) control.blur();" in JS
     # And a page restored by back-navigation restores the focus with it, so
     # the card came back open with no pointer near it.
-    assert 'window.addEventListener("pageshow", dropStaleFocus)' in JS
-    assert 'active.closest(".way")' in JS
+    assert "window.setTimeout(dropStaleFocus, 0)" in JS
+    # The menu is the same bug: closing it was not enough, because the
+    # restored focus reopened it through :focus-within.
+    assert 'active.closest(".way, .topbar")' in JS
 
 
 def test_each_card_says_where_the_full_steps_are():
@@ -976,3 +978,15 @@ def test_the_demo_transcript_is_in_the_markup_before_it_is_played():
     assert 'id="run-demo" hidden' in demo
     assert "function wireRunner()" in JS
     assert 'out.innerHTML = lines.join' in JS, "the run must end on the whole thing"
+
+
+def test_nothing_can_leave_the_menu_stuck_open():
+    """Forcing it shut on a restored page was wrong in one direction and
+    leaving it open was wrong in the other, so the restore asks the document
+    which item is under the pointer and agrees with that. Under all of it is
+    a guard: the next pointer movement outside the bar closes it, whatever
+    left it open."""
+    menus = JS[JS.index("function wireMenus()"):]
+    assert '.navitem:hover, .navpanel:hover' in menus, "the restore guesses"
+    assert 'document.addEventListener("mousemove"' in menus
+    assert "if (bar.contains(event.target)) return;" in menus

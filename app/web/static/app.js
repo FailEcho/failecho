@@ -552,7 +552,27 @@
     // Back-navigation restores the page exactly as it was, hover state and
     // all -- except there is no pointer on the bar any more, so nothing ever
     // closes it. It arrives shut instead.
-    window.addEventListener("pageshow", function () { open(false); });
+    // Coming back to a page restores it as it was, and the pointer is
+    // wherever the pointer is. Forcing the menu shut was wrong in one
+    // direction and leaving it open was wrong in the other, so this asks the
+    // document which item is actually under the pointer and agrees with it.
+    function sync() {
+      open(!!document.querySelector(".navitem:hover, .navpanel:hover"));
+    }
+    window.addEventListener("pageshow", function () {
+      sync();
+      window.setTimeout(sync, 0);
+    });
+
+    // The net under all of it. Whatever left the menu open -- a restored
+    // page, a mouseleave that never fired, a pointer that jumped -- the next
+    // movement outside the bar closes it. The panel is inside the bar in the
+    // markup, so pointing at it still counts as being in.
+    document.addEventListener("mousemove", function (event) {
+      if (!bar.classList.contains("is-open")) return;
+      if (bar.contains(event.target)) return;
+      open(false);
+    }, { passive: true });
     window.addEventListener("blur", function () { open(false); });
     window.addEventListener("resize", measure);
     measure();
@@ -675,19 +695,24 @@
     });
   }
 
-  // A card opens while anything inside it has focus, and a page restored by
-  // back-navigation restores the focus with it -- so the card came back open,
-  // black, showing its command, with no pointer anywhere near it. Same shape
-  // as the bar arriving open. Both let go on the way in.
+  // A card opens while anything inside it has focus, and so does a menu.
+  // Back-navigation restores the page with its focus, which is how both came
+  // back open with no pointer near them -- closing the menu was not enough,
+  // because the restored focus reopened it through :focus-within. Whatever
+  // held the focus lets go on the way in.
   function dropStaleFocus() {
     var active = document.activeElement;
     if (active && active !== document.body && active.closest
-        && active.closest(".way")) {
+        && active.closest(".way, .topbar")) {
       active.blur();
     }
   }
 
-  window.addEventListener("pageshow", dropStaleFocus);
+  window.addEventListener("pageshow", function () {
+    dropStaleFocus();
+    // Some navigations restore the focus after this event rather than before.
+    window.setTimeout(dropStaleFocus, 0);
+  });
 
   addCopyButtons();
   wireCopyButtons();
