@@ -122,13 +122,63 @@ can grep it:
 grep -iE "root@|arbitrage|/root/|token|salt|password" demo.cast
 ```
 
+## Making the GIF
+
+Both tools are installed on this box already: `asciinema` 2.4.0 from apt and
+`agg` 1.9.0 at `/usr/local/bin/agg`. Every command below was run before being
+written here.
+
+**1. Record.** `-c` runs one command with no shell, so there is no prompt in
+the frame to redact. `--cols` and `--rows` fix the terminal size, which is
+what decides the GIF's shape -- record at the size you want the picture to be,
+because nothing crops it afterwards. `-i 1` collapses any pause longer than a
+second, which is most of what makes a recording feel slow.
+
+```bash
+cd ~/agentwebsite
+asciinema rec demo.cast --overwrite -q --cols 100 --rows 32 -i 1 \
+  -c ".venv/bin/python examples/live_agent/run_demo.py --network-url http://127.0.0.1:8099"
+```
+
+**2. Check it before converting.** The cast is plain text:
+
+```bash
+grep -iE "root@|arbitrage|/root/|token|salt|password" demo.cast
+```
+
+**3. Convert.**
+
+```bash
+agg --theme asciinema --font-size 20 --idle-time-limit 1 \
+    --last-frame-duration 3 demo.cast demo.gif
+```
+
+`--last-frame-duration 3` holds on the final frame for three seconds, so the
+evidence block is still on screen when the GIF loops. That is the frame the
+whole thing exists for; do not let it flick past.
+
+`--speed 1.2` or `1.5` if it still feels slow. A recording always feels slower
+to a viewer than it did to you.
+
+**4. Check the size.** Under 5MB embeds in a README and uploads to Reddit
+without being re-encoded. A 100x32 terminal at font-size 20 is about 1200x800,
+which is fine. If it comes out too large: drop `--font-size` to 16, cut rows,
+or trim the recording rather than compressing the GIF.
+
+```bash
+ls -lh demo.gif
+```
+
+A test run of the shape above produced a 21KB GIF from a seven-second cast, so
+there is a lot of headroom -- the real demo will be bigger but not megabytes
+bigger.
+
 ## Tools
 
-- **asciinema** — not installed here yet: `pipx install asciinema` or
-  `apt install asciinema`, and `agg` (from the asciinema project) converts a
-  cast to a GIF. Best quality-to-size for a terminal, the file is plain text
-  you can inspect before publishing, and the text stays selectable if you
-  embed the player instead of a GIF.
+- **asciinema + agg** — both installed here. Best quality-to-size for a
+  terminal by a wide margin, and the cast is plain text you can inspect before
+  publishing. If you would rather embed the player than a GIF, the text in it
+  stays selectable.
 - **Plain screen capture** to MP4 works everywhere and Reddit prefers native
   video uploads to links.
 - A **GIF under 5MB** embeds directly in the README. Trim aggressively; nobody
