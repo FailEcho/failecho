@@ -1509,9 +1509,10 @@ def test_the_footer_github_link_is_marked_external():
         html = (STATIC / name).read_text()
         block = re.search(r"<!--github-->(.*?)<!--/github-->", html, re.S)
         assert block, f"{name}: no GitHub block"
-        footer_link = re.search(r"<li><a\b[^>]*>GitHub</a></li>", block.group(1))
-        if not footer_link:
-            continue  # that page carries only the nav link
-        tag = footer_link.group(0)
-        assert 'rel="external noopener"' in tag, f"{name}: footer GitHub has no arrow"
-        assert 'target="_blank"' in tag, f"{name}: footer GitHub does not open a new tab"
+        # every GitHub link on the page -- the bar's and the footer's -- leaves
+        # the site, so every one of them carries the mark and the behaviour
+        tags = re.findall(r"<a\b[^>]*>GitHub</a>", html)
+        assert tags, f"{name}: no GitHub link at all"
+        for tag in tags:
+            assert 'rel="external noopener"' in tag, f"{name}: GitHub link has no arrow: {tag}"
+            assert 'target="_blank"' in tag, f"{name}: GitHub link stays in the tab: {tag}"
