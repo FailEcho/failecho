@@ -435,7 +435,7 @@ def test_brand_entity_sentence_is_visible_html(client):
         "FailEcho is a shared failure intelligence network for AI agents and"
         in body
     )
-    assert "Live failure and recovery intelligence for autonomous software." in body
+    assert "Connect your agent to shared failure and recovery evidence." in body
     # The protocol is named on the front page, and spelled out on /about.
     assert "MCP" in body
     assert "Model Context Protocol (MCP)" in client.get("/about").text

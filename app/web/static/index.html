@@ -74,7 +74,7 @@
       </span>
       <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
       <a class="nav-narrow" href="/network">Network</a>
-      <a class="btn btn--red btn--sm" href="/setup">Get started</a>
+      <a class="btn btn--red btn--sm" href="/setup">Connect</a>
     </nav>
   </div>
 </header>
@@ -93,11 +93,17 @@
   <section class="shell hero hero--lead" aria-labelledby="hero-title">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
     <p class="hero-lede">
-      Live failure and recovery intelligence for autonomous software.
+      Connect your agent to shared failure and recovery evidence. Check what
+      worked before retrying a failed tool call.
     </p>
     <p class="hero-actions">
-      <a class="btn btn--red" href="/setup">Get started</a>
+      <a class="btn btn--red" href="/setup">Connect</a>
       <a class="btn" href="/demo">See it work</a>
+      <span class="hero-endpoint">
+        <button class="hero-endpoint-copy copyable" type="button"
+                data-copy-target="hero-mcp-url"
+                aria-label="Copy the MCP endpoint"><code id="hero-mcp-url">{{PUBLIC_URL}}/mcp</code></button>
+      </span>
     </p>
     <p class="hero-meta">Claude Code · MCP · REST · OpenAPI · No account required</p>
     <p class="hero-listed">

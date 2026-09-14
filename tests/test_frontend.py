@@ -36,10 +36,10 @@ def test_hero_states_the_product_immediately(client):
 
     body = re.sub(r"\s+", " ", client.get("/").text)
     assert "AI agents shouldn't debug" in body and "the same failure twice." in body
-    assert "Live failure and recovery intelligence for autonomous software." in body
+    assert "Connect your agent to shared failure and recovery evidence." in body
     assert "Before you retry, check the echo." in body
     assert "what actually worked, before you retry" in body
-    assert "Get started" in body
+    assert "Connect" in body
     assert "See it work" in body
     assert "Claude Code · MCP · REST · OpenAPI · No account required" in body
 
@@ -137,7 +137,8 @@ def test_interactive_elements_are_real_buttons_with_labels():
     mouse now; the button is the control, and it is a real one.
     """
     assert HTML.count('class="way-copy"') == 4, "one Copy button per card"
-    assert HTML.count("data-copy-target=") == 8, "the button and the block"
+    # Four cards x (button + block), plus the endpoint in the hero.
+    assert HTML.count("data-copy-target=") == 9
     assert HTML.count('class="copyable"') == 4
     assert 'role="button"' not in HTML, "two tab stops per card is one too many"
     assert HTML.count("aria-label=") >= 4, "each button says what it copies"
@@ -225,7 +226,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 60_000
+    assert len(CSS) < 61_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -238,7 +239,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 104_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 106_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -256,7 +257,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 139_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 141_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -480,9 +481,10 @@ def test_only_motion_that_carries_information_is_on_the_page():
     assert "@keyframes blink" in CSS, "the prompt caret is gone"
     assert "@keyframes steplit" in CSS, "the loop is a static diagram again"
     assert "@keyframes carry" in CSS, "nothing travels the return path"
+    assert "@keyframes settle" in CSS, "the row stopped moving as one thing"
     # And nothing that animates a number upward from zero: that would draw
-    # growth the network has not had. Six keyframes is the whole budget.
-    assert CSS.count("@keyframes") == 6
+    # growth the network has not had. Seven keyframes is the whole budget.
+    assert CSS.count("@keyframes") == 7
 
 
 def test_every_animation_respects_reduced_motion():
@@ -753,7 +755,7 @@ def test_the_lede_is_left_alone():
     instant the page paints, not a second later."""
     assert "data-scramble" not in HTML
     assert "wireScramble" not in JS
-    assert "Live failure and recovery intelligence for autonomous software." in HTML
+    assert "Connect your agent to shared failure and recovery evidence." in HTML
 
 
 def test_the_primary_button_change_is_impossible_to_miss():
@@ -922,7 +924,7 @@ def test_all_four_cards_start_their_content_on_the_same_line():
     """Centring each face in its own card was the obvious way to move the
     content down and it was wrong: the four faces are different heights, so
     each one started somewhere different. One shared offset instead."""
-    face = CSS[CSS.index(".way-face {"):]
+    face = CSS[CSS.index(".way-face {\n  margin-top"):]
     face = face[:face.index("}")]
     code = CSS[CSS.index(".way-code {\n  position: absolute"):]
     code = code[:code.index("}")]
@@ -953,7 +955,7 @@ def test_the_two_faces_never_share_a_frame():
     leaving = (transition(".way:hover .way-face"),
                transition(".way-code {\n  position: absolute"))
     arriving = (transition(".way:hover .way-code"),
-                transition(".way-face {"))
+                transition(".way-face {\n  margin-top"))
 
     for rule in leaving:
         assert "0.26s ease," in rule, "a leaving face should not wait"
@@ -1124,12 +1126,18 @@ def test_every_card_is_in_the_effect_while_the_row_rearranges():
     """The other three cards are resizing too. Three of them reflowing sharply
     beside one doing something considered is what read as interference, so
     they soften over the same 0.42s the widths take and settle sharp."""
-    assert ".ways:hover .way:not(:hover)" in CSS
-    soft = CSS[CSS.index(".ways:hover .way:not(:hover),"):]
-    soft = soft[:soft.index("}")]
-    assert "filter: blur(2.5px)" in soft
-    assert ".ways:focus-within .way:not(:focus-within)" in soft
-    # And the blur is transitioned on the card, matching the width move.
-    card = CSS[CSS.index(".way {"):]
-    card = card[:card.index("}")]
-    assert "filter 0.42s" in card
+    assert "@keyframes settle" in CSS
+    frames = CSS[CSS.index("@keyframes settle"):]
+    frames = frames[:frames.index("\n}")]
+    assert "translateY(-12px)" in frames, "they arrive from above"
+    assert "blur(7px)" in frames and "blur(0)" in frames, "out of blur, into place"
+
+    played = CSS[CSS.index(".ways:hover .way:not(:hover) .way-face,"):]
+    played = played[:played.index("}")]
+    assert "animation: settle 0.42s" in played, "same 0.42s the widths take"
+    assert ".ways:focus-within .way:not(:focus-within) .way-face" in CSS
+
+    # An animation rather than a transition, because it has to replay every
+    # time the row rearranges and a transition between two states it is
+    # already in does nothing.
+    assert "filter: blur(2.5px)" not in CSS, "they sit softened again"
