@@ -422,10 +422,22 @@ WRITES -- adds a row to the shared network:
 - report_tool_success      contribute a success (failure rates need a
                            denominator, so successes matter as much)
 - report_recovery_outcome  report whether a recovery action worked
-                           (note the name: three of these four carry `tool`
-                           and this one does not. It is not
-                           report_tool_recovery_outcome, which is the name
-                           an agent completing the pattern will guess.)
+
+  Two things about this one, because it is the only tool in the set that
+  does not behave like the others:
+
+  The name has no `tool` in it. The other three do. It is not
+  `report_tool_recovery_outcome`, which is what an agent completing the
+  pattern will guess, and the guess fails at call time.
+
+  It takes different arguments. The other three are keyed on `service` and
+  `operation`; this one takes `fingerprint`, `action` and `successful`
+  (plus optional `reporter_id`), and `service`/`operation` are not accepted.
+  The fingerprint is not something you can construct -- it comes back in the
+  response from `check_tool_failure` or `report_tool_failure`, so one of
+  those has to happen first. The order is: report or check the failure, keep
+  the `fingerprint` from the reply, try a recovery action, then send the
+  outcome with that fingerprint.
 
 An agent may call the read and never the writes. That is a supported way to
 use FailEcho, and the read is not degraded by not writing.

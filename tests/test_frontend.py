@@ -1321,5 +1321,19 @@ def test_llms_txt_flags_the_odd_tool_name(client):
     import re
 
     body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
-    assert "It is not report_tool_recovery_outcome" in body
-    assert "three of these four carry `tool` and this one does not" in body
+    assert "It is not `report_tool_recovery_outcome`" in body
+    assert "The name has no `tool` in it. The other three do." in body
+
+
+def test_llms_txt_explains_the_recovery_outcome_call_shape(client):
+    """report_recovery_outcome takes fingerprint/action/successful, not
+    service/operation like the other three, and the fingerprint can only come
+    from a prior check or report. An agent that guesses gets three validation
+    errors; llms.txt did not say so until this was tested end to end."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+    assert "takes `fingerprint`, `action` and `successful`" in body
+    assert "`service`/`operation` are not accepted" in body
+    assert "it comes back in the response from `check_tool_failure`" in body
+    assert "It is not `report_tool_recovery_outcome`" in body
