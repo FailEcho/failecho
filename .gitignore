@@ -12,3 +12,7 @@ data/*.db-shm
 dist/
 build/
 .DS_Store
+
+# Editor swap files
+.*.sw[a-p]
+*~

@@ -940,8 +940,8 @@ footer.shell {
    it. All four are visible at once, which is the point: the question a first
    visitor has is "is there a path for me", and a tab strip answers it one
    quarter at a time. */
-.hero--lead { padding-block: 56px 40px; max-width: 1040px; }
-.hero--lead h1 { margin: 0 0 14px; max-width: none; }
+.hero--lead { padding-block: 64px 52px; max-width: 1040px; }
+.hero--lead h1 { margin: 0 0 24px; max-width: none; }
 .hero--lead .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 .hero-def {
   margin: 20px 0 0; max-width: 68ch;
