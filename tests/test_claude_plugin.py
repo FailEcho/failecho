@@ -136,4 +136,11 @@ def test_the_site_advertises_the_install_this_repository_actually_serves():
 def test_llms_txt_offers_the_plugin_to_agents_that_read_it(client):
     body = client.get("/llms.txt").text
     assert "/plugin install failecho@failecho" in body
-    assert "Use FailEcho when a tool, API, or MCP operation fails" in body
+    assert "when a tool, API or MCP operation fails, an agent can ask" in _flat(body)
+
+
+def _flat(text):
+    """llms.txt is hard-wrapped; match prose on words, not on line breaks."""
+    import re
+
+    return re.sub(r"\s+", " ", text)

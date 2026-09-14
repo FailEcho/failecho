@@ -40,10 +40,10 @@ def test_docs_page_carries_the_brand(client):
 def test_llms_txt_is_branded_and_leads_with_the_trigger(client):
     body = client.get("/llms.txt").text
     assert body.startswith("# FailEcho")
-    assert "Use FailEcho when a tool, API, or MCP operation fails" in body
+    assert "when a tool, API or MCP operation fails, an agent can ask" in _flat(body)
     assert "for AI agents and autonomous software" in body
     assert "Canonical site" in body
-    assert "Before retrying blindly" in body
+    assert "is a retry that can be skipped" in _flat(body)
     for term in ("Failure Echo", "Recovery Echo", "Reporter", "Fingerprint"):
         assert term in body
     assert "Do not send prompts" in body
@@ -621,3 +621,10 @@ def test_the_favicon_link_does_not_move_between_deploys(client):
     assert '<link rel="icon" href="/static/favicon.png" type="image/png"' in body
     assert "favicon.png?v=" not in body, "the icon URL moves on every deploy"
     assert '<link rel="shortcut icon" href="/favicon.ico">' in body
+
+
+def _flat(text):
+    """llms.txt is hard-wrapped; match prose on words, not on line breaks."""
+    import re
+
+    return re.sub(r"\s+", " ", text)

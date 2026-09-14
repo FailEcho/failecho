@@ -143,7 +143,7 @@ def test_llms_txt_tells_an_agent_when_to_use_the_service(client):
     assert response.headers["content-type"].startswith("text/plain")
     body = response.text
 
-    assert "Use FailEcho when a tool, API, or MCP operation fails" in body
+    assert "when a tool, API or MCP operation fails, an agent can ask" in _flat(body)
     assert "Canonical site" in body
     for endpoint in ("/mcp", "/v1/query", "/v1/observe", "/v1/outcome", "/openapi.json"):
         assert endpoint in body
@@ -377,3 +377,10 @@ def test_a_failed_deploy_rolls_back_instead_of_leaving_the_site_down():
     # the app can be healthy while nothing outside can reach it.
     assert "--resolve failecho.com:443:127.0.0.1" in deploy
     assert deploy.index("rm -rf \"$PREV\"") < deploy.index("systemctl restart failecho")
+
+
+def _flat(text):
+    """llms.txt is hard-wrapped; match prose on words, not on line breaks."""
+    import re
+
+    return re.sub(r"\s+", " ", text)
