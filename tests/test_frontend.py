@@ -913,7 +913,10 @@ def test_the_widening_actually_animates():
     animated = re.findall(r"\.ways[^{]*\{[^}]*grid-template-columns:([^;]+);", CSS)
     assert len(animated) >= 5, "the rest state and the four hovered states"
     for block in animated:
-        assert block.count("minmax(0,") == 4 or block.count("minmax(0, ") == 4, block.strip()
+        # Every fr track wrapped in a minmax, however the list is written:
+        # four explicit ones at the wide breakpoint, a repeat() at the narrow
+        # one where the grid is two columns and nothing widens.
+        assert block.count("fr") == block.count("minmax(0"), block.strip()
 
 
 def test_the_command_panels_are_one_size():
