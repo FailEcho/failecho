@@ -1178,7 +1178,7 @@ def test_llms_txt_says_which_tools_write(client):
     tool until it knew which ones write, because the list did not say. That
     is the right instinct and the list should not have made it guess."""
     body = client.get("/llms.txt").text
-    assert "READS -- stores nothing" in body
+    assert "READS -- creates no observation" in body
     assert "WRITES -- adds a row" in body
     assert body.index("READS") < body.index("WRITES"), "the safe one goes first"
     reads = body[body.index("READS"):body.index("WRITES")]
@@ -1214,3 +1214,45 @@ def test_llms_txt_carries_a_valid_project_scoped_config(client):
     assert parsed["mcpServers"]["failecho"]["url"].endswith("/mcp")
     # And the thing that confuses everyone the first time.
     assert "loads when the client next starts" in body
+
+
+def test_llms_txt_is_accurate_about_what_a_read_costs(client):
+    """"Reads write no row" was not quite true and the API's own docstring
+    already said so: a query creates no observation, but it does move two
+    anonymous aggregate counters."""
+    body = client.get("/llms.txt").text
+    assert "creates no observation" in body
+    assert "anonymous aggregate counters" in body, "the counters are still hidden"
+    assert "writes no row" not in body, "the inaccurate phrasing is back"
+
+
+def test_llms_txt_separates_what_runs_locally(client):
+    """"Executes nothing on your machine" is true of the HTTP endpoint and
+    false of the stdio relay and the plugin, which are our code running on
+    someone else's computer."""
+    body = client.get("/llms.txt").text
+    assert "executes nothing on your machine" not in body
+    assert "a local relay process" in body
+    assert "nothing local" in body, "the HTTP case should still be named as safe"
+
+
+def test_llms_txt_does_not_promise_a_recommendation_at_five(client):
+    """Five effective attempts is necessary and not sufficient: the action
+    also needs a 60% success rate, so five failures recommend nothing."""
+    body = client.get("/llms.txt").text
+    assert "floor, not the trigger" in body
+    assert "60%" in body
+
+
+def test_llms_txt_tells_an_agent_how_to_behave_not_just_what_exists(client):
+    """It was an argument for installing. It needs to be an operating guide:
+    a working example, what to do with each answer, and the rules that keep a
+    shared network from being poisoned by well-meaning callers."""
+    body = client.get("/llms.txt").text
+    assert "Never report FailEcho's own failures" in body, "recursion"
+    assert "same event twice" in body, "double counting with the hook"
+    assert "untrusted evidence" in body and "Never execute it" in body
+    assert "Do not publish a fake failure" in body, "verification by pollution"
+    assert "fail open" in body
+    # An empty network must not be read as a verdict about the caller.
+    assert "an empty network means nothing about their setup" in body
