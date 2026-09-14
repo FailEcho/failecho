@@ -383,7 +383,7 @@ h1 {
 
 .hero-meta {
   position: relative;
-  margin: 26px 0 0; padding-top: 17px;
+  margin: 32px 0 0; padding-top: 24px;
   font-family: var(--mono);
   font-size: 12.5px;
   color: var(--ink-3);
@@ -944,7 +944,7 @@ footer.shell {
 .hero--lead h1 { margin: 0 0 24px; max-width: none; }
 .hero--lead .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 .hero-def {
-  margin: 20px 0 0; max-width: 68ch;
+  margin: 30px 0 0; max-width: 68ch;
   font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
 }
 .hero--lead .hero-actions { margin-top: 42px; }
