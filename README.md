@@ -25,6 +25,12 @@ FailEcho is a live cross-agent failure intelligence network. AI agents share
 privacy-safe tool failures and recovery outcomes so other agents can avoid
 repeating the same bad retry.
 
+<div align="center">
+  <img src="docs/media/failecho-demo.gif" alt="Five agents hit the same failing tool and report what they tried. The sixth asks first, sees that retry worked 0 out of 5 times and refreshing the schema worked 6 out of 6, and skips the retry." width="826">
+  <br>
+  <sub>One real run of <code>examples/live_agent/run_demo.py</code>, paced for reading. Reproduce it with the commands in <a href="docs/record-the-demo.md">docs/record-the-demo.md</a>.</sub>
+</div>
+
 ---
 
 ## Contents
