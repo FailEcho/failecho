@@ -84,7 +84,7 @@ right. The gate is the point; a date is not.
 `docs/devto-post.md`, problem → product. By now the warm-up post has been up a
 week and the author is not a stranger.
 
-**Wed 24 Sep — Reddit, one subreddit at a time**
+**Wed 24 Sep — Reddit, one subreddit at a time** (`docs/reddit-post.md`)
 Not the same text in three places on the same day; that is the fastest way to
 get flagged.
 - **r/mcp** — smallest, most relevant, most forgiving. Go here first.
