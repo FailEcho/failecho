@@ -876,15 +876,40 @@ footer.shell {
 
 /* ---- the four ways ------------------------------------------------------ */
 .install { padding-bottom: 72px; }
-/* The line that says what this connects to belongs above the four cards that
-   connect to it, not at the bottom of the hero. */
-.ways-meta {
-  margin: 0 0 18px; font-family: var(--mono); font-size: 12.5px;
-  letter-spacing: 0.02em; color: var(--ink-3);
+/* The four cards answer one question, and this is the question. Centred over
+   them at the size of a section's second line. */
+.ways-lead {
+  margin: 0 auto 30px; text-align: center;
+  font-family: var(--serif); font-weight: 400;
+  font-size: clamp(21px, 2.2vw, 29px); letter-spacing: -0.012em;
+  color: var(--ink-2);
 }
+/* The card you are pointing at takes the room. A command needs more width
+   than three facts do, and taking it from the other three is cheaper than
+   giving every card enough for the widest command it might hold. Grid tracks
+   interpolate as long as the count does not change, so this is one
+   transition on one property. */
 .ways {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px; align-items: stretch;
+  transition: grid-template-columns 0.34s cubic-bezier(0.2, 0, 0.2, 1);
+}
+.ways:has(.way--a:hover), .ways:has(.way--a:focus-within) {
+  grid-template-columns: 2.05fr 1fr 1fr 1fr;
+}
+.ways:has(.way--b:hover), .ways:has(.way--b:focus-within) {
+  grid-template-columns: 1fr 2.05fr 1fr 1fr;
+}
+.ways:has(.way--c:hover), .ways:has(.way--c:focus-within) {
+  grid-template-columns: 1fr 1fr 2.05fr 1fr;
+}
+.ways:has(.way--d:hover), .ways:has(.way--d:focus-within) {
+  grid-template-columns: 1fr 1fr 1fr 2.05fr;
+}
+@media (max-width: 1080px) {
+  .ways:has(.way:hover), .ways:has(.way:focus-within) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 /* At rest a card is what this way in is: the artwork, the facts, one line
    about it. Point at it and the artwork goes, the facts go with it, and the
@@ -922,7 +947,7 @@ footer.shell {
 }
 .way-code {
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   opacity: 0; visibility: hidden;
 }
 .way:hover .way-face, .way:focus-within .way-face { opacity: 0; visibility: hidden; }
@@ -959,21 +984,40 @@ footer.shell {
      column that is only as tall as the card: the command was being squeezed
      and clipped rather than filling the space it was given. */
   flex: 0 0 auto;
-  margin: 0; padding: 0; max-width: 100%;
+  margin: 0; padding: 14px 14px 14px 16px; max-width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 2px solid var(--red-deep);
   white-space: pre-wrap; overflow-wrap: anywhere;
   /* pre carries overflow-x: auto everywhere else on the site. Here the text
      wraps, so the only thing that rule can produce is a scrollbar with
      nothing to scroll. */
   overflow: visible;
 }
-.way code { font-family: var(--mono); font-size: 12px; line-height: 1.7; }
+.way code { font-family: var(--mono); font-size: 12.5px; line-height: 1.75; }
+.way .copyable:hover { background: rgba(255, 255, 255, 0.07); }
+/* The Copy control is a control now, so the block does not need to explain
+   that it is one too. */
+.way .copyable::after { content: none; }
+
+/* Copy on the left, where the full steps are on the right. */
+.way-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 14px;
+}
+.way-copy {
+  appearance: none; cursor: pointer; flex: none;
+  font-family: var(--sans); font-size: 12px; letter-spacing: 0.02em;
+  color: var(--ink-2); background: transparent;
+  border: 1px solid var(--line-2); padding: 6px 14px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.way-copy:hover { color: var(--ink); border-color: var(--ink-3); background: var(--surface-2); }
+.way-copy.is-copied { color: var(--healthy); border-color: var(--healthy); }
 .way-foot { margin: 14px 0 0; font-size: 12.5px; color: var(--ink-3); }
 .way .copyable::after { top: -20px; bottom: auto; right: 0; }
 /* Where this way in is written out in full. */
 .way-more {
-  margin-top: 14px; align-self: flex-start;
-  font-size: 12.5px; color: var(--ink-2);
-  border-bottom: 1px solid var(--line-2); padding-bottom: 2px;
+  font-size: 12.5px; line-height: 1.3; color: var(--ink-2); text-align: right;
 }
 .way-more::after { content: " \2197"; color: var(--ink-3); }
 .way-more:hover { color: var(--ink); border-bottom-color: var(--red); }

@@ -99,7 +99,7 @@
       <a class="btn btn--red" href="/setup">Get started</a>
       <a class="btn" href="/demo">See it work</a>
     </p>
-    <p class="hero-tagline">Before you retry, check the echo.</p>
+    <p class="hero-meta">Claude Code · MCP · REST · OpenAPI · No account required</p>
     <p class="hero-listed">
       Listed in the
       <a href="https://registry.modelcontextprotocol.io/v0/servers?search=com.failecho/failecho" rel="external noopener">official MCP registry</a>
@@ -110,7 +110,7 @@
 
   <section class="shell install" aria-labelledby="install-title">
     <h2 id="install-title" class="visually-hidden">Ways to connect</h2>
-    <p class="ways-meta">Claude Code · MCP · REST · OpenAPI · No account required</p>
+    <p class="ways-lead">Before you retry, check the echo.</p>
     <div class="ways">
 
       <div class="way way--a">
@@ -125,10 +125,13 @@
 <p class="way-foot">Reports MCP failures for you. You never call a tool by hand.</p>
           </div>
           <div class="way-code">
-<pre class="copyable" tabindex="0" role="button" data-copy-target="code-plugin"
-     aria-label="Copy the Claude Code install"><code id="code-plugin">/plugin marketplace add FailEcho/failecho
+<pre class="copyable" data-copy-target="code-plugin"><code id="code-plugin">/plugin marketplace add FailEcho/failecho
 /plugin install failecho@failecho<span class="caret" aria-hidden="true"></span></code></pre>
-            <a class="way-more" href="/setup#claude-code">Claude Code, step by step</a>
+            <div class="way-actions">
+              <button class="way-copy" type="button" data-copy-target="code-plugin"
+                      aria-label="Copy the Claude Code install">Copy</button>
+              <a class="way-more" href="/setup#claude-code">Claude Code, step by step</a>
+            </div>
           </div>
         </div>
       </div>
@@ -145,12 +148,15 @@
 <p class="way-foot">Can your host only start a process? <code>uvx failecho-mcp</code> or <code>npx -y failecho-mcp</code>.</p>
           </div>
           <div class="way-code">
-<pre class="copyable" tabindex="0" role="button" data-copy-target="code-mcp"
-     aria-label="Copy the MCP server config"><code id="code-mcp">"failecho": {
+<pre class="copyable" data-copy-target="code-mcp"><code id="code-mcp">"failecho": {
   "type": "http",
   "url": "{{PUBLIC_URL}}/mcp"
 }<span class="caret" aria-hidden="true"></span></code></pre>
-            <a class="way-more" href="/setup#mcp-clients">Any MCP client, step by step</a>
+            <div class="way-actions">
+              <button class="way-copy" type="button" data-copy-target="code-mcp"
+                      aria-label="Copy the MCP server config">Copy</button>
+              <a class="way-more" href="/setup#mcp-clients">Any MCP client, step by step</a>
+            </div>
           </div>
         </div>
       </div>
@@ -167,12 +173,15 @@
 <p class="way-foot">One call. There is an OpenAPI document at <a href="/docs">/docs</a>.</p>
           </div>
           <div class="way-code">
-<pre class="copyable" tabindex="0" role="button" data-copy-target="code-rest"
-     aria-label="Copy the REST query"><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
+<pre class="copyable" data-copy-target="code-rest"><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
   -H "Content-Type: application/json" \
   -d '{"service":"api.example.com",
        "operation":"create_issue","error_code":"429"}'<span class="caret" aria-hidden="true"></span></code></pre>
-            <a class="way-more" href="/setup#rest-api">The REST API, step by step</a>
+            <div class="way-actions">
+              <button class="way-copy" type="button" data-copy-target="code-rest"
+                      aria-label="Copy the REST query">Copy</button>
+              <a class="way-more" href="/setup#rest-api">The REST API, step by step</a>
+            </div>
           </div>
         </div>
       </div>
@@ -189,10 +198,13 @@
 <p class="way-foot">It reads the guide and configures itself.</p>
           </div>
           <div class="way-code">
-<pre class="copyable" tabindex="0" role="button" data-copy-target="code-agent"
-     aria-label="Copy the prompt for your agent"><code id="code-agent">Read {{PUBLIC_URL}}/llms.txt and set yourself
+<pre class="copyable" data-copy-target="code-agent"><code id="code-agent">Read {{PUBLIC_URL}}/llms.txt and set yourself
 up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
-            <a class="way-more" href="/setup#let-the-agent">Letting the agent do it</a>
+            <div class="way-actions">
+              <button class="way-copy" type="button" data-copy-target="code-agent"
+                      aria-label="Copy the prompt for your agent">Copy</button>
+              <a class="way-more" href="/setup#let-the-agent">Letting the agent do it</a>
+            </div>
           </div>
         </div>
       </div>

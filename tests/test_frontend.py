@@ -79,7 +79,7 @@ def test_the_front_page_stays_brief():
     # 13k -> 14k when the definition moved back into the hero's left column,
     # 14k -> 15k for the three cards that close the page, 15k -> 16k for the
     # four install cards carrying two faces each.
-    assert len(HTML) < 17_000
+    assert len(HTML) < 18_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -130,19 +130,17 @@ def test_semantic_landmarks_and_labels():
 
 
 def test_interactive_elements_are_real_buttons_with_labels():
-    """Four tabs, and four code blocks that are their own copy control.
+    """One real button per card, and the block beside it is clickable too.
 
-    A pre cannot be a button element without wrapping every line of the
-    command in one, so the hero's blocks take the role, the tab stop and the
-    keyboard handling instead -- all three, or role="button" is a label on
-    something that does not behave like one.
+    The block used to carry role="button" and a tab stop of its own, which
+    made two tab stops per card for one action. It is a convenience for a
+    mouse now; the button is the control, and it is a real one.
     """
-    assert HTML.count("data-copy-target=") == 4, "one per code block"
+    assert HTML.count('class="way-copy"') == 4, "one Copy button per card"
+    assert HTML.count("data-copy-target=") == 8, "the button and the block"
     assert HTML.count('class="copyable"') == 4
-    assert HTML.count('role="button"') == 4
-    assert HTML.count('tabindex="0"') == 4
-    assert HTML.count("aria-label=") >= 4, "each block says what it copies"
-    assert 'event.key !== "Enter" && event.key !== " "' in JS
+    assert 'role="button"' not in HTML, "two tab stops per card is one too many"
+    assert HTML.count("aria-label=") >= 4, "each button says what it copies"
     assert ":focus-visible" in CSS
 
 
@@ -227,7 +225,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 50_000
+    assert len(CSS) < 52_000
     assert len(JS) < 27_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -240,7 +238,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 92_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 95_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -258,7 +256,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 125_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 128_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -877,7 +875,29 @@ def test_each_card_says_where_the_full_steps_are():
         assert 'id="%s"' % href.split("#")[1] in setup, href
 
 
-def test_the_stack_line_sits_above_the_cards_it_describes():
-    assert 'class="ways-meta"' in HTML
-    assert HTML.index('class="ways-meta"') < HTML.index('class="ways"')
-    assert "hero-meta" not in HTML
+def test_the_question_sits_above_the_four_answers_to_it():
+    """The stack line stays in the hero. What goes over the cards is the line
+    that says what to do with them."""
+    assert 'class="ways-lead">Before you retry, check the echo.' in HTML
+    assert HTML.index('class="ways-lead"') < HTML.index('class="ways"')
+    assert 'class="hero-meta">Claude Code · MCP · REST' in HTML
+    assert "hero-tagline" not in HTML
+
+
+def test_the_card_you_point_at_takes_the_room():
+    """A command needs more width than three facts do. Taking it from the
+    other three is cheaper than giving every card enough for the widest
+    command it might hold: 303px at rest, 492px hovered at 1440."""
+    ways = CSS[CSS.index(".ways {"):]
+    ways = ways[:ways.index("}")]
+    assert "transition: grid-template-columns" in ways
+    for variant in ("--a", "--b", "--c", "--d"):
+        assert ".ways:has(.way" + variant + ":hover)" in CSS
+    # Two columns below 1080, and no card grows out of that.
+    assert ".ways:has(.way:hover), .ways:has(.way:focus-within) {" in CSS
+
+
+def test_the_command_starts_where_the_facts_started():
+    code = CSS[CSS.index(".way-code {"):]
+    code = code[:code.index("}")]
+    assert "justify-content: flex-start" in code
