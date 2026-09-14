@@ -244,7 +244,10 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 109_000
+    # 109k -> 110k: target="_blank" and rel on every link that already showed
+    # the ↗, plus the footer's GitHub link joining them. Attributes on links
+    # that were already there, not new markup.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 110_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -1476,3 +1479,39 @@ def test_hero_endpoint_note_does_not_add_height(client):
     block = block[: block.index("}")]
     assert "align-items: center" in block, "the note must sit on the button's line"
     assert "flex-direction: column" not in block, "a column makes the hero taller"
+
+
+def test_arrow_links_open_in_a_new_tab(client):
+    """The ↗ marks a link that leaves the site, so it should behave like one.
+    Every link carrying it opens in a new tab, and every new tab carries
+    noopener -- target="_blank" without it hands the opener to the other page."""
+    import re
+
+    for path in ("/", "/about", "/setup", "/demo", "/network"):
+        body = client.get(path).text
+        for tag in re.findall(r"<a\b[^>]*>", body):
+            external = re.search(r'rel="[^"]*\bexternal\b', tag)
+            blank = 'target="_blank"' in tag
+            if external:
+                assert blank, f"{path}: arrow link does not open a new tab: {tag}"
+            if blank:
+                assert "noopener" in tag, f"{path}: new tab without noopener: {tag}"
+
+
+def test_the_footer_github_link_is_marked_external():
+    """It leaves the site like the registry links do, so it gets the same ↗.
+
+    Asserted on the source rather than a response: the whole block is stripped
+    unless FIN_GITHUB_URL is set, and the substitution only fills the href."""
+    import re
+
+    for name in ("index.html", "about.html", "setup.html", "demo.html", "network.html"):
+        html = (STATIC / name).read_text()
+        block = re.search(r"<!--github-->(.*?)<!--/github-->", html, re.S)
+        assert block, f"{name}: no GitHub block"
+        footer_link = re.search(r"<li><a\b[^>]*>GitHub</a></li>", block.group(1))
+        if not footer_link:
+            continue  # that page carries only the nav link
+        tag = footer_link.group(0)
+        assert 'rel="external noopener"' in tag, f"{name}: footer GitHub has no arrow"
+        assert 'target="_blank"' in tag, f"{name}: footer GitHub does not open a new tab"
