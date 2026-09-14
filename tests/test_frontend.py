@@ -933,15 +933,41 @@ def test_all_four_cards_start_their_content_on_the_same_line():
     assert "justify-content: flex-start" in body
 
 
-def test_the_two_faces_cross_dissolve_rather_than_cut():
-    """Both fading at once held two half-visible sets of words on top of each
-    other for a moment, which is the worst frame either of them has."""
-    leaving = CSS[CSS.index(".way:hover .way-face"):]
-    leaving = leaving[:leaving.index("}")]
-    assert "translateY(-12px)" in leaving and "blur(7px)" in leaving
-    arriving = CSS[CSS.index(".way:hover .way-code"):]
-    arriving = arriving[:arriving.index("}")]
-    assert "0.1s" in arriving, "the command arrives on the same beat it left on"
+def test_the_two_faces_never_share_a_frame():
+    """Overlapping them at all was the mistake: while both are partly visible
+    the card holds two sets of words on top of each other, and no amount of
+    blur stops that reading as mashed text.
+
+    Whichever face is leaving gets the first 0.26s to itself; the arriving one
+    starts at 0.28s, after the other is gone. Symmetrical, so the resting
+    rules are the leaving half for the code and the arriving half for the
+    facts -- which is why their delays look reversed.
+    """
+    import re
+
+    def transition(selector):
+        at = CSS.index(selector)
+        block = CSS[at:CSS.index("}", at)]
+        return re.search(r"transition:([^;]+);", block, re.S).group(1)
+
+    leaving = (transition(".way:hover .way-face"),
+               transition(".way-code {\n  position: absolute"))
+    arriving = (transition(".way:hover .way-code"),
+                transition(".way-face {"))
+
+    for rule in leaving:
+        assert "0.26s ease," in rule, "a leaving face should not wait"
+        assert "0.28s" not in rule
+    for rule in arriving:
+        assert "0.34s ease 0.28s" in rule, "an arriving face must wait out the other"
+
+    # The leaving face is fully gone at 0.26s, before the other starts at 0.28s.
+    assert 0.26 < 0.28
+
+    style = CSS[CSS.index(".way:hover .way-face"):]
+    style = style[:style.index("}")]
+    assert "translateY(-12px)" in style and "blur(7px)" in style
+
     # Motion off means off, and these are transitions.
     reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce) {\n  .pulse"):]
     reduced = reduced[:reduced.index("\n}")]

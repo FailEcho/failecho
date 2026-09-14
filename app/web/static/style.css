@@ -1046,13 +1046,22 @@ footer.shell {
    each one somewhere different -- the last card, which says the least, began
    16px below the first. One offset, shared, puts all four on the same line.
 
-   They cross-dissolve rather than cut. Both fading at once over 0.22s read as
-   a flicker: for a moment the card holds two half-visible sets of words on
-   top of each other, which is the worst frame either of them has. So the
-   facts leave first, rising and softening as they go, and the command
-   follows a beat later from just below and slightly out of focus. The blur
-   is what makes the overlap read as depth rather than as two things fighting
-   over the same space. */
+   They hand over rather than cross-fade. Overlapping them at all was the
+   mistake: while both are partly visible the card holds two sets of words on
+   top of each other, and no amount of blur stops that reading as mashed
+   text. "A beat later" was not late enough -- the arriving face began at
+   0.10s while the leaving one still had until 0.20s to go, so the worst
+   frame was still in there.
+
+   Now they never share one. Whichever face is leaving gets the first 0.26s
+   to itself, rising and softening as it goes; the arriving one starts at
+   0.28s, after the other is completely gone, and takes 0.34s to come up from
+   below and into focus. About 0.62s end to end.
+
+   Symmetrical in both directions: going in, the facts leave and the command
+   arrives; coming out, the command leaves and the facts arrive. So the
+   resting rules are the *leaving* half for the code and the *arriving* half
+   for the facts, which is why their delays look reversed. */
 .way-body {
   position: relative; flex: 1 1 auto; min-height: 252px;
   display: flex; flex-direction: column; justify-content: flex-start;
@@ -1060,30 +1069,31 @@ footer.shell {
 .way-face {
   margin-top: 52px;
   transform: none; filter: blur(0);
-  transition: opacity 0.2s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.2s ease, visibility 0s linear 0s;
+  transition: opacity 0.34s ease 0.28s,
+              transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.24s,
+              filter 0.34s ease 0.28s, visibility 0s linear 0.24s;
 }
 .way-code {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   justify-content: flex-start; padding-top: 52px;
   opacity: 0; visibility: hidden;
   transform: translateY(12px); filter: blur(7px);
-  transition: opacity 0.24s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.24s ease, visibility 0s linear 0.24s;
+  transition: opacity 0.26s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.26s ease, visibility 0s linear 0.26s;
 }
 .way:hover .way-face, .way:focus-within .way-face {
   opacity: 0; visibility: hidden;
   transform: translateY(-12px); filter: blur(7px);
-  transition: opacity 0.2s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
-              filter 0.2s ease, visibility 0s linear 0.2s;
+  transition: opacity 0.26s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+              filter 0.26s ease, visibility 0s linear 0.26s;
 }
 .way:hover .way-code, .way:focus-within .way-code {
   opacity: 1; visibility: visible;
   transform: none; filter: blur(0);
-  /* A beat behind the facts leaving, so the two never share a frame. */
-  transition: opacity 0.26s ease 0.1s,
-              transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.06s,
-              filter 0.26s ease 0.1s, visibility 0s linear 0.06s;
+  /* Starts after the facts are gone, not merely behind them. */
+  transition: opacity 0.34s ease 0.28s,
+              transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.24s,
+              filter 0.34s ease 0.28s, visibility 0s linear 0.24s;
 }
 
 /* No pointer, no hover: a touch screen gets both at once rather than a card
