@@ -1040,3 +1040,18 @@ def test_the_demo_says_it_is_a_recording_before_it_invites_a_press():
     # And it says where the real thing is, and what it will and will not show.
     assert "Run it for real" in demo
     assert "which today is not much" in demo
+
+
+def test_the_api_reference_serves_its_own_swagger():
+    """It pulled the bundle from cdn.jsdelivr.net and its favicon from
+    fastapi.tiangolo.com: a third-party script running with this origin's
+    privileges, and a request telling someone else who reads our docs."""
+    main = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text()
+    assert 'swagger_js_url="/static/vendor/swagger-ui-bundle.js"' in main
+    assert 'swagger_css_url="/static/vendor/swagger-ui.css"' in main
+    assert 'swagger_favicon_url="/static/favicon.png"' in main
+    for name in ("swagger-ui-bundle.js", "swagger-ui.css", "swagger-init.js"):
+        assert (STATIC / "vendor" / name).exists(), name
+    # And the inline bootstrap is a file, because script-src 'self' blocks it.
+    assert '<script src="/static/vendor/swagger-init.js"></script>' in main
+    assert "swagger template has no inline bootstrap" in main, "no loud failure"

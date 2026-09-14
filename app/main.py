@@ -122,6 +122,43 @@ app = FastAPI(
     license_info={"name": "MIT"},
 )
 
+#: The largest legitimate request body. Every field on every endpoint is
+#: length-capped in the schema -- the longest is a 128-character service name
+#: -- so a real call is a few hundred bytes and the biggest imaginable one is
+#: a couple of kilobytes. 16KB is generous by an order of magnitude.
+MAX_BODY_BYTES = 16 * 1024
+
+
+@app.middleware("http")
+async def refuse_oversized_bodies(request: Request, call_next):
+    """Reject a body before it is read, not after it is parsed.
+
+    Nothing capped it. A 32MB JSON body was accepted, buffered and parsed, and
+    the worker's resident memory went from 40MB to 100MB holding one -- on a
+    box with a 400MB ceiling and one worker, a handful of concurrent uploads
+    is the whole process. Unknown fields are dropped by the schema, so the
+    megabytes were not even reaching the database; they were just being paid
+    for.
+
+    Content-Length covers the ordinary case. A chunked body has no length to
+    check, so the proxy in front carries the same limit for those -- see
+    request_body max_size in deploy/Caddyfile.
+    """
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            if int(declared) > MAX_BODY_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": f"Request body exceeds {MAX_BODY_BYTES} bytes."},
+                )
+        except ValueError:
+            return JSONResponse(
+                status_code=400, content={"detail": "Malformed Content-Length."}
+            )
+    return await call_next(request)
+
+
 # Public, free, unauthenticated API: any agent or browser may call it.
 app.add_middleware(
     CORSMiddleware,
@@ -354,13 +391,37 @@ async def swagger_docs(request: Request) -> HTMLResponse:
     """Swagger UI, with the brand and canonical metadata it does not ship."""
     from fastapi.openapi.docs import get_swagger_ui_html
 
+    # Served from here, not from a CDN. The default sends every reader of the
+    # API reference to cdn.jsdelivr.net for a script that then runs with this
+    # origin's privileges, and to fastapi.tiangolo.com for a favicon that
+    # tells them who is reading our docs. Pinned at 5.17.14 in
+    # app/web/static/vendor/, which is also what lets the Content-Security-
+    # Policy say script-src 'self' and mean it.
     page = get_swagger_ui_html(
         openapi_url=app.openapi_url or "/openapi.json",
         title="FailEcho API — Failure Intelligence for AI Agents",
+        swagger_js_url="/static/vendor/swagger-ui-bundle.js",
+        swagger_css_url="/static/vendor/swagger-ui.css",
+        swagger_favicon_url="/static/favicon.png",
     )
     html = page.body.decode()
     html = html.replace(
         "</head>", DOCS_HEAD.format(base_url=public_base_url(request)) + "</head>", 1
+    )
+
+    # The generated page bootstraps Swagger from an inline <script>, which
+    # script-src 'self' blocks -- correctly. The same configuration is served
+    # as a file instead. Asserted rather than attempted: if FastAPI changes
+    # the shape of its own template, /docs must fail loudly here rather than
+    # quietly render an empty page in every browser.
+    start = html.find("<script>")
+    end = html.find("</script>", start)
+    assert start != -1 and end != -1, "swagger template has no inline bootstrap"
+    assert "SwaggerUIBundle(" in html[start:end], "swagger bootstrap moved"
+    html = (
+        html[:start]
+        + '<script src="/static/vendor/swagger-init.js"></script>'
+        + html[end + len("</script>"):]
     )
     return HTMLResponse(html)
 

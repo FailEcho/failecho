@@ -289,3 +289,55 @@ def test_a_service_filter_longer_than_a_service_name_is_rejected(client):
     """Bounding the key space at the door, not only in the cache."""
     body = client.get("/v1/services", params={"service": "x" * 5000})
     assert body.status_code == 422
+
+
+def test_a_body_larger_than_any_real_call_is_refused_unread(client):
+    """A 32MB JSON body was accepted, buffered and parsed, and the worker's
+    resident memory went from 40MB to 100MB holding one -- on a box with a
+    400MB ceiling and a single worker. Unknown fields are dropped by the
+    schema, so those megabytes were not even reaching the database.
+
+    Every field on every endpoint is length-capped, the longest being a
+    128-character service name, so a real call is a few hundred bytes.
+    """
+    from app.main import MAX_BODY_BYTES
+
+    assert MAX_BODY_BYTES == 16 * 1024
+
+    body = {"service": "s", "operation": "o", "outcome": "failure",
+            "error_type": "x", "junk": "A" * (MAX_BODY_BYTES * 2)}
+    fat = client.post("/v1/observe", json=body)
+    assert fat.status_code == 413
+    assert str(MAX_BODY_BYTES) in fat.json()["detail"]
+
+    lean = client.post("/v1/observe", json={
+        "service": "s", "operation": "o", "outcome": "failure", "error_type": "x"})
+    assert lean.status_code == 200, "a real call must still get through"
+
+
+def test_a_lying_content_length_is_refused(client):
+    body = '{"service":"s","operation":"o","outcome":"failure","error_type":"x"}'
+    answer = client.post("/v1/observe", content=body,
+                         headers={"Content-Type": "application/json",
+                                  "Content-Length": "not-a-number"})
+    assert answer.status_code in (400, 422)
+
+
+def test_a_name_may_not_carry_control_characters(client):
+    """NUL, escapes and the C1 range were accepted, stored, and served back
+    out of /v1/services. A NUL truncates that string in a surprising number of
+    consumers; an escape sequence in a terminal is a cursor instruction rather
+    than a word."""
+    for bad in ("bad\x00name", "bad\x1b[31mname", "two\nlines", "two\ttabs",
+                "bad\x7fname", "bad\x85name"):
+        answer = client.post("/v1/observe", json={
+            "service": bad, "operation": "op", "outcome": "failure",
+            "error_type": "x"})
+        assert answer.status_code == 422, f"{bad!r} was accepted"
+
+    # Names in other scripts are names.
+    for good in ("github-mcp", "服务-mcp", "mcp-\U0001f600", "a b"):
+        answer = client.post("/v1/observe", json={
+            "service": good, "operation": "op", "outcome": "failure",
+            "error_type": "x"})
+        assert answer.status_code == 200, f"{good!r} was rejected"

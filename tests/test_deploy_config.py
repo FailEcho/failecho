@@ -31,3 +31,39 @@ def test_the_dev_proxy_never_logs_headers_either():
     dev = (DEPLOY / "Caddyfile.failecho-dev").read_text()
     if "log {" in dev:
         assert "request>headers delete" in dev
+
+
+def test_the_edge_sets_the_headers_a_browser_will_not_assume():
+    """There were none of these. Each one is a default the browser applies if
+    it is told to and does not if it is not."""
+    for header in ("Strict-Transport-Security", "Content-Security-Policy",
+                   "X-Content-Type-Options", "X-Frame-Options",
+                   "Referrer-Policy", "Permissions-Policy",
+                   "Cross-Origin-Opener-Policy"):
+        assert header in CADDYFILE, f"{header} is not set"
+    assert "-Server" in CADDYFILE, "Caddy still announces itself"
+    assert "max-age=31536000" in CADDYFILE
+    # Not preloaded: that is a one-way door and belongs to a decision, not to
+    # a config tidy-up. (Checked on the directive, not the comment above it.)
+    hsts = CADDYFILE[CADDYFILE.index("Strict-Transport-Security"):]
+    assert "preload" not in hsts[:hsts.index("\n")]
+
+
+def test_the_policy_allows_no_third_party_code():
+    """script-src 'self' is only true while the site serves its own scripts.
+    The API reference used to pull Swagger UI from a CDN, which meant a
+    third-party bundle executing with this origin's privileges."""
+    policy = CADDYFILE[CADDYFILE.index("Content-Security-Policy"):]
+    policy = policy[:policy.index("\n")]
+    assert "script-src 'self'" in policy
+    assert "cdn." not in policy and "unsafe-eval" not in policy
+    assert "frame-ancestors 'none'" in policy
+    assert "object-src 'none'" in policy and "base-uri 'none'" in policy
+
+
+def test_the_proxy_caps_a_body_the_app_cannot_measure():
+    """Content-Length covers the ordinary case and the app checks it. A
+    chunked body has no length to check, so the limit is here too, where the
+    connection can be cut before the bytes reach a worker."""
+    assert "request_body {" in CADDYFILE
+    assert "max_size 64KB" in CADDYFILE

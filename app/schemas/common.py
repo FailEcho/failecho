@@ -17,17 +17,30 @@ from app.core.config import STATUS_DEGRADED, STATUS_HEALTHY  # noqa: F401  (docs
 Outcome = Literal["success", "failure"]
 Status = Literal["HEALTHY", "DEGRADED", "MAJOR", "INSUFFICIENT_DATA"]
 
+#: Every metadata field is a name, and a name has no control characters in
+#: it. NUL, escape sequences and the C1 range were all accepted, stored, and
+#: served back out of /v1/services -- a NUL in a service name truncates that
+#: string in a surprising number of consumers, and an escape sequence in a
+#: terminal is a cursor instruction rather than a word. Rejected at the door
+#: rather than stripped, so the caller learns the name they chose is not the
+#: name we stored.
+_NO_CONTROL = r"^[^\x00-\x1f\x7f-\x9f]+$"
+
 ServiceName = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128,
+                           pattern=_NO_CONTROL)
 ]
 OperationName = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128,
+                           pattern=_NO_CONTROL)
 ]
 ShortToken = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64,
+                           pattern=_NO_CONTROL)
 ]
 ErrorCode = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32,
+                           pattern=_NO_CONTROL)
 ]
 FingerprintStr = Annotated[
     str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9a-f]{32}$")
