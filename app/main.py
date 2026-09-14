@@ -321,10 +321,15 @@ they are not the same decision:
    not sure. `claude mcp remove failecho` undoes either.
 
    If you cannot run that command yourself -- the CLI is not on PATH, or
-   your session cannot spawn it -- print it for the person you are working
-   with and stop there. That is the correct outcome, not a failure. Do not
-   fall back to editing the config file by hand: `~/.claude.json` is live
-   state owned by a running client, and an out-of-band write can be
+   your session cannot spawn it -- you have two safe options. Writing a new
+   `.mcp.json` in the working directory by hand is fine: it is a new file
+   that no running process owns, it is the same thing `--scope project`
+   would have written, and deleting it undoes it. Otherwise print the
+   command for the person you are working with and stop there; that is the
+   correct outcome, not a failure.
+
+   What to avoid either way is hand-editing `~/.claude.json`. That one is
+   live state owned by a running client, so an out-of-band write can be
    clobbered or can corrupt it.
 
    The file `--scope project` writes is just:
@@ -417,6 +422,10 @@ WRITES -- adds a row to the shared network:
 - report_tool_success      contribute a success (failure rates need a
                            denominator, so successes matter as much)
 - report_recovery_outcome  report whether a recovery action worked
+                           (note the name: three of these four carry `tool`
+                           and this one does not. It is not
+                           report_tool_recovery_outcome, which is the name
+                           an agent completing the pattern will guess.)
 
 An agent may call the read and never the writes. That is a supported way to
 use FailEcho, and the read is not degraded by not writing.

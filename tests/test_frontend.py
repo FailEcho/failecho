@@ -1277,9 +1277,11 @@ def test_llms_txt_tells_an_agent_what_to_do_when_it_cannot_run_the_cli(client):
     import re
 
     body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
-    assert "print it for the person you are working with" in body
-    assert "That is the correct outcome, not a failure." in body
-    assert "Do not fall back to editing the config file by hand" in body
+    assert "print the command for the person you are working with" in body
+    assert "that is the correct outcome, not a failure" in body
+    # writing a NEW file is safe; editing live client state is not
+    assert "Writing a new `.mcp.json` in the working directory by hand is fine" in body
+    assert "What to avoid either way is hand-editing `~/.claude.json`" in body
 
 
 def test_llms_txt_does_not_open_by_instructing_the_agent(client):
@@ -1309,3 +1311,15 @@ def test_llms_txt_warns_about_the_relay_next_to_the_relay_command(client):
         "the warning is not adjacent to the command it is about"
     )
     assert "a bigger ask than the endpoint above, not a smaller one" in intro
+
+
+def test_llms_txt_flags_the_odd_tool_name(client):
+    """The sixth install test wrote `report_tool_recovery_outcome`, pattern-
+    completing from report_tool_failure and report_tool_success. The real name
+    has no `tool` in it, and an agent that guesses gets tool-not-found on its
+    first real use."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+    assert "It is not report_tool_recovery_outcome" in body
+    assert "three of these four carry `tool` and this one does not" in body
