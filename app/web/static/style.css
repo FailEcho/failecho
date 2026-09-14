@@ -923,9 +923,11 @@ footer.shell {
 }
 .copyable:hover::after, .copyable:focus-visible::after { opacity: 1; }
 .copyable.is-copied::after { content: "copied"; color: var(--healthy); opacity: 1; }
-/* "copied" times out while the pointer is still on the control, so the hint
-   would return at full opacity and read as a flicker. Quiet until it leaves. */
-.copyable.is-quiet::after { opacity: 0; }
+/* "copied" fades out still reading "copied" -- the word never changes back in
+   view -- and stays gone until the pointer leaves. Both classes to outrank
+   .is-copied's own opacity. */
+.copyable.is-quiet::after,
+.copyable.is-copied.is-quiet::after { opacity: 0; }
 
 /* ---- hero: one column, the ways underneath ------------------------------ */
 /* Spacing down the hero, top to bottom, all of it in this block:

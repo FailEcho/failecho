@@ -1430,3 +1430,23 @@ def test_arriving_content_never_shows_while_the_columns_move(client):
     # every arrival delay is the variable, never a hard-coded duration
     for block in re.findall(r"\.way[^{]*\{[^}]*opacity 0\.18s ease ([^,]+),", css):
         assert block.strip() == "var(--shift)", f"arrival delayed by {block!r}"
+
+
+def test_copied_label_fades_out_still_saying_copied(client):
+    """The hint must never be seen changing back. It fades out while it still
+    reads "copied", and only reverts once it is invisible -- so the revert has
+    to be held longer than the fade that hides it."""
+    import re
+
+    css = (STATIC / "style.css").read_text()
+    js = (STATIC / "app.js").read_text()
+
+    # the quiet rule has to beat .is-copied's own opacity: 1
+    assert ".copyable.is-copied.is-quiet::after" in css
+
+    fade = float(re.search(r"\.copyable::after\b[^}]*?transition: opacity ([\d.]+)s", css, re.S).group(1))
+    hold = int(re.search(r"is-quiet\"\);\s*setTimeout\(function \(\) \{\s*"
+                         r"control\.classList\.remove\(\"is-copied\"\);\s*\}, (\d+)\)", js).group(1))
+    assert hold > fade * 1000, (
+        f"the label reverts after {hold}ms but takes {fade * 1000:.0f}ms to fade"
+    )

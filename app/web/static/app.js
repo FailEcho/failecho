@@ -292,11 +292,13 @@
         if (!isBlock) return say(control, ok);
         control.classList.toggle("is-copied", ok);
         setTimeout(function () {
-          control.classList.remove("is-copied");
-          // The pointer is usually still on the control here. Letting the
-          // "click to copy" hint come straight back reads as a flicker, so
-          // hold it until the pointer or focus actually leaves.
+          // Fade it out while it still reads "copied": swapping the word back
+          // first is what made it flash. Only once it is invisible does the
+          // label revert, and it stays hidden until the pointer leaves.
           control.classList.add("is-quiet");
+          setTimeout(function () {
+            control.classList.remove("is-copied");
+          }, 260);
         }, 1600);
         // Clicking the block copies, but the block cannot say so without
         // rewriting the command. The button next to it says it instead.
