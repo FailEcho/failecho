@@ -77,8 +77,9 @@ def test_the_front_page_stays_brief():
     # Four ways in, four tabs. The budget follows the install card, not the
     # other way round -- but sections are still capped at four above.
     # 13k -> 14k when the definition moved back into the hero's left column,
-    # 14k -> 15k for the three cards that close the page.
-    assert len(HTML) < 15_000
+    # 14k -> 15k for the three cards that close the page, 15k -> 16k for the
+    # four install cards carrying two faces each.
+    assert len(HTML) < 16_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -204,6 +205,8 @@ def test_static_assets_stay_small():
     # which passed ten sections.
     # 35k -> 36k for the four jump chips staying on a wide screen next to the
     # rail, and for the copy control fitting inside the terminal title bar.
+    # 47k of CSS: the four install cards, two faces each, and a loop that
+    # scales with the window.
     # 25k -> 27k: the scramble pins its own box and plays once a tab.
     # 23k -> 25k: the scramble measures every distinct character so it can
     # only ever swap one for another of the same width.
@@ -222,7 +225,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 47_000
+    assert len(CSS) < 48_000
     assert len(JS) < 27_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -235,7 +238,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 88_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 90_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -253,7 +256,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 121_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 123_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -436,7 +439,7 @@ def test_the_hero_fits_a_laptop_screen():
     truncated. Stacked down the middle it had to be trimmed to 930; in two
     columns the definition and the install card share the height instead of
     queueing for it."""
-    assert ".hero--lead { padding-block: 64px 40px; max-width: 980px; }" in CSS
+    assert ".hero--lead { padding-block: 64px 40px; max-width: 1040px; }" in CSS
 
 
 def test_no_install_snippet_is_wider_than_its_box():
@@ -760,7 +763,20 @@ def test_the_four_ways_are_cards_and_all_four_are_on_the_page():
     # One artwork, four crops, one request.
     assert CSS.count('url("/static/card-abstract1.webp")') == 2
     for variant in ("--a", "--b", "--c", "--d"):
-        assert ".way" + variant + " { background-position:" in CSS
+        assert ".way" + variant + "::before { background-position:" in CSS
+
+
+def test_a_card_shows_its_facts_until_you_point_at_it():
+    """At rest a card says what this way in is. Hovering trades the artwork
+    and the facts for the command, in the same box, so nothing resizes."""
+    assert HTML.count('class="way-face"') == 4
+    assert HTML.count('class="way-code"') == 4
+    assert ".way:hover .way-code, .way:focus-within .way-code" in CSS
+    assert ".way:hover::before, .way:focus-within::before { opacity: 0; }" in CSS
+    # Keyboard reaches it: the command block is a tab stop inside the card.
+    assert ":focus-within" in CSS
+    # And a touch screen, which has no hover, gets both at once.
+    assert "@media (hover: none)" in CSS
 
 
 def test_a_command_wraps_inside_its_card_rather_than_widening_the_page():
@@ -772,7 +788,7 @@ def test_a_command_wraps_inside_its_card_rather_than_widening_the_page():
     pre = CSS[CSS.index(".way pre {"):]
     pre = pre[:pre.index("}")]
     assert "white-space: pre-wrap" in pre and "overflow-wrap: anywhere" in pre
-    assert "margin: auto 0 0" in pre, "the commands must line up along the foot"
+    assert "margin: 0;" in pre
 
 
 def test_the_loop_shrinks_with_the_window():
@@ -783,3 +799,41 @@ def test_the_loop_shrinks_with_the_window():
     assert "width: var(--node); height: var(--node)" in CSS
     assert "width: calc(100% - var(--node))" in CSS
     assert "282px" not in CSS.split("--node: clamp")[1].split("}")[0] or True
+
+
+def test_a_typing_label_cannot_wrap_onto_a_second_line():
+    """The caret is a character wide, so the label plus a caret is wider than
+    the label -- and the box is pinned to the label's own width. The last
+    frame of every run wrapped for one frame, which is the drop you could
+    see. Measured: one height, one width, for the whole run."""
+    assert 'node.style.whiteSpace = "nowrap"' in JS
+    assert "node.style.whiteSpace = hadWrap;" in JS
+
+
+def test_a_restored_page_does_not_arrive_with_a_menu_open():
+    """Back-navigation restores the page exactly as it was, hover state and
+    all -- and there is no pointer on the bar any more, so nothing closes it."""
+    assert 'window.addEventListener("pageshow"' in JS
+    assert 'window.addEventListener("blur"' in JS
+
+
+def test_the_definition_is_not_between_the_reader_and_the_install():
+    """It stood in the hero, so the four cards started below the fold."""
+    hero = HTML[HTML.index('class="shell hero hero--lead"'):HTML.index('class="shell install"')]
+    assert "shared failure intelligence network" not in hero
+    how = HTML[HTML.index('id="how"'):HTML.index('id="live"')]
+    assert "shared failure intelligence network" in how, "it has to be somewhere"
+
+
+def test_no_long_sentence_wears_the_nowrap_meta_class():
+    """.band-meta is for short mono lines and has white-space: nowrap. A
+    sentence in it was 1288px wide and scrolled the whole document sideways
+    at every window under that."""
+    meta = CSS[CSS.index(".band-meta {"):]
+    assert "white-space: nowrap" in meta[:meta.index("}")]
+    import re
+
+    for body in (HTML, (STATIC / "network.html").read_text()):
+        for found in re.findall(r'class="band-meta"[^>]*>(.*?)</p>', body, re.S):
+            words = len(re.sub(r"<[^>]+>", " ", found).split())
+            assert words <= 12, f"{words} words in a nowrap line: {found[:60]}"

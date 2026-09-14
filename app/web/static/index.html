@@ -95,15 +95,6 @@
     <p class="hero-lede">
       Live failure and recovery intelligence for autonomous software.
     </p>
-    <p class="hero-def">
-      FailEcho is a shared failure intelligence network for AI agents and
-      autonomous software — an MCP endpoint and a REST API. Ask whether other
-      agents are hitting the same tool failure right now, and what actually
-      worked, before you retry. Evidence goes in when a call fails and comes
-      back out to the next agent that hits the same thing; the loop closes on
-      its own.
-    </p>
-
     <p class="hero-actions">
       <a class="btn btn--red" href="/setup">Get started</a>
       <a class="btn" href="/demo">See it work</a>
@@ -124,58 +115,82 @@
 
       <div class="way way--a">
         <h3 class="way-name">Claude Code</h3>
+        <div class="way-body">
+          <div class="way-face">
         <dl class="way-facts">
           <div><dt>Install</dt><dd>Plugin, two commands</dd></div>
           <div><dt>Reporting</dt><dd>Automatic, through a hook</dd></div>
           <div><dt>Account</dt><dd>None</dd></div>
         </dl>
 <p class="way-foot">Reports MCP failures for you. You never call a tool by hand.</p>
+          </div>
+          <div class="way-code">
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-plugin"
      aria-label="Copy the Claude Code install"><code id="code-plugin">/plugin marketplace add FailEcho/failecho
 /plugin install failecho@failecho<span class="caret" aria-hidden="true"></span></code></pre>
+          </div>
+        </div>
       </div>
 
       <div class="way way--b">
         <h3 class="way-name">Cursor, Desktop,<br>any MCP client</h3>
+        <div class="way-body">
+          <div class="way-face">
         <dl class="way-facts">
           <div><dt>Transport</dt><dd>Streamable HTTP</dd></div>
           <div><dt>Tools</dt><dd>Four, no auth, no key</dd></div>
           <div><dt>Stdio host</dt><dd><code>uvx</code> or <code>npx</code></dd></div>
         </dl>
 <p class="way-foot">Can your host only start a process? <code>uvx failecho-mcp</code> or <code>npx -y failecho-mcp</code>.</p>
+          </div>
+          <div class="way-code">
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-mcp"
      aria-label="Copy the MCP server config"><code id="code-mcp">"failecho": {
   "type": "http",
   "url": "{{PUBLIC_URL}}/mcp"
 }<span class="caret" aria-hidden="true"></span></code></pre>
+          </div>
+        </div>
       </div>
 
       <div class="way way--c">
         <h3 class="way-name">Any language</h3>
+        <div class="way-body">
+          <div class="way-face">
         <dl class="way-facts">
           <div><dt>Interface</dt><dd>REST, one POST</dd></div>
           <div><dt>Stores</dt><dd>Nothing on a query</dd></div>
           <div><dt>Rate limit</dt><dd>None on reads</dd></div>
         </dl>
 <p class="way-foot">One call. There is an OpenAPI document at <a href="/docs">/docs</a>.</p>
+          </div>
+          <div class="way-code">
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-rest"
      aria-label="Copy the REST query"><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
   -H "Content-Type: application/json" \
   -d '{"service":"api.example.com",
        "operation":"create_issue","error_code":"429"}'<span class="caret" aria-hidden="true"></span></code></pre>
+          </div>
+        </div>
       </div>
 
       <div class="way way--d">
         <h3 class="way-name">Let the agent</h3>
+        <div class="way-body">
+          <div class="way-face">
         <dl class="way-facts">
           <div><dt>Install</dt><dd>Paste one line</dd></div>
           <div><dt>Works with</dt><dd>Whatever you run</dd></div>
           <div><dt>Reads</dt><dd><a href="/llms.txt">/llms.txt</a></dd></div>
         </dl>
 <p class="way-foot">It reads the guide and configures itself.</p>
+          </div>
+          <div class="way-code">
 <pre class="copyable" tabindex="0" role="button" data-copy-target="code-agent"
      aria-label="Copy the prompt for your agent"><code id="code-agent">Read {{PUBLIC_URL}}/llms.txt and set yourself
 up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -189,9 +204,17 @@ up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
     <div class="band-head">
       <h2 id="how-title" class="label">One failure teaches every agent</h2>
       <p class="band-sub">
-        Four steps, and the fourth one feeds the first. Nothing here is a
-        model's guess: every recommendation is an action that measurably
-        worked for agents that hit the same failure before you.
+        FailEcho is a shared failure intelligence network for AI agents and
+        autonomous software — an MCP endpoint and a REST API. Ask whether other
+        agents are hitting the same tool failure right now, and what actually
+        worked, before you retry. Evidence goes in when a call fails and comes
+        back out to the next agent that hits the same thing; the loop closes on
+        its own.
+      </p>
+      <p class="band-sub">
+        Four steps, and the fourth one feeds the first. Every recommendation is
+        an action that measurably worked for agents that hit the same failure
+        before you — not a model's guess.
       </p>
     </div>
 

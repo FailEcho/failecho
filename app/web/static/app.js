@@ -488,6 +488,11 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape") open(false);
     });
+    // Back-navigation restores the page exactly as it was, hover state and
+    // all -- except there is no pointer on the bar any more, so nothing ever
+    // closes it. It arrives shut instead.
+    window.addEventListener("pageshow", function () { open(false); });
+    window.addEventListener("blur", function () { open(false); });
     window.addEventListener("resize", measure);
     measure();
   }
@@ -510,8 +515,14 @@
     var box = node.getBoundingClientRect();
     var hadWidth = node.style.width;
     var hadHeight = node.style.height;
+    var hadWrap = node.style.whiteSpace;
     node.style.width = box.width + "px";
     node.style.height = box.height + "px";
+    // The caret is a character wide, so "Get started" plus a caret is wider
+    // than "Get started" -- and the box is pinned to the label's own width.
+    // The last frame of every run wrapped onto a second line for one frame,
+    // which is the drop everyone saw. Nothing wraps while it types.
+    node.style.whiteSpace = "nowrap";
 
     var shown = 0;
 
@@ -521,6 +532,7 @@
         node.textContent = text;
         node.style.width = hadWidth;
         node.style.height = hadHeight;
+        node.style.whiteSpace = hadWrap;
         node.removeAttribute("data-typing");
         return;
       }

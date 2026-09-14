@@ -32,7 +32,7 @@
     "Liberation Mono", monospace;
 
   --gutter: 24px;
-  --max: 1200px;
+  --max: 1320px;
   --band: 120px;
   --r: 0px;   /* every panel is a rectangle; the corners were the only curve */
 }
@@ -854,7 +854,7 @@ footer.shell {
    it. All four are visible at once, which is the point: the question a first
    visitor has is "is there a path for me", and a tab strip answers it one
    quarter at a time. */
-.hero--lead { padding-block: 64px 40px; max-width: 980px; }
+.hero--lead { padding-block: 64px 40px; max-width: 1040px; }
 .hero--lead h1 { margin: 0 0 24px; max-width: none; }
 .hero--lead .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 .hero-def {
@@ -873,24 +873,55 @@ footer.shell {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px; align-items: stretch;
 }
-/* Each card wears the same artwork, cropped differently, under enough black
-   that a command stays readable on it. One file, four crops, one request. */
+/* At rest a card is what this way in is: the artwork, the facts, one line
+   about it. Point at it and the artwork goes, the facts go with it, and the
+   command you came for is what is left. The art is its own layer so it can
+   fade -- a background image cannot be transitioned. */
 .way {
-  display: flex; flex-direction: column; min-width: 0;
+  position: relative; overflow: hidden; min-width: 0;
+  display: flex; flex-direction: column;
   padding: 22px 20px 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line); background: #000;
+  transition: border-color 0.22s ease;
+}
+.way::before {
+  content: ""; position: absolute; inset: 0; z-index: 0;
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.93)),
+    linear-gradient(rgba(0, 0, 0, 0.52), rgba(0, 0, 0, 0.82)),
     url("/static/card-abstract1.webp");
   background-size: auto, 260% auto;
   background-repeat: no-repeat, no-repeat;
-  transition: border-color 0.2s ease;
+  transition: opacity 0.28s ease;
 }
-.way:hover { border-color: var(--line-2); }
-.way--a { background-position: 0 0, 6% 18%; }
-.way--b { background-position: 0 0, 38% 72%; }
-.way--c { background-position: 0 0, 66% 26%; }
-.way--d { background-position: 0 0, 98% 62%; }
+.way > * { position: relative; z-index: 1; }
+.way:hover, .way:focus-within { border-color: var(--line-2); }
+.way:hover::before, .way:focus-within::before { opacity: 0; }
+.way--a::before { background-position: 0 0, 6% 18%; }
+.way--b::before { background-position: 0 0, 38% 72%; }
+.way--c::before { background-position: 0 0, 66% 26%; }
+.way--d::before { background-position: 0 0, 98% 62%; }
+
+/* Two faces, one box: the facts and the command occupy the same space, so
+   the card does not resize when they trade places. */
+.way-body { position: relative; flex: 1 1 auto; min-height: 218px; }
+.way-face, .way-code {
+  transition: opacity 0.22s ease, visibility 0.22s;
+}
+.way-code {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  justify-content: flex-end;
+  opacity: 0; visibility: hidden;
+}
+.way:hover .way-face, .way:focus-within .way-face { opacity: 0; visibility: hidden; }
+.way:hover .way-code, .way:focus-within .way-code { opacity: 1; visibility: visible; }
+
+/* No pointer, no hover: a touch screen gets both at once rather than a card
+   whose whole point never appears. */
+@media (hover: none) {
+  .way-body { min-height: 0; }
+  .way-code { position: static; opacity: 1; visibility: visible; margin-top: 18px; }
+  .way::before { opacity: 1 !important; }
+}
 
 .way-name {
   margin: 0 0 18px; font-family: var(--serif); font-weight: 400;
@@ -902,19 +933,21 @@ footer.shell {
 .way-facts dd { margin: 0; color: var(--ink-2); }
 .way-facts code { font-size: 12px; color: var(--ink-2); }
 
-/* The command is the last thing in the card, pushed to the foot, so the four
-   of them line up along the bottom of the row however tall the cards are.
-   It wraps rather than scrolling: a 276px column cannot hold a curl line, and
-   a sideways scrollbar inside a card is worse than a wrapped command. Without
-   min-width: 0 above, a wide <pre> widens its grid track instead and the
-   whole document scrolls sideways. */
+/* The command wraps rather than scrolling: a card column cannot hold a curl
+   line, and a sideways scrollbar inside a card is worse than a wrapped
+   command. Without min-width: 0 above, a wide <pre> widens its own grid
+   track instead and the whole document scrolls sideways. */
 .way pre {
-  margin: auto 0 0; padding: 14px 0 0; max-width: 100%;
-  border-top: 1px solid var(--line);
+  /* A flex item shrinks below its content by default, and this one is in a
+     column that is only as tall as the card: the command was being squeezed
+     and clipped rather than filling the space it was given. */
+  flex: 0 0 auto;
+  margin: 0; padding: 0; max-width: 100%;
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .way code { font-family: var(--mono); font-size: 12px; line-height: 1.7; }
 .way-foot { margin: 14px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.way .copyable::after { top: auto; bottom: -18px; }
 .install-note { margin: 26px 0 0; font-size: 14px; color: var(--ink-2); }
 
 @media (max-width: 1080px) {
