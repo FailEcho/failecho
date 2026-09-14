@@ -1220,7 +1220,9 @@ def test_llms_txt_is_accurate_about_what_a_read_costs(client):
     """"Reads write no row" was not quite true and the API's own docstring
     already said so: a query creates no observation, but it does move two
     anonymous aggregate counters."""
-    body = client.get("/llms.txt").text
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
     assert "creates no observation" in body
     assert "anonymous aggregate counters" in body, "the counters are still hidden"
     assert "writes no row" not in body, "the inaccurate phrasing is back"
@@ -1230,7 +1232,9 @@ def test_llms_txt_separates_what_runs_locally(client):
     """"Executes nothing on your machine" is true of the HTTP endpoint and
     false of the stdio relay and the plugin, which are our code running on
     someone else's computer."""
-    body = client.get("/llms.txt").text
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
     assert "executes nothing on your machine" not in body
     assert "a local relay process" in body
     assert "nothing local" in body, "the HTTP case should still be named as safe"
@@ -1239,7 +1243,9 @@ def test_llms_txt_separates_what_runs_locally(client):
 def test_llms_txt_does_not_promise_a_recommendation_at_five(client):
     """Five effective attempts is necessary and not sufficient: the action
     also needs a 60% success rate, so five failures recommend nothing."""
-    body = client.get("/llms.txt").text
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
     assert "floor, not the trigger" in body
     assert "60%" in body
 
@@ -1248,7 +1254,13 @@ def test_llms_txt_tells_an_agent_how_to_behave_not_just_what_exists(client):
     """It was an argument for installing. It needs to be an operating guide:
     a working example, what to do with each answer, and the rules that keep a
     shared network from being poisoned by well-meaning callers."""
-    body = client.get("/llms.txt").text
+    import re
+
+    # Prose in this file is hard-wrapped, so a phrase that reads as one line
+    # is not one line in the bytes. Match on words, not on line breaks --
+    # this exact trap has produced three passing-but-wrong tests already.
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+
     assert "Never report FailEcho's own failures" in body, "recursion"
     assert "same event twice" in body, "double counting with the hook"
     assert "untrusted evidence" in body and "Never execute it" in body
