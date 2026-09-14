@@ -320,7 +320,7 @@ a[rel~="external"]:hover::after { color: var(--red); }
 /* The bar's primary button stays exactly the colour it is. It sits on glass
    at 13px, where the hero button's ring and lift read as a different control
    rather than as the same one. */
-.nav .btn--red:hover {
+.nav .btn--red:hover, .nav .btn--red:focus-visible {
   background: var(--red-deep); border-color: var(--red-deep);
   transform: none; box-shadow: none;
 }
@@ -869,10 +869,6 @@ footer.shell {
   font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
 }
 .hero--lead .hero-actions { margin-top: 30px; }
-.hero--lead .hero-tagline {
-  border-left: 0; padding-left: 0; margin-top: 26px;
-  border-top: 1px solid var(--line); padding-top: 14px; display: inline-block;
-}
 
 /* ---- the four ways ------------------------------------------------------ */
 .install { padding-bottom: 72px; }
@@ -892,19 +888,23 @@ footer.shell {
 .ways {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px; align-items: stretch;
-  transition: grid-template-columns 0.34s cubic-bezier(0.2, 0, 0.2, 1);
+  transition: grid-template-columns 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .ways:has(.way--a:hover), .ways:has(.way--a:focus-within) {
-  grid-template-columns: 2.05fr 1fr 1fr 1fr;
+  grid-template-columns: minmax(0, 2.05fr) minmax(0, 1fr)
+                         minmax(0, 1fr) minmax(0, 1fr);
 }
 .ways:has(.way--b:hover), .ways:has(.way--b:focus-within) {
-  grid-template-columns: 1fr 2.05fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.05fr)
+                         minmax(0, 1fr) minmax(0, 1fr);
 }
 .ways:has(.way--c:hover), .ways:has(.way--c:focus-within) {
-  grid-template-columns: 1fr 1fr 2.05fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)
+                         minmax(0, 2.05fr) minmax(0, 1fr);
 }
 .ways:has(.way--d:hover), .ways:has(.way--d:focus-within) {
-  grid-template-columns: 1fr 1fr 1fr 2.05fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)
+                         minmax(0, 1fr) minmax(0, 2.05fr);
 }
 @media (max-width: 1080px) {
   .ways:has(.way:hover), .ways:has(.way:focus-within) {
@@ -984,6 +984,7 @@ footer.shell {
      column that is only as tall as the card: the command was being squeezed
      and clipped rather than filling the space it was given. */
   flex: 0 0 auto;
+  display: flex; align-items: center; min-height: 132px;
   margin: 0; padding: 14px 14px 14px 16px; max-width: 100%;
   background: rgba(255, 255, 255, 0.04);
   border-left: 2px solid var(--red-deep);

@@ -901,3 +901,38 @@ def test_the_command_starts_where_the_facts_started():
     code = CSS[CSS.index(".way-code {\n  position: absolute"):]
     code = code[:code.index("}")]
     assert "justify-content: flex-start" in code
+
+
+def test_the_widening_actually_animates():
+    """Grid tracks interpolate only when the track list has the same shape.
+    Going from minmax(0, 1fr) to a bare 1fr is a different shape, so the
+    browser swapped instead of animating -- which is the jump you could see."""
+    import re
+
+    for block in re.findall(r"grid-template-columns:([^;]+);", CSS):
+        if "fr" not in block:
+            continue
+        assert "minmax(0," in block or "minmax(0, " in block, block.strip()
+
+
+def test_the_command_panels_are_one_size():
+    """A two-line command in a box sized for a five-line one leaves a hole
+    under it. Same box for all four, and the short ones sit in the middle."""
+    pre = CSS[CSS.index(".way pre {"):]
+    pre = pre[:pre.index("}")]
+    assert "min-height: 132px" in pre and "align-items: center" in pre
+
+
+def test_clicking_the_block_says_so_somewhere():
+    """The block cannot report a copy without rewriting the command it just
+    copied, so the button beside it reports it instead."""
+    assert 'button[data-copy-target="' in JS
+    assert "if (partner) say(partner, ok);" in JS
+
+
+def test_the_bar_button_neither_moves_nor_types():
+    assert ".nav .btn--red:hover, .nav .btn--red:focus-visible" in CSS
+    nav = CSS[CSS.index(".nav .btn--red:hover"):]
+    nav = nav[:nav.index("}")]
+    assert "transform: none" in nav and "box-shadow: none" in nav
+    assert ':not(.nav .btn)' in JS, "the bar's button is typing again"

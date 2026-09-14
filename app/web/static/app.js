@@ -234,17 +234,29 @@
       var isBlock = control.classList.contains("copyable");
       var original = control.textContent;
 
+      function say(node, ok) {
+        var was = node.textContent;
+        node.textContent = ok ? "Copied" : "Copy failed";
+        node.classList.toggle("is-copied", ok);
+        setTimeout(function () {
+          node.textContent = was;
+          node.classList.remove("is-copied");
+        }, 1600);
+      }
+
       function done(ok) {
         setText("copy-status", ok
           ? "Copied to clipboard"
           : "Copy failed. Select the text manually.");
-        if (isBlock) {
-          control.classList.toggle("is-copied", ok);
-          setTimeout(function () { control.classList.remove("is-copied"); }, 1600);
-          return;
-        }
-        control.textContent = ok ? "Copied" : "Copy failed";
-        setTimeout(function () { control.textContent = original; }, 1600);
+        if (!isBlock) return say(control, ok);
+        control.classList.toggle("is-copied", ok);
+        setTimeout(function () { control.classList.remove("is-copied"); }, 1600);
+        // Clicking the block copies, but the block cannot say so without
+        // rewriting the command. The button next to it says it instead.
+        var partner = document.querySelector(
+          'button[data-copy-target="' + control.getAttribute("data-copy-target") + '"]'
+        );
+        if (partner) say(partner, ok);
       }
 
       function copy() {
@@ -559,7 +571,7 @@
     // Not the copy controls: their label is their feedback, and a button that
     // says "Copied" must not be busy typing something else when it does.
     Array.prototype.forEach.call(
-      document.querySelectorAll(".btn:not([data-copy-target])"),
+      document.querySelectorAll(".btn:not([data-copy-target]):not(.nav .btn)"),
       function (button) {
         function run() { typeOut(button, 0.8); }
         button.addEventListener("mouseenter", run);
