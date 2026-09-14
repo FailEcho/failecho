@@ -309,12 +309,35 @@ plain request means by default. It is deliberately the smallest of the
 options, and it is option 2 below:
 
 - **Query-only access, current project, remote MCP endpoint.** Register
-  {base_url}/mcp for this project -- `claude mcp add --transport http
-  --scope project`, or a `.mcp.json` in the working directory. Not the
-  user-wide config.
+  {base_url}/mcp for this project only, not user-wide.
+
+  Write `.mcp.json` in the working directory. That is the default mechanism,
+  not a fallback: it needs no CLI, works on every platform and in every
+  client that reads project config, is owned by no running process, and is
+  undone by deleting the file.
+
+      {{"mcpServers": {{"failecho": {{"type": "http", "url": "{base_url}/mcp"}}}}}}
+
+  If `claude mcp add --transport http --scope project failecho {base_url}/mcp`
+  runs, it writes that same file and is equally fine. If the CLI is missing
+  -- it often is, because plenty of hosts never put it on PATH -- that is not
+  a problem to solve or work around. Write the file.
+
+- **Never hand-edit `~/.claude.json`, and this is the one that matters.**
+  It is live state owned by a running client, so an out-of-band write can be
+  clobbered or can corrupt it, and it is user-wide rather than project scope,
+  which is already more than was asked for. If the CLI is unavailable, the
+  answer is `.mcp.json` -- never this file. The same goes for any other
+  config a running client owns.
+
 - **Preserve existing configuration.** Add an entry; do not rewrite, reorder
-  or remove anything already there. If a `failecho` entry already exists,
-  stop and say so rather than overwriting it.
+  or remove anything already there. Reading a config file, modifying an
+  object and writing the whole thing back re-serialises the entire file:
+  formatting, key order and anything a parser drops are all lost, in a file
+  you did not write and cannot fully see. Never do that to a file you did not
+  create. Writing a fresh `.mcp.json` is safe precisely because there is
+  nothing in it to preserve. If a `failecho` entry already exists, stop and
+  say so rather than overwriting it.
 - **No automatic reporting.** Do not install the hook or the plugin, and do
   not enable anything that reports in the background. Those are option 3 and
   they need to be asked for explicitly. Registering the endpoint makes four
@@ -327,10 +350,11 @@ options, and it is option 2 below:
   when the client next starts, so the tools will not appear in the session
   that added them. Say that plainly rather than reporting success and leaving
   someone to find an empty tool list.
-- **If you cannot register it at all** -- no CLI, no writable config, a host
-  that does not do MCP -- do not force it. Use `POST {base_url}/v1/query`
-  for this session and say that is what you did. That path needs no setup and
-  gives the same evidence.
+- **If you cannot write `.mcp.json`** -- a read-only directory, or a host
+  that does not read project config at all -- do not go looking for another
+  file to edit instead. Use `POST {base_url}/v1/query` for this session and
+  say that is what you did. That path needs no setup and gives the same
+  evidence. A missing CLI is not this case: write the file.
 
 Anything beyond that default is a larger ask, so confirm it first. That
 includes user-wide or global scope, the stdio relay, the hook, and the

@@ -1351,9 +1351,14 @@ def test_llms_txt_states_a_default_setup(client):
     default = default[: default.index("Setting it up, least committal first")]
 
     assert "Query-only access, current project, remote MCP endpoint" in default
-    assert "Not the user-wide config." in default
+    assert "for this project only, not user-wide" in default
     assert "Preserve existing configuration" in default
     assert "stop and say so rather than overwriting it" in default
+    # the seventh test hand-edited ~/.claude.json after the CLI was missing
+    assert "Never hand-edit `~/.claude.json`" in default
+    assert "That is the default mechanism, not a fallback" in default
+    assert "A missing CLI is not this case: write the file." in default
+    assert "Never do that to a file you did not create." in default
     assert "Do not install the hook or the plugin" in default
     assert "make one metadata-only lookup" in default
     assert "Say if a restart is needed" in default
