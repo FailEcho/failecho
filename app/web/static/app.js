@@ -89,7 +89,48 @@
     show("demo-mode-badge", stats.demo_mode);
     show("demo-mode-banner", stats.demo_mode);
 
+    renderCharts(stats);
     setText("updated", "updated " + new Date().toLocaleTimeString());
+  }
+
+  // -- charts ---------------------------------------------------------------
+  // Two bars each, drawn from the same numbers the cards above them show. No
+  // history: the network keeps 48 hours of raw observations and there is no
+  // endpoint that would let a line over time be honest.
+  function bar(fillId, valueId, value, total) {
+    var fill = el(fillId);
+    var label = el(valueId);
+    if (!fill || !label) return;
+    var share = total > 0 ? (value / total) * 100 : 0;
+    // A real but tiny number still gets a mark, or the chart says zero when
+    // the number does not.
+    fill.style.width = (value > 0 ? Math.max(share, 1.5) : 0) + "%";
+    label.textContent = number(value);
+  }
+
+  function renderCharts(stats) {
+    if (el("chart-demand")) {
+      var known = stats.known_query_hits_24h || 0;
+      var unknown = stats.unknown_query_hits_24h || 0;
+      var asked = known + unknown;
+      bar("bar-known", "val-known", known, asked);
+      bar("bar-unknown", "val-unknown", unknown, asked);
+      setText("demand-note", asked === 0
+        ? "Nothing has asked the network anything in the last 24 hours."
+        : "A network that answers nothing is a network with no evidence in it"
+          + " yet, not a network nobody is asking.");
+    }
+
+    if (el("chart-provenance")) {
+      var agent = stats.real_observations_total || 0;
+      var own = stats.first_party_observations || 0;
+      var fake = (stats.demo_agent_observations || 0)
+        + (stats.synthetic_observations || 0);
+      var held = agent + own + fake;
+      bar("bar-agent", "val-agent", agent, held);
+      bar("bar-own", "val-own", own, held);
+      bar("bar-demo", "val-demo", fake, held);
+    }
   }
 
   // -- incidents ---------------------------------------------------------
@@ -580,12 +621,67 @@
     );
   }
 
+  // -- the demo terminal ----------------------------------------------------
+  // The transcript is in the markup, so it is there for a reader without a
+  // script and for anyone who would rather read than watch. With a script it
+  // becomes something you can press Run on: the same lines, arriving at
+  // roughly the speed the script printed them.
+  function wireRunner() {
+    var out = el("run-output");
+    var button = el("run-demo");
+    if (!out || !button) return;
+
+    // Captured before anything touches it. Lines only: no span in this
+    // transcript crosses a newline, so splitting the markup is safe.
+    var lines = out.innerHTML.split("\n");
+    var timer = null;
+    var reduced = window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return;
+
+    button.hidden = false;
+
+    function stop() {
+      if (timer) window.clearTimeout(timer);
+      timer = null;
+      out.innerHTML = lines.join("\n");
+      out.classList.remove("is-running");
+      button.textContent = "Run again";
+      button.disabled = false;
+    }
+
+    function play() {
+      button.disabled = true;
+      button.textContent = "Running";
+      out.classList.add("is-running");
+      var at = 0;
+
+      function next() {
+        out.innerHTML = lines.slice(0, at).join("\n");
+        // A blank line is where the script waited on the network, so it is
+        // where the playback waits too. Everything else is one tick.
+        var pause = lines[at] === "" ? 260 : 55;
+        at += 1;
+        if (at > lines.length) return stop();
+        timer = window.setTimeout(next, pause);
+      }
+
+      next();
+    }
+
+    button.addEventListener("click", function () {
+      if (button.disabled) return;
+      play();
+    });
+  }
+
   addCopyButtons();
   wireCopyButtons();
   wireRail();
   wireTopbar();
   wireMenus();
   wireTypedLabels();
+  wireRunner();
   if (el("stat-real-24h")) {
     refresh();
     if (!document.hidden) startPolling();

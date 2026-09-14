@@ -225,8 +225,8 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 52_000
-    assert len(JS) < 27_000
+    assert len(CSS) < 55_000
+    assert len(JS) < 30_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -238,7 +238,7 @@ def test_static_assets_stay_small():
     # 69k -> 73k for the two-state bar and the drifting ground, 73k -> 82k
     # for everything since: the menu, the loop's light, the return path, and
     # a scramble that has to measure before it can be stable.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 95_000
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 100_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -256,7 +256,7 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 128_000, f"page weight crept to {per_visit} bytes"
+    assert per_visit < 133_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -698,7 +698,7 @@ def test_the_next_step_cards_are_one_image_cropped_three_ways():
     assert HTML.count('class="card"') == 3
     for href in ('href="/demo"', 'href="/network"', 'href="/about"'):
         assert href in HTML[HTML.index('class="cards"'):]
-    assert CSS.count("card-abstract1.webp") == 2, "the next-step cards and the ways"
+    assert CSS.count("card-abstract1.webp") == 3, "next-step cards, the ways, the network hero"
     for variant in ("--a", "--b", "--c"):
         assert ".card-art" + variant + " { background-position:" in CSS
     card = (STATIC / "card-abstract1.webp")
@@ -761,7 +761,7 @@ def test_the_four_ways_are_cards_and_all_four_are_on_the_page():
     assert ways.count('class="way-facts"') == 4
     assert 'role="tab"' not in HTML and "wireTabs" not in JS
     # One artwork, four crops, one request.
-    assert CSS.count('url("/static/card-abstract1.webp")') == 2
+    assert CSS.count('url("/static/card-abstract1.webp")') == 3
     for variant in ("--a", "--b", "--c", "--d"):
         assert ".way" + variant + "::before { background-position:" in CSS
 
@@ -940,3 +940,31 @@ def test_the_bar_button_neither_moves_nor_types():
     nav = nav[:nav.index("}")]
     assert "transform: none" in nav and "box-shadow: none" in nav
     assert ':not(.nav .btn)' in JS, "the bar's button is typing again"
+
+
+def test_the_network_charts_only_draw_numbers_that_exist():
+    """Bars, not lines. Raw observations are kept for 48 hours and there is no
+    endpoint that would make a line over time honest."""
+    net = (STATIC / "network.html").read_text()
+    assert 'id="chart-demand"' in net and 'id="chart-provenance"' in net
+    for field in ("known_query_hits_24h", "unknown_query_hits_24h",
+                  "real_observations_total", "first_party_observations",
+                  "demo_agent_observations", "synthetic_observations"):
+        assert field in JS, f"{field} is charted from nowhere"
+    # Adoption is one bar and the rest is labelled as not being adoption.
+    assert "Independent agents" in net
+    assert "FailEcho's own agents" in net and "Demo and synthetic" in net
+    # A real but tiny share still gets a mark; zero gets none.
+    assert "value > 0 ? Math.max(share, 1.5) : 0" in JS
+
+
+def test_the_demo_transcript_is_in_the_markup_before_it_is_played():
+    """The recording is the page. The button is a way of watching it arrive,
+    not the only way of seeing it."""
+    demo = (STATIC / "demo.html").read_text()
+    assert 'id="run-output"' in demo and 'id="run-demo"' in demo
+    assert "refresh_schema" in demo and "6ed9ef705ff4037af2c977306b8b9f92" in demo
+    # Hidden until the script un-hides it: no dead button without JS.
+    assert 'id="run-demo" hidden' in demo
+    assert "function wireRunner()" in JS
+    assert 'out.innerHTML = lines.join' in JS, "the run must end on the whole thing"

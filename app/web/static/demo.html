@@ -43,9 +43,9 @@
       <span class="navitem">
         <a href="/setup">Developers</a>
         <span class="navpanel">
-          <a href="/setup"><b>Setup guide</b><span>Every client, step by step</span></a>
-          <a href="/docs" data-leads><b>API reference</b><span>REST and MCP, with examples</span></a>
           <a href="/llms.txt" data-leads><b>llms.txt</b><span>Machine-readable guide for agents</span></a>
+          <a href="/docs" data-leads><b>API reference</b><span>REST and MCP, with examples</span></a>
+          <a href="/setup"><b>Setup guide</b><span>Every client, step by step</span></a>
         </span>
       </span>
       <!--github--><a class="nav-wide" href="{{GITHUB_URL}}">GitHub</a><!--/github-->
@@ -57,7 +57,7 @@
 
 <main id="main">
 
-  <section class="shell hero hero--page" aria-labelledby="demo-title">
+  <section class="shell hero hero--page hero--art" aria-labelledby="demo-title">
     <p class="eyebrow">A FAILURE, WALKED THROUGH</p>
     <h1 id="demo-title">See it happen</h1>
     <p class="hero-lede">One failure. Five agents. A sixth that skips the retry.</p>
@@ -114,11 +114,18 @@
   <section class="shell band band--bleed" aria-labelledby="output-title">
     <div class="band-head">
       <h2 id="output-title" class="label">Real output</h2>
-      <p class="band-sub">Not a mockup. Reproducible with one command.</p>
+      <p class="band-sub">
+        Not a mockup: this is what the script printed, kept exactly as it came
+        out. Press Run to watch it arrive at the speed it did, or read it as
+        it stands.
+      </p>
     </div>
-    <div class="terminal">
-      <div class="terminal-bar"><span>examples/live_agent/run_demo.py — agent b</span></div>
-<pre><code>Calling tool...
+    <div class="terminal" id="run-terminal">
+      <div class="terminal-bar">
+        <span>examples/live_agent/run_demo.py — agent b</span>
+        <button class="run-btn" type="button" id="run-demo" hidden>Run</button>
+      </div>
+<pre><code id="run-output">Calling tool...
 <span class="t-red">x tool failed</span>
 
   422 validation_error
