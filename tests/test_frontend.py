@@ -1296,3 +1296,16 @@ def test_llms_txt_does_not_open_by_instructing_the_agent(client):
     assert "github.com/FailEcho/failecho" in head, "verify-it-yourself link is below the fold"
     assert "Use FailEcho when a tool" not in body, "the imperative opener is back"
     assert "Before retrying blindly, query FailEcho" not in body
+
+
+def test_llms_txt_warns_about_the_relay_next_to_the_relay_command(client):
+    """The fifth install test refused `uvx`/`npx` because they execute code
+    from a registry. The file agreed with it, forty lines further down."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+    intro, _, rest = body.partition("uvx failecho-mcp")
+    assert "download and execute our code on your machine" in intro[-500:], (
+        "the warning is not adjacent to the command it is about"
+    )
+    assert "a bigger ask than the endpoint above, not a smaller one" in intro

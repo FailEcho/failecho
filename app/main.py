@@ -244,7 +244,11 @@ shape, so you can add it yourself without reading the setup page:
   }}
 }}
 
-Local process instead of HTTP (same four tools, relays here, stores nothing):
+Local process instead of HTTP (same four tools, relays here, stores nothing).
+Unlike the HTTP endpoint, both of these download and execute our code on your
+machine, from a public package registry -- so they are a bigger ask than the
+endpoint above, not a smaller one. An agent that will not run them unprompted
+is right:
 
     uvx failecho-mcp          # PyPI, needs Python
     npx -y failecho-mcp       # npm, zero dependencies, needs Node 18+
