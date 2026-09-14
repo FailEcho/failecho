@@ -109,3 +109,16 @@ def test_observation_columns_are_the_whole_contract(client, rows):
         "reporter_hash",
         "source",
     }
+
+
+def test_the_node_relay_logs_lengths_not_protocol_content():
+    """A malformed message is still a protocol message. The first 120
+    characters of one are whatever happened to be at the front of it -- tool
+    arguments, most likely -- and this process has no business copying that
+    into the host's logs."""
+    from pathlib import Path
+
+    relay = (Path(__file__).resolve().parents[1]
+             / "npm-relay" / "bin" / "failecho-mcp.js").read_text()
+    assert ".slice(0, 120)" not in relay, "protocol fragments are being logged again"
+    assert "bytes)`);" in relay, "the length is what should be logged"

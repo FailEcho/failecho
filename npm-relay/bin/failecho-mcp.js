@@ -74,7 +74,10 @@ async function forward(message) {
       try {
         write(JSON.parse(chunk));
       } catch {
-        log(`ignored an unparseable reply: ${chunk.slice(0, 120)}`);
+        // The length, not the content. A malformed reply is still a
+        // protocol message, and the first 120 characters of one is
+        // whatever happened to be at the front of it.
+        log(`ignored an unparseable reply (${chunk.length} bytes)`);
       }
     }
   } catch (error) {
@@ -113,7 +116,10 @@ process.stdin.on("data", (chunk) => {
     try {
       message = JSON.parse(line);
     } catch {
-      log(`ignored an unparseable line from the host: ${line.slice(0, 120)}`);
+      // Same reasoning: a malformed line from the host may be carrying
+      // tool arguments, and this process has no business copying them
+      // into the host's logs.
+      log(`ignored an unparseable line from the host (${line.length} bytes)`);
       continue;
     }
     queue = queue.then(() => forward(message));

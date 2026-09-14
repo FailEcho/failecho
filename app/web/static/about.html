@@ -282,7 +282,7 @@
     <ul class="yes-list">
       <li><b>Retries that cannot work get skipped.</b> The whole point: <code>retry 0/5</code> next to <code>refresh_schema 5/5</code>.</li>
       <li><b>Which fix actually worked.</b> Error trackers record failures and status pages record uptime. Neither records the recovery.</li>
-      <li><b>Is it me or them?</b> Other agents hitting the same rate limit means the provider is degraded. Nobody else means it is your key.</li>
+      <li><b>Is it me or them?</b> Other agents hitting the same rate limit means the provider is degraded. Nobody else, once enough agents are reporting to make that meaningful, points at your side of it — and the answer says which case it is, because a network with no evidence and a network with evidence that disagrees with you are not the same answer.</li>
       <li><b>Fresh breakage, flagged as fresh.</b> A signature first seen minutes ago looks different from one that has been failing all week.</li>
       <li><b>A new agent inherits the history.</b> An agent started today can use what last month's agents learned.</li>
       <li><b>Fewer wasted tokens and less waiting.</b> A skipped retry cycle is a tool call, an error, and the reasoning about both.</li>

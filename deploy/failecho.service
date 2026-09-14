@@ -12,9 +12,12 @@ WorkingDirectory=/srv/failecho
 
 # One worker: SQLite serialises writes anyway, and the in-process rate limiter
 # and MCP session manager are per-process.
+# --no-access-log: Caddy already logs every request, with its headers
+# filtered out. Uvicorn's copy adds the URI a second time, into journald,
+# where nothing filters anything -- and a query string is caller-supplied.
 ExecStart=/srv/failecho/.venv/bin/python -m uvicorn app.main:app \
     --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers \
-    --forwarded-allow-ips '127.0.0.1' --no-server-header \
+    --forwarded-allow-ips '127.0.0.1' --no-server-header --no-access-log \
     --timeout-graceful-shutdown 5
 
 Environment="FIN_DATABASE_URL=sqlite+aiosqlite:////srv/failecho/data/failure_network.db"
@@ -40,6 +43,12 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/srv/failecho/data
+
+# The database and the backups are the service's own business. They were mode
+# 0644 in a 0755 directory: nothing in the web configuration exposes them, and
+# this box has no other human accounts, but "no other account can read the
+# database" is a cheaper thing to guarantee than to keep checking.
+UMask=0077
 MemoryMax=400M
 
 [Install]

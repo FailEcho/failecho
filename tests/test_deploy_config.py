@@ -67,3 +67,20 @@ def test_the_proxy_caps_a_body_the_app_cannot_measure():
     connection can be cut before the bytes reach a worker."""
     assert "request_body {" in CADDYFILE
     assert "max_size 64KB" in CADDYFILE
+
+
+def test_the_service_keeps_its_database_to_itself():
+    """The database and the backups were mode 0644 in 0755 directories.
+    Nothing in the web configuration exposes them and this box has no other
+    human accounts, but "no other account can read it" is cheaper to guarantee
+    once than to keep checking."""
+    unit = (DEPLOY / "failecho.service").read_text()
+    assert "UMask=0077" in unit
+
+
+def test_uvicorn_does_not_log_the_uri_a_second_time():
+    """Caddy already logs every request with its headers filtered out.
+    Uvicorn's copy goes to journald, where nothing filters anything, and a
+    query string is caller-supplied."""
+    unit = (DEPLOY / "failecho.service").read_text()
+    assert "--no-access-log" in unit

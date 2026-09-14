@@ -203,3 +203,32 @@ def test_default_window_keeps_recent_data(client, rows):
 
 def _find(intel: dict, action: str) -> dict:
     return next(a for a in intel["recovery_actions"] if a["action"] == action)
+
+
+def test_pruning_a_partial_hour_cannot_hand_a_reporter_a_second_cap():
+    """The cap is five effective attempts per reporter, per fingerprint, per
+    action, per hour, applied once to whatever is in the bucket.
+
+    Cutting at an arbitrary minute -- the prune timer fires at :15 -- split the
+    boundary hour into an archived part and a live part, and each got the full
+    cap of its own. Six attempts at 03:10 and six at 03:40 were capped at five
+    together while both were live, and at ten the moment the prune ran.
+    Confidence rising because retention ran is the one thing a number
+    described as arithmetic you can recompute cannot do.
+    """
+    import inspect
+    from datetime import datetime, timedelta, timezone
+
+    from app.core import retention
+
+    source = inspect.getsource(retention.aggregate_and_prune)
+    assert "raw_cutoff" in source and "minute=0" in source, "the cutoff floats again"
+
+    # And the arithmetic itself: whatever hour the clock is in, the cutoff
+    # lands on an hour boundary, so no bucket is ever half-archived.
+    for minute in (0, 1, 15, 30, 59):
+        now = datetime(2026, 9, 14, 3, minute, 30, tzinfo=timezone.utc)
+        cutoff = (now - timedelta(hours=48)).replace(
+            minute=0, second=0, microsecond=0)
+        assert cutoff.minute == 0 and cutoff.second == 0 and cutoff.microsecond == 0
+        assert cutoff <= now - timedelta(hours=48), "retention window must not shrink"

@@ -137,7 +137,20 @@ async def aggregate_and_prune(
 ) -> PruneReport:
     """Aggregate then delete everything older than the retention window."""
     hours = settings.retention_hours if retention_hours is None else retention_hours
-    cutoff = (now or utcnow()) - timedelta(hours=hours)
+    # Floored to the hour, so a bucket is either wholly archived or wholly
+    # live and never both.
+    #
+    # It was not, and that let a reporter's evidence outrun its own cap. The
+    # cap is five effective attempts per reporter, per fingerprint, per action,
+    # per hour, and it is applied once to whatever is in the bucket. Cutting at
+    # an arbitrary minute -- the prune timer fires at :15 -- split the boundary
+    # hour into an archived part and a live part, each of which then got the
+    # full cap of its own. Six attempts at 03:10 and six at 03:40 were capped
+    # at five together while both were live, and at ten the moment the prune
+    # ran. Confidence rising because retention ran is the one thing a number
+    # described as "arithmetic you can recompute" cannot do.
+    raw_cutoff = (now or utcnow()) - timedelta(hours=hours)
+    cutoff = raw_cutoff.replace(minute=0, second=0, microsecond=0)
     report = PruneReport(cutoff=cutoff, dry_run=dry_run)
 
     # ---- observations ----------------------------------------------------
