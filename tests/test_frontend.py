@@ -713,7 +713,7 @@ def test_the_next_step_cards_are_one_image_cropped_three_ways():
     assert HTML.count('class="card"') == 3
     for href in ('href="/demo"', 'href="/network"', 'href="/about"'):
         assert href in HTML[HTML.index('class="cards"'):]
-    assert CSS.count("card-abstract1.webp") == 3, "next-step cards, the ways, the network hero"
+    assert CSS.count("card-abstract1.webp") == 2, "the next-step cards and the ways"
     for variant in ("--a", "--b", "--c"):
         assert ".card-art" + variant + " { background-position:" in CSS
     card = (STATIC / "card-abstract1.webp")
@@ -776,7 +776,7 @@ def test_the_four_ways_are_cards_and_all_four_are_on_the_page():
     assert ways.count('class="way-facts"') == 4
     assert 'role="tab"' not in HTML and "wireTabs" not in JS
     # One artwork, four crops, one request.
-    assert CSS.count('url("/static/card-abstract1.webp")') == 3
+    assert CSS.count('url("/static/card-abstract1.webp")') == 2
     for variant in ("--a", "--b", "--c", "--d"):
         assert ".way" + variant + "::before { background-position:" in CSS
 
@@ -1069,3 +1069,24 @@ def test_the_api_reference_serves_its_own_swagger():
     # And the inline bootstrap is a file, because script-src 'self' blocks it.
     assert '<script src="/static/vendor/swagger-init.js"></script>' in main
     assert "swagger template has no inline bootstrap" in main, "no loud failure"
+
+
+def test_no_green_anywhere():
+    """Green was the one colour on the page that belonged to no other part of
+    it. The status legend and the checkmarks take the page's own off-white;
+    successes in the demo take the brand red in the story and an accent in the
+    transcript, where red is already spoken for by the failure above them."""
+    assert "#43c98a" not in CSS, "the green is back"
+    assert ".t-green" not in CSS, "the old class is back"
+    demo = (STATIC / "demo.html").read_text()
+    assert "t-green" not in demo
+    story = demo[:demo.index('<div class="terminal"')]
+    terminal = demo[demo.index('<div class="terminal"'):]
+    assert story.count('"t-brand"') == 3 and story.count('"t-ok"') == 0
+    assert terminal.count('"t-ok"') == 3 and terminal.count('"t-brand"') == 0
+
+
+def test_the_two_inner_pages_lead_with_type_not_artwork():
+    for page in ("network.html", "demo.html"):
+        assert "hero--art" not in (STATIC / page).read_text(), page
+    assert "hero--art" not in CSS, "the rule outlived its only two users"

@@ -20,7 +20,10 @@
   --red-deep: #c00010;
   --red-dim:  rgba(248, 48, 48, 0.12);
 
-  --healthy:  #43c98a;
+  --healthy:  #edeae3;   /* was green: the one colour on the page that
+                            belonged to no other part of it */
+  --accent:   #a78bfa;   /* the terminal's successes, where red is
+                            already taken by the failure above them */
   --degraded: #e0a63f;
   --major:    #f8564a;
   --unknown:  #8a8680;
@@ -573,7 +576,11 @@ td.num { font-family: var(--mono); }
 .terminal pre { margin: 0; padding: 18px 16px; overflow-x: auto;
                 font-size: 12.5px; line-height: 1.65; color: var(--ink-2); }
 .t-red { color: var(--major); }
-.t-green { color: var(--healthy); }
+/* Two kinds of success, two places. In the story the brand red carries
+   it; in the transcript red is already spoken for by the failure three
+   lines above, so it takes the accent instead. */
+.t-brand { color: var(--red); }
+.t-ok { color: var(--accent); }
 .t-dim { color: var(--ink-3); }
 
 /* ---- endpoint ---------------------------------------------------------- */
@@ -874,17 +881,6 @@ footer.shell {
 @media (max-width: 640px) {
   .chart-row { grid-template-columns: minmax(0, 1fr) 64px; gap: 6px 12px; }
   .chart-track { grid-column: 1 / -1; }
-}
-
-/* A page that is mostly numbers gets the artwork behind its title. */
-.hero--art { position: relative; isolation: isolate; overflow: hidden; }
-.hero--art::before {
-  content: ""; position: absolute; z-index: -1; pointer-events: none;
-  inset: -30% -10% -40% 30%;
-  background: url("/static/card-abstract1.webp") right center / cover no-repeat;
-  opacity: 0.22;
-  -webkit-mask-image: linear-gradient(to left, #000, transparent 72%);
-          mask-image: linear-gradient(to left, #000, transparent 72%);
 }
 
 /* ---- cards ------------------------------------------------------------- */

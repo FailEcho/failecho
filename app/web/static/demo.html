@@ -57,7 +57,7 @@
 
 <main id="main">
 
-  <section class="shell hero hero--page hero--art" aria-labelledby="demo-title">
+  <section class="shell hero hero--page" aria-labelledby="demo-title">
     <p class="eyebrow">A FAILURE, WALKED THROUGH</p>
     <h1 id="demo-title">See it happen</h1>
     <p class="hero-lede">One failure. Five agents. A sixth that skips the retry.</p>
@@ -87,7 +87,7 @@
         <div>
           <p class="story-head">Other agents already tried</p>
           <p class="story-body"><code>retry</code> <span class="t-dim">0 / 5 worked</span></p>
-          <p class="story-body"><code>refresh_schema</code> <span class="t-green">5 / 5 worked</span></p>
+          <p class="story-body"><code>refresh_schema</code> <span class="t-brand">5 / 5 worked</span></p>
         </div>
       </li>
       <li>
@@ -95,7 +95,7 @@
         <div>
           <p class="story-head">FailEcho returns</p>
           <p class="story-body">Best observed recovery:</p>
-          <p class="story-body"><code class="t-green">refresh_schema</code></p>
+          <p class="story-body"><code class="t-brand">refresh_schema</code></p>
         </div>
       </li>
       <li>
@@ -103,7 +103,7 @@
         <div>
           <p class="story-head">Agent B skips the retry</p>
           <p class="story-body">Applies <code>refresh_schema</code>.</p>
-          <p class="story-body"><span class="t-green">Tool call succeeds.</span></p>
+          <p class="story-body"><span class="t-brand">Tool call succeeds.</span></p>
         </div>
       </li>
     </ol>
@@ -146,7 +146,7 @@ Checking shared failure intelligence...
   Service status:         <span class="t-red">MAJOR</span>
 
   Recovery actions others reported:
-    <span class="t-green">refresh_schema        5/5 (100.0%) confidence 0.57 reporters 5</span>
+    <span class="t-ok">refresh_schema        5/5 (100.0%) confidence 0.57 reporters 5</span>
     <span class="t-dim">retry                 0/5 (0.0%) confidence 0.00 reporters 5</span>
 
 Best observed recovery:
@@ -157,10 +157,10 @@ Best observed recovery:
 Applying recovery: refresh_schema
   Refreshed tool schema -> v3.0.0, field 'content'
   Retrying tool call...
-  <span class="t-green">+ tool call succeeded</span>
+  <span class="t-ok">+ tool call succeeded</span>
 
 Reporting recovery outcome...
-<span class="t-green">+ accepted   (refresh_schema -> success)</span></code></pre>
+<span class="t-ok">+ accepted   (refresh_schema -> success)</span></code></pre>
     </div>
     <p class="fineprint">
       Run it for real: <code>python examples/live_agent/run_demo.py</code>.
