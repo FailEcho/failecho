@@ -315,13 +315,20 @@ a[rel~="external"]:hover::after { color: var(--red); }
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.28), 0 10px 26px rgba(0, 0, 0, 0.5);
 }
 .btn:active { transform: translateY(0); }
+
+/* The bar's primary button hovers exactly like the hero's -- same lift, same
+   ring, same red -- because it is the same control.
+   This rule exists only to win a specificity argument: `.nav > a:hover` is
+   (0,2,1) and `.btn--red:hover` is (0,2,0), so without it the nav rule's grey
+   `--surface-2` background beats the red one no matter which is written
+   later. The lift and the ring are uncontested and come from .btn--red:hover
+   itself. */
+.nav .btn--red:hover, .nav .btn--red:focus-visible {
+  background: var(--red); border-color: #ff7a6a; color: #fff;
+}
 /* The bar's primary button stays exactly the colour it is. It sits on glass
    at 13px, where the hero button's ring and lift read as a different control
    rather than as the same one. */
-.nav .btn--red:hover, .nav .btn--red:focus-visible {
-  background: var(--red-deep); border-color: var(--red-deep);
-  transform: none; box-shadow: none;
-}
 
 .btn--sm { padding: 8px 15px; font-size: 13px; }
 

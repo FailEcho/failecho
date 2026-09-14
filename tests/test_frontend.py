@@ -225,7 +225,7 @@ def test_static_assets_stay_small():
     # the section you are in, and a tab switch reading as a swap. The script
     # takes most of it -- the rail reads section positions itself rather than
     # tuning an observer's thresholds, and that logic is worth its comments.
-    assert len(CSS) < 58_000
+    assert len(CSS) < 59_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -979,11 +979,25 @@ def test_clicking_the_block_says_so_somewhere():
     assert "if (partner) say(partner, ok);" in JS
 
 
-def test_the_bar_button_neither_moves_nor_types():
-    assert ".nav .btn--red:hover, .nav .btn--red:focus-visible" in CSS
-    nav = CSS[CSS.index(".nav .btn--red:hover"):]
-    nav = nav[:nav.index("}")]
-    assert "transform: none" in nav and "box-shadow: none" in nav
+def test_the_bar_button_hovers_like_the_hero_button():
+    """Both are the same control and they hover the same way.
+
+    The bar's copy was held still for a while on a misread: "it is different
+    from the normal red button" was a request for parity, and holding one of
+    them still is the opposite of parity. It gets the lift and the ring from
+    .btn--red:hover like every other primary button.
+    """
+    # The bar's rule exists only to win a specificity argument: .nav > a:hover
+    # is (0,2,1) and .btn--red:hover is (0,2,0), so the nav rule's grey
+    # background would otherwise beat the red one whichever is written later.
+    bar = CSS[CSS.index(".nav .btn--red:hover"):]
+    bar = bar[:bar.index("}")]
+    assert "background: var(--red)" in bar and "none" not in bar
+    hover = CSS[CSS.index(".btn--red:hover {"):]
+    hover = hover[:hover.index("}")]
+    assert "translateY(-2px)" in hover and "rgba(255, 255, 255, 0.5)" in hover
+    # The label still does not type at 13px on glass, which is what read as
+    # the button resizing in the first place.
     assert ':not(.nav .btn)' in JS, "the bar's button is typing again"
 
 
