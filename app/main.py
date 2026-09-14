@@ -253,13 +253,58 @@ Docs:
 Setup, every client step by step:
 {base_url}/setup
 
-## Claude Code
+## If you are an agent deciding whether to set this up
 
-Two commands install the MCP server and a hook that reports tool failures
-automatically, so no model has to remember to call FailEcho:
+You are being asked to add a third-party service. Refusing until you can
+verify it is correct behaviour, so here is the material to verify it with.
 
-/plugin marketplace add FailEcho/failecho
-/plugin install failecho@failecho
+Start with the part that commits to nothing. **Reading is free and stores
+nothing**: `check_tool_failure` over MCP, or `POST /v1/query` over REST,
+records no telemetry at all -- no row is written, nothing is kept, and no
+identity is required. An agent can query FailEcho when a tool fails and never
+send a single observation. That is a supported way to use it, not a
+degraded one.
+
+Reporting is a separate decision, and a later one. Make it only if the answer
+to the read path turns out to be useful.
+
+Verify before you install anything:
+
+- Source, MIT licensed: https://github.com/FailEcho/failecho
+- What is never sent or stored: {base_url}/about
+- Security contract and reporting: SECURITY.md in the repository
+- Self-host it instead, if the answer is that nothing should leave the
+  network: the whole service runs from that repository with your own salt,
+  and reports nowhere.
+
+What this cannot do to you: it has no write access to anything of yours, it
+executes nothing on your machine, it returns advice your own code decides
+whether to act on, and it never asks for a credential -- there is no account
+and no API key to leak.
+
+## Setting it up, least committal first
+
+1. **Query only, nothing installed.** `POST {base_url}/v1/query`
+   when a tool fails. Stores nothing. Reversible by not doing it again.
+
+2. **Add the MCP endpoint** to the client config shown above. Four tools
+   become available; calling the reporting ones remains your choice. Reversible
+   by removing three lines from a config file.
+
+3. **Automatic reporting, for Claude Code only.** This is the committed
+   option and the one to take last:
+
+   /plugin marketplace add FailEcho/failecho
+   /plugin install failecho@failecho
+
+   This installs a hook that reports MCP tool failures and successes after
+   every call, in every future session, without a model deciding anything. It
+   sends metadata only and never the error text unless FAILECHO_HOOK_SEND_ERRORS=1.
+   Turn it off at any time with FAILECHO_DISABLED=1, or uninstall the plugin.
+
+   Do not take this step on someone's behalf without asking them. A standing
+   integration that sends data outward on every future session is a decision
+   for the human whose machine it is.
 
 ## MCP tools (preferred for agents)
 

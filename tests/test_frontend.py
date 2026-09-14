@@ -1130,3 +1130,44 @@ def test_the_hero_endpoint_is_dressed_like_the_commands_below_it():
     assert "border-left: 2px solid var(--red-deep)" in block
     assert "rgba(255, 255, 255, 0.04)" in block
     assert "border: 0;" in block, "the chip outline is back"
+
+
+def test_llms_txt_offers_the_reversible_option_before_the_committed_one(client):
+    """A real Claude session read this file and declined to install anything,
+    citing no company info, no security docs, nothing independently
+    verifiable, and a standing integration that would report outward in every
+    future session. Every one of those was fair, and most were gaps in this
+    file rather than in the product.
+
+    It used to lead with the plugin -- a marketplace, a hook, and automatic
+    reporting forever -- which asks for maximum trust in the first thing an
+    agent reads. Reading stores nothing and commits to nothing, so that goes
+    first now, and the plugin goes last with its off switch named.
+    """
+    body = client.get("/llms.txt").text
+
+    verify = body.index("If you are an agent deciding")
+    plugin = body.index("/plugin marketplace add")
+    assert verify < plugin, "the plugin is being offered before the evidence again"
+
+    query_only = body.index("Query only, nothing installed")
+    assert query_only < plugin, "the least committal option must come first"
+
+    # The material the agent said was missing.
+    assert "github.com/FailEcho/failecho" in body, "no source to verify against"
+    assert "SECURITY.md" in body, "no security contract"
+    assert "MIT licensed" in body and "Self-host it" in body
+    assert "/about" in body, "no link to what is never stored"
+
+    # And the off switch, next to the thing it switches off.
+    assert "FAILECHO_DISABLED=1" in body
+    assert "FAILECHO_HOOK_SEND_ERRORS=1" in body
+    assert "without asking them" in body, "an agent may install this unasked"
+
+
+def test_llms_txt_does_not_tell_an_agent_to_trust_it(client):
+    """The file supplies evidence. It does not assert trustworthiness, which
+    is not a thing a service can claim about itself."""
+    body = client.get("/llms.txt").text.lower()
+    for phrase in ("trust us", "safe to install", "you can trust", "don't worry"):
+        assert phrase not in body, f"llms.txt asserts {phrase!r}"
