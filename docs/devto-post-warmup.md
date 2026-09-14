@@ -244,6 +244,21 @@ describe failures that turn out to be the same failure, that settles it.
 
 ---
 
+## The bio, which is where the link goes
+
+Set this on the dev.to profile *before* publishing, because it is the only
+place the product appears and a reader who liked the post will look there.
+Keep it a description of what you do, not a pitch:
+
+```
+Building FailEcho — a shared failure-intelligence network for AI agents.
+https://failecho.com
+```
+
+That is the whole mechanism. The post earns the click; the bio receives it.
+A post that sells and a bio that explains is the right way round; the reverse
+is an ad with a blog post attached.
+
 ## Before publishing
 
 - **Do not mention FailEcho.** Not in the post, not in a comment, not in a
