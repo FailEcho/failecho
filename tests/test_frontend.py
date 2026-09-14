@@ -1268,3 +1268,15 @@ def test_llms_txt_tells_an_agent_how_to_behave_not_just_what_exists(client):
     assert "fail open" in body
     # An empty network must not be read as a verdict about the caller.
     assert "an empty network means nothing about their setup" in body
+
+
+def test_llms_txt_tells_an_agent_what_to_do_when_it_cannot_run_the_cli(client):
+    """The fourth install test could not run `claude mcp add` and handed the
+    command to its human instead of hand-editing the config. That was the
+    right call and llms.txt had not asked for it."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+    assert "print it for the person you are working with" in body
+    assert "That is the correct outcome, not a failure." in body
+    assert "Do not fall back to editing the config file by hand" in body

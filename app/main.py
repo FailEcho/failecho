@@ -311,6 +311,13 @@ they are not the same decision:
    is removed by deleting the file, and is the one to prefer when you are
    not sure. `claude mcp remove failecho` undoes either.
 
+   If you cannot run that command yourself -- the CLI is not on PATH, or
+   your session cannot spawn it -- print it for the person you are working
+   with and stop there. That is the correct outcome, not a failure. Do not
+   fall back to editing the config file by hand: `~/.claude.json` is live
+   state owned by a running client, and an out-of-band write can be
+   clobbered or can corrupt it.
+
    The file `--scope project` writes is just:
 
    {{"mcpServers": {{"failecho": {{"type": "http", "url": "{base_url}/mcp"}}}}}}
