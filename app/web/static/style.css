@@ -1026,9 +1026,13 @@ footer.shell {
 .way--d::before { background-position: 0 0, 98% 62%; }
 
 /* Two faces, one box: the facts and the command occupy the same space, so
-   the card does not resize when they trade places. Both sit in the middle of
-   that space rather than at the top of it -- the title has the top of the
-   card, and everything under it is centred in what is left.
+   the card does not resize when they trade places. Both start the same
+   distance down that space rather than at the top of it.
+
+   Centring them was the obvious way to do that and it was wrong: the four
+   faces are different heights, so centring each one in its own card started
+   each one somewhere different -- the last card, which says the least, began
+   16px below the first. One offset, shared, puts all four on the same line.
 
    They cross-dissolve rather than cut. Both fading at once over 0.22s read as
    a flicker: for a moment the card holds two half-visible sets of words on
@@ -1039,16 +1043,17 @@ footer.shell {
    over the same space. */
 .way-body {
   position: relative; flex: 1 1 auto; min-height: 252px;
-  display: flex; flex-direction: column; justify-content: center;
+  display: flex; flex-direction: column; justify-content: flex-start;
 }
 .way-face {
+  margin-top: 52px;
   transform: none; filter: blur(0);
   transition: opacity 0.2s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
               filter 0.2s ease, visibility 0s linear 0s;
 }
 .way-code {
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start; padding-top: 52px;
   opacity: 0; visibility: hidden;
   transform: translateY(12px); filter: blur(7px);
   transition: opacity 0.24s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
@@ -1146,6 +1151,11 @@ footer.shell {
 }
 @media (max-width: 620px) {
   .ways { grid-template-columns: minmax(0, 1fr); }
+  /* One card to a row: nothing to line up with, and the offset is only
+     empty space. */
+  .way-body { min-height: 0; }
+  .way-face { margin-top: 18px; }
+  .way-code { position: static; padding-top: 18px; }
 }
 
 /* ---- centred bands ----------------------------------------------------- */

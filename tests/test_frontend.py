@@ -918,15 +918,19 @@ def test_the_card_you_point_at_takes_the_room():
     assert ".ways:has(.way:hover), .ways:has(.way:focus-within) {" in CSS
 
 
-def test_the_two_faces_of_a_card_sit_in_the_same_place():
-    """The title has the top of the card; everything under it is centred in
-    what is left, and the command lands exactly where the facts were."""
-    body = CSS[CSS.index(".way-body {"):]
-    body = body[:body.index("}")]
-    assert "justify-content: center" in body
+def test_all_four_cards_start_their_content_on_the_same_line():
+    """Centring each face in its own card was the obvious way to move the
+    content down and it was wrong: the four faces are different heights, so
+    each one started somewhere different. One shared offset instead."""
+    face = CSS[CSS.index(".way-face {"):]
+    face = face[:face.index("}")]
     code = CSS[CSS.index(".way-code {\n  position: absolute"):]
     code = code[:code.index("}")]
-    assert "justify-content: center" in code
+    assert "margin-top: 52px" in face
+    assert "padding-top: 52px" in code, "the command starts where the facts did"
+    body = CSS[CSS.index(".way-body {"):]
+    body = body[:body.index("}")]
+    assert "justify-content: flex-start" in body
 
 
 def test_the_two_faces_cross_dissolve_rather_than_cut():
