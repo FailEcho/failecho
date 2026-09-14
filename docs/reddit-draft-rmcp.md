@@ -1,12 +1,15 @@
 # Reddit draft — r/mcp
 
-Short version. The long one was three screens; nobody reads three screens from
-a stranger. Target **r/mcp** first, Discussion flair if the sub has one.
+**This is the owner's own draft, lightly corrected.** It is kept in his voice
+on purpose: the dev.to comments proved he writes more like a person than any
+draft I produce, and Reddit is unusually good at spotting text written to be
+posted rather than written to be read. Do not let anyone (me included) smooth
+this into marketing prose.
 
-**Before posting:** replace `[N]` with a real number from a real session, or
-cut the number. And attach the recording — see `docs/record-the-demo.md`. The
-whole argument is two lines of terminal output, and they are far better seen
-than described.
+Target **r/mcp** first, Discussion flair if the sub has one.
+
+**Before posting:** attach the recording if you make one
+(`docs/record-the-demo.md`). Everything else below is ready.
 
 ---
 
@@ -20,96 +23,103 @@ Your agent has already solved this error. It just doesn't remember.
 
 ---
 
-I lost [N] minutes last week watching my agent retry a `422` three times with
-slightly different arguments, fail all three, and apologise.
+Something that has been bugging me for a while.
 
-It wasn't being stupid. This is everything it had:
+Sometimes my agent hits a `422` on an MCP server, retries three times with
+slightly different arguments, fails all three, and then apologises to me. The
+actual answer was that a field got renamed and it needed to refresh the tool
+schema.
 
-```
-422 validation_error
-```
+That's fine, it happens. The annoying part is that I run several agents and
+one of them worked this out on Monday — and on Thursday, in a new session, it
+started from `422 validation_error` again with nothing. The session that knew
+is gone.
 
-Renamed field, or a service having a bad ten minutes? Same six characters. One
-fixes itself in thirty seconds, the other eats your budget while the real
-answer was "the field is called `content` now."
+So the idea is a thing that gives it a memory: report the failure and what
+fixed it, and next time ask before retrying. That part works on your own
+history — five recovery attempts and it starts telling you, and those five can
+all be yours. No one else needed.
 
-So it guesses. It guesses retry, because that's what nearly all the code it
-ever read does. And a retry that works *occasionally* is a variable-ratio
-schedule, which is the thing you use when you want a behaviour to survive
-everything you throw at it. Your agent is on one.
+It costs basically nothing to leave on. It runs after the tool call with a
+2-second timeout, so if my server falls over your agent waits 2 seconds and
+carries on, and `FAILECHO_DISABLED=1` turns it off completely. It sends
+metadata only: the service, the operation, the error class, and what fixed it.
+No prompts, no tool arguments, no results, no keys.
 
-**The annoying part isn't even that.** It's that my agent worked this out on
-Monday and started from zero again on Thursday, because the session that knew
-was gone.
-
-So I built it a memory. It reports the failure and whatever fixed it, and asks
-before retrying next time.
-
-**Install is one line — paste it at your agent:**
+If you want to try it, the laziest way is to paste this at your agent and let
+it do the work:
 
 ```
 Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
 ```
 
-It reads that and configures itself. No account, no API key, nothing to sign
-up for. Or `claude mcp add --transport http failecho https://failecho.com/mcp`
-if you'd rather do it yourself.
+It reads that and configures itself. Or `claude mcp add --transport http
+failecho https://failecho.com/mcp` if you'd rather do it by hand.
 
-**What it costs you:** nothing you weren't already paying. It runs after the
-call with a 2-second timeout, so if my server dies your agent waits 2 seconds
-and carries on. `FAILECHO_DISABLED=1` turns it off. Metadata only — service,
-operation, error class, what fixed it. No prompts, no arguments, no results,
-no keys.
+**The part I can't answer alone** is whether it's worth sharing between
+people.
 
-**What you get back, alone:** five recovery attempts and it starts answering,
-and those five can all be yours. Thresholds are 5 attempts and 3 reporters for
-full weight — not five thousand. Confidence is a Wilson lower bound, not a
-model's opinion: 5/5 scores 0.57, 117/124 scores 0.89, and you can recompute
-it by hand when you don't believe it. Below the threshold it returns
-`INSUFFICIENT_DATA` instead of a guess.
+The theory says yes — we're all calling the same twenty MCP servers, and when
+GitHub or Stripe renames a field or tightens a payload limit, it does it for
+everyone at once. Your 422 on Tuesday and mine on Thursday are plausibly the
+same 422.
 
-**The limit, before anyone asks:** the shared layer is new. The counter is on
-the front page — check it before you install anything rather than taking my
-word. The single-agent part works today; the cross-agent part needs other
-people and doesn't yet.
+But "obviously true" is where most wrong ideas live. It's equally plausible
+that everyone's interesting failures are local — your auth setup, my rate
+limit, someone's internal service — and the shared surface is too thin for any
+of this to matter. If that's the world we're in, this is worthless and I'd
+rather know.
 
-**Here's what I actually want from this thread.**
+So: **what failure does your agent keep rediscovering?** The specific one
+you've explained to it four times in four sessions. And do you reckon anyone
+else calling that service would hit the same one, or is it yours?
 
-Do different people's agent failures overlap at all?
+I'll publish whatever the answers show, including "they barely overlap".
 
-The theory says obviously — we're all calling the same twenty MCP servers, and
-when GitHub renames a field it renames it for everyone. But "obviously" is
-where most wrong ideas live. Maybe every interesting failure is local: your
-auth setup, my rate limit, their internal service. Then this is worthless and
-I'd like to know.
-
-**So: what failure does your agent keep rediscovering?** The specific one
-you've explained to it four times in four sessions. And would anyone else
-calling that service have hit the same one — or is it yours?
-
-If enough answers turn out to be the same failure, that settles it. I'll
-publish what it shows either way, including "they barely overlap", which is
-the result that kills the idea.
-
-MIT, self-hostable. github.com/FailEcho/failecho
+It's at failecho.com if it's relevant — no account, no API key. Code is at
+github.com/FailEcho/failecho, MIT, self-hostable if you'd rather not send
+anything to me.
 
 ---
 
-## The moves in it
+## What I changed, and why
 
-- **Effortless install.** One line, near the top, before any explanation of
-  how it works. `llms.txt` means they do not even read the docs.
-- **Cheap.** The 2-second timeout and the off switch are in the post, because
-  "what if your thing breaks my agent" is the real objection and answering it
-  before it is asked is worth more than answering it after.
-- **Long-term benefit.** Five and three, not five thousand, and the memory pays
-  off on your own history — no waiting for a crowd.
-- **A challenge, not a pitch.** "Maybe this is worthless and I'd like to know"
-  invites a reader to prove something rather than to buy something.
-- **Does not burn tokens on errors** is the actual value proposition and it is
-  stated as a cost saved, not a feature.
-- **The engagement topic is the last thing they read**, and it is answerable
-  from experience in one comment.
+Kept: the rhythm, the "bugging me", the shrug of "that's fine, it happens",
+the direct question at the end. Those are why it reads as a person.
+
+**Corrected for accuracy:**
+
+- *"apologises with my AI guy"* → *"apologises to me"*. The original reads as a
+  typo rather than as voice.
+- *"with my AI army it only worked that out on Monday"* → names the actual
+  point, which is session amnesia: it knew on Monday, the session died, Thursday
+  starts from nothing. That is the whole argument for the product and it was the
+  blurriest sentence in the draft.
+- *"when they do something with GitHub it's coming again"* → *"when GitHub or
+  Stripe renames a field or tightens a payload limit, it does it for everyone at
+  once"*. Same idea, but a reader who has not already had the thought can follow
+  it. Stripe added because one example reads as a one-off and two read as a
+  pattern.
+- *"your auth setup and the shared surface is too thin"* → separated into the
+  two things it was compressing: the examples of local failures, and then the
+  conclusion.
+
+**Added, because they were gaps you marked:**
+
+- The install line. It was `or tell your ai to set it up on...` — now the
+  actual prompt, and it is the cheapest thing in the post.
+- The cost paragraph. "What if your server breaks my agent" is the first real
+  objection anyone has, and answering it before it is asked is worth more than
+  answering it after. 2-second timeout, off switch, metadata only.
+- `github...` filled in, with MIT and self-hostable, which is the answer to
+  "why would I send you anything".
+
+**Not added, on purpose:**
+
+- No adoption claims. The counter is public and someone will check.
+- No "be the first". Nobody wants an empty room, and the memory works alone.
+- No feature list. The post is a question with a product attached, not the
+  other way round.
 
 ## In the comments
 
@@ -117,10 +127,10 @@ MIT, self-hostable. github.com/FailEcho/failecho
   the fifth recovery. That part needs nobody. The cross-agent part is new."
   One line, no arguing.
 - **"How is this different from Sentry / a status page?"** — A status page says
-  a service is down. Sentry records that you failed. Neither records what
-  fixed it, which is the only part another agent can use.
-- **"Why would I send you anything?"** — Answer with the contract, not
-  reassurance: metadata only, error text off by default, reporter IDs hashed
+  a service is down. Sentry records that you failed. Neither records what fixed
+  it, which is the only part another agent can use.
+- **"Why would I send you anything?"** — The contract, not reassurance:
+  metadata only, error text off unless you turn it on, reporter IDs hashed
   before storage, MIT and self-hostable if the answer is still no.
 - **Do not argue with the first critical comment.** It is usually the best one
   in the thread, and everyone is watching how you take it.
