@@ -260,3 +260,17 @@ def test_a_subagent_transcript_is_the_parent_sessions_not_a_new_one(tmp_path):
     # the subagent's later success counts as this session having got past it
     assert row["recovered_in"] == 1
     assert report["repeated_failures"] == 0
+
+
+def test_diagnose_prints_structure_and_never_content(transcripts, monkeypatch):
+    """--diagnose exists because the first laptop run found 2 transcripts with
+    no tool calls and there was no way to tell why. It may print counts, record
+    types and key names. It must not print a message, an argument or an error."""
+    import failecho_scan
+
+    monkeypatch.setattr(failecho_scan, "CANDIDATE_ROOTS", (str(transcripts),))
+    text = failecho_scan.diagnose()
+    assert "record types" in text and "tool_result" in text
+    assert "SUPERSECRET" not in text and "unknown field" not in text
+    assert "issue #42" not in text
+    assert "no content was read past the JSON parser" in text

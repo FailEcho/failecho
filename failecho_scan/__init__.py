@@ -404,6 +404,104 @@ Retry tax: <b style="color:#edeae3">{tax}</b> failure{'s' if tax != 1 else ''} o
 """
 
 
+# ---------------------------------------------------------------------------
+# --diagnose: where are the transcripts on this machine?
+# ---------------------------------------------------------------------------
+
+#: Places Claude Code has been seen to keep session data, across the CLI, the
+#: desktop app and Windows. Structural facts only come out of this -- counts,
+#: record types, key names -- never a line of content.
+CANDIDATE_ROOTS = (
+    "~/.claude/projects",
+    "~/.claude/sessions",
+    "~/.claude",
+    "~/.config/claude",
+    "~/Library/Application Support/Claude",
+    "%APPDATA%/Claude",
+    "%LOCALAPPDATA%/Claude",
+    "%APPDATA%/claude-code",
+    "%LOCALAPPDATA%/claude-code",
+)
+
+
+def _expand(p: str) -> str:
+    return os.path.expandvars(os.path.expanduser(p))
+
+
+def _shape(path: str, limit: int = 4000) -> dict:
+    """What kind of records a transcript holds. Keys and types only."""
+    types: collections.Counter = collections.Counter()
+    top_keys: set = set()
+    content_types: collections.Counter = collections.Counter()
+    lines = 0
+    with open(path, encoding="utf-8", errors="ignore") as fh:
+        for line in fh:
+            lines += 1
+            if lines > limit:
+                break
+            try:
+                d = json.loads(line)
+            except ValueError:
+                types["<not json>"] += 1
+                continue
+            if not isinstance(d, dict):
+                types["<not object>"] += 1
+                continue
+            types[str(d.get("type"))] += 1
+            top_keys.update(k for k in d.keys() if k in
+                            ("message", "toolUseResult", "tool_use_result", "sessionId",
+                             "timestamp", "isSidechain", "parentUuid", "summary", "leafUuid"))
+            m = d.get("message")
+            c = m.get("content") if isinstance(m, dict) else None
+            if isinstance(c, list):
+                for x in c:
+                    if isinstance(x, dict):
+                        content_types[str(x.get("type"))] += 1
+            elif c is not None:
+                content_types[f"<{type(c).__name__}>"] += 1
+    return {"lines": lines, "record_types": dict(types.most_common(6)),
+            "top_keys": sorted(top_keys), "content_block_types": dict(content_types.most_common(6))}
+
+
+def diagnose() -> str:
+    home = os.path.expanduser("~")
+    out = [f"python {sys.version.split()[0]} on {sys.platform}",
+           f"home resolves to {home}", ""]
+    for cand in CANDIDATE_ROOTS:
+        root = _expand(cand)
+        if not os.path.isdir(root):
+            out.append(f"  {cand:<44} absent")
+            continue
+        jsonl = []
+        for dirpath, _d, files in os.walk(root):
+            jsonl += [os.path.join(dirpath, f) for f in files if f.endswith(".jsonl")]
+            if len(jsonl) > 2000:
+                break
+        subdirs = sorted(d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d)))[:12]
+        out.append(f"  {cand:<44} {len(jsonl):>5} .jsonl   dirs: {', '.join(subdirs) or '-'}")
+    out.append("")
+    root = _expand(CANDIDATE_ROOTS[0])
+    groups = find_transcripts(root) if os.path.isdir(root) else {}
+    shown = 0
+    for sid, paths in groups.items():
+        for path in paths:
+            if shown >= 3:
+                break
+            sh = _shape(path)
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            out.append(f"  {rel if len(rel) <= 76 else '...' + rel[-73:]}")
+            out.append(f"     {sh['lines']} lines; record types {sh['record_types']}")
+            out.append(f"     top-level keys seen {sh['top_keys']}")
+            out.append(f"     message.content block types {sh['content_block_types']}")
+            shown += 1
+    if not shown:
+        out.append("  (no transcripts under the default root to describe)")
+    out.append("")
+    out.append("this is structure only: counts, record types and key names. no content "
+               "was read past the JSON parser and none is printed.")
+    return "\n".join(out)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="failecho-scan", description=__doc__.split("\n\n")[0])
     ap.add_argument("--root", default=DEFAULT_ROOT, help="transcripts root (default ~/.claude/projects)")
@@ -411,7 +509,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="only show failures seen in at least this many sessions")
     ap.add_argument("--json", action="store_true", help="print the full report as JSON")
     ap.add_argument("--html", metavar="PATH", help="write the bird's-eye view to this file")
+    ap.add_argument("--diagnose", action="store_true",
+                    help="show where transcripts are on this machine and what shape they are; "
+                         "structure only, no content")
     args = ap.parse_args(argv)
+
+    if args.diagnose:
+        print(diagnose())
+        return 0
 
     if not os.path.isdir(args.root):
         print(f"no transcripts at {args.root}", file=sys.stderr)
