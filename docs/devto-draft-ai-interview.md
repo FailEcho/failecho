@@ -213,21 +213,19 @@ than the paragraph they were extending:
    answering under a prior whichever way they go. Naming the boundary is the
    move that works in both rooms.
 
-Sent (cut to five sentences -- the long version below was drafted first and
-trimmed, because a reply that runs longer than the comment it answers reads
-as a lecture rather than a conversation):
+Sent (47 words). Drafted long, cut twice. A reply that runs longer than the
+comment it answers reads as a lecture, and on a thread this small the only
+job is to keep the other person talking:
 
-> The falsifiable piece is better than what I wrote, and I think it's because
-> "I review everything" isn't only uncheckable -- at any real volume it's
-> probably not true, and the interviewer knows it, so it costs you rather than
-> landing neutral. A named case where the tool stayed in the box survives the
-> follow-up, and that's the real test: "what made that one different?" is
-> cheap for them to ask and expensive to fake. The asymmetry is the part I
-> missed -- a prior needs a yes/no to attach to, so naming the boundary
-> refuses the axis instead of picking a side on it. My one worry is that once
-> "tell me when you didn't use it" becomes a known beat, it gets rehearsed
-> like "greatest weakness." Do you think the follow-up keeps it honest, or
-> does the boundary answer have a shelf life too?
+> Agreed, and worse than uncheckable -- at volume "I review everything" is
+> probably untrue, and they know it, so it costs you. The asymmetry point is
+> the one I missed. Though once "when didn't you use it" becomes a known
+> beat, does it get rehearsed like "greatest weakness"?
+
+What survived the cut, and what did not: the concession, the one new idea
+(implausible beats unfalsifiable), and the question. Gone are the follow-up
+mechanism and the restatement of their own point back at them -- the second
+of which was never worth its words.
 
 Why it is built that way:
 
