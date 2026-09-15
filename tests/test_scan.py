@@ -227,3 +227,36 @@ def test_a_missing_root_says_so_and_suggests_the_flag(tmp_path):
     table = render_table(scan(str(tmp_path)))
     assert "no transcripts found there" in table
     assert "--root" in table
+
+
+# -- subagents belong to their session -------------------------------------
+
+
+def test_a_subagent_transcript_is_the_parent_sessions_not_a_new_one(tmp_path):
+    """Layout is <project>/<session>.jsonl plus <project>/<session>/subagents/
+    .../<agent>.jsonl. Half the transcripts on the build box were nested and
+    the scanner never read them. Worse than missing them would be counting
+    them as sessions: one run with five subagents must not look like six
+    sessions that all hit the same failure."""
+    proj = tmp_path / "-home-x-proj"
+    sub = proj / "sess-1111" / "subagents" / "workflows" / "wf_1"
+    sub.mkdir(parents=True)
+    (proj / "sess-1111.jsonl").write_text("\n".join([
+        _line("2026-09-08T09:00:00Z", "sess-1111", [_use("m1", "mcp__github__create_issue")]),
+        _line("2026-09-08T09:00:01Z", "sess-1111", [_result("m1", "429 rate limit", True)], "user"),
+    ]))
+    (sub / "agent-aaaa.jsonl").write_text("\n".join([
+        _line("2026-09-08T09:00:30Z", "sess-1111", [_use("s1", "mcp__github__create_issue")]),
+        _line("2026-09-08T09:00:31Z", "sess-1111", [_result("s1", "429 rate limit", True)], "user"),
+        _line("2026-09-08T09:00:40Z", "sess-1111", [_use("s2", "mcp__github__create_issue")]),
+        _line("2026-09-08T09:00:41Z", "sess-1111", [_result("s2", "created")], "user"),
+    ]))
+    report = scan(str(tmp_path))
+    assert report["transcripts_read"] == 2
+    assert report["sessions_read"] == 1, "the subagent was counted as its own session"
+    row = report["rows"][0]
+    assert row["sessions"] == 1
+    assert row["failures"] == 2, "the subagent's failure was not read"
+    # the subagent's later success counts as this session having got past it
+    assert row["recovered_in"] == 1
+    assert report["repeated_failures"] == 0

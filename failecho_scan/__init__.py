@@ -38,7 +38,6 @@ from __future__ import annotations
 import argparse
 import collections
 import datetime as dt
-import glob
 import html
 import json
 import os
@@ -127,8 +126,9 @@ def _parse_ts(value) -> float | None:
 # ---------------------------------------------------------------------------
 
 
-def read_session(path: str) -> dict:
-    """One transcript -> the ordered list of external tool calls in it.
+def read_session(session_id: str, paths: list[str]) -> dict:
+    """One session -- its main transcript plus any subagent transcripts --
+    as one ordered list of external tool calls.
 
     Each call: {"tool", "ok", "ts", "error_type", "error_code"}. The text of a
     failure is classified and discarded inside this function; it does not
@@ -139,6 +139,19 @@ def read_session(path: str) -> dict:
     first_ts = None
     tool_results = 0
     local_failures: collections.Counter = collections.Counter()
+    for path in paths:
+        _read_file(path, pending, calls, local_failures, counters := {"n": 0, "first": first_ts})
+        tool_results += counters["n"]
+        if counters["first"] is not None and (first_ts is None or counters["first"] < first_ts):
+            first_ts = counters["first"]
+    calls.sort(key=lambda c: c["ts"] or 0)
+    short = session_id.rsplit("/", 1)[-1][:8]
+    return {"id": short, "files": len(paths), "started": first_ts,
+            "calls": calls, "tool_results": tool_results, "local_failures": local_failures}
+
+
+def _read_file(path, pending, calls, local_failures, counters) -> None:
+    first_ts = None
     for line in open(path, encoding="utf-8", errors="ignore"):
         try:
             d = json.loads(line)
@@ -160,7 +173,7 @@ def read_session(path: str) -> dict:
                 pending[c.get("id")] = (name, ts)
             elif kind == "tool_result":
                 name, started = pending.pop(c.get("tool_use_id"), ("?", None))
-                tool_results += 1
+                counters["n"] += 1
                 if not is_external(name):
                     if c.get("is_error"):
                         local_failures[name] += 1
@@ -172,12 +185,32 @@ def read_session(path: str) -> dict:
                 else:
                     calls.append({"tool": name, "ok": True, "ts": started or ts,
                                   "error_type": None, "error_code": None})
-    return {"path": path, "id": os.path.basename(path)[:8], "started": first_ts,
-            "calls": calls, "tool_results": tool_results, "local_failures": local_failures}
+    counters["first"] = first_ts
 
 
-def find_transcripts(root: str) -> list[str]:
-    return sorted(glob.glob(os.path.join(root, "*", "*.jsonl")))
+def find_transcripts(root: str) -> dict[str, list[str]]:
+    """Every transcript under the root, grouped by the session it belongs to.
+
+    Layout is <root>/<project>/<session>.jsonl for the main thread, and
+    <root>/<project>/<session>/subagents/.../<agent>.jsonl for anything the
+    session delegated. A subagent's failure is the session's failure: it was
+    the same task, the same day, the same human. Counting it as a separate
+    session would let one run with five subagents look like six sessions,
+    which inflates the one number this tool exists to get right.
+    """
+    sessions: dict[str, list[str]] = collections.defaultdict(list)
+    for dirpath, _dirs, files in os.walk(root):
+        for name in files:
+            if not name.endswith(".jsonl"):
+                continue
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, root).split(os.sep)
+            if len(rel) < 2:
+                continue  # a stray file at the root is not a transcript
+            project, head = rel[0], rel[1]
+            session = head[:-6] if head.endswith(".jsonl") else head
+            sessions[f"{project}/{session}"].append(path)
+    return {k: sorted(v) for k, v in sorted(sessions.items())}
 
 
 # ---------------------------------------------------------------------------
@@ -186,9 +219,9 @@ def find_transcripts(root: str) -> list[str]:
 
 
 def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
-    paths = find_transcripts(root)
-    all_sessions = [read_session(p) for p in paths]
-    transcripts_read = len(all_sessions)
+    groups = find_transcripts(root)
+    all_sessions = [read_session(sid, paths) for sid, paths in groups.items()]
+    transcripts_read = sum(len(p) for p in groups.values())
     tool_results_seen = sum(s["tool_results"] for s in all_sessions)
     local_failures: collections.Counter = collections.Counter()
     for s in all_sessions:
@@ -257,6 +290,7 @@ def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
         "version": __version__,
         "root": root,
         "transcripts_read": transcripts_read,
+        "sessions_read": len(all_sessions),
         "tool_results_seen": tool_results_seen,
         "local_failures": [{"tool": t, "failures": n} for t, n in local_failures.most_common(5)],
         "sessions_scanned": len(sessions),
@@ -281,7 +315,9 @@ def render_table(report: dict) -> str:
     if shown.startswith(home):
         shown = "~" + shown[len(home):]
     read = report["transcripts_read"]
-    out.append(f"read {read} transcript{'s' if read != 1 else ''} under {shown}; "
+    sess = report["sessions_read"]
+    out.append(f"read {read} transcript{'s' if read != 1 else ''} from {sess} "
+               f"session{'s' if sess != 1 else ''} under {shown}; "
                f"{n} used an MCP server or a web tool")
     out.append("")
     if read == 0:
