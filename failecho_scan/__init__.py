@@ -260,7 +260,11 @@ def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
 def render_table(report: dict) -> str:
     out = []
     n = report["sessions_scanned"]
-    out.append(f"scanned {n} session{'s' if n != 1 else ''} under {report['root']}")
+    shown = report["root"]
+    home = os.path.expanduser("~")
+    if shown.startswith(home):
+        shown = "~" + shown[len(home):]
+    out.append(f"scanned {n} session{'s' if n != 1 else ''} under {shown}")
     out.append("")
     if not report["rows"]:
         out.append("no external tool failures found. either nothing has broken, or the "
@@ -270,7 +274,7 @@ def render_table(report: dict) -> str:
     out.append(f"{'tool':<40} {'error':<20} {'sessions':>8} {'failures':>8} {'tax':>5}   next")
     for r in report["rows"]:
         label = r["error_type"] + (f"/{r['error_code']}" if r["error_code"] else "")
-        nxt = ", ".join(f"{x['tool'].replace('mcp__', '')}×{x['times']}" for x in r["next"]) or "-"
+        nxt = ", ".join(f"{x['tool'].replace('mcp__', '')} x{x['times']}" for x in r["next"]) or "-"
         out.append(f"{r['tool'].replace('mcp__', '')[:40]:<40} {label:<20} "
                    f"{r['sessions']:>8} {r['failures']:>8} {r['retry_tax']:>5}   {nxt[:40]}")
     out.append("")
