@@ -49,6 +49,31 @@ __version__ = "0.1.0"
 
 DEFAULT_ROOT = os.path.expanduser("~/.claude/projects")
 
+
+def _under_wsl() -> bool:
+    try:
+        with open("/proc/version", encoding="utf-8", errors="ignore") as fh:
+            return "microsoft" in fh.read().lower()
+    except OSError:
+        return False
+
+
+def default_roots() -> list[str]:
+    """Every place this machine's transcripts might be, most likely first.
+
+    Under WSL the interpreter's home is the Linux one, which usually holds a
+    couple of stray sessions, while the desktop app writes to the Windows
+    home under /mnt/c. The first laptop run scanned the wrong one and reported
+    "2 transcripts, 0 tool calls" on a machine with months of history.
+    """
+    roots = [DEFAULT_ROOT]
+    if _under_wsl() and os.path.isdir("/mnt/c/Users"):
+        for user in sorted(os.listdir("/mnt/c/Users")):
+            cand = os.path.join("/mnt/c/Users", user, ".claude", "projects")
+            if os.path.isdir(cand) and user not in ("Public", "Default", "Default User", "All Users"):
+                roots.append(cand)
+    return roots
+
 #: Tools whose failures are worth knowing about across sessions. Everything
 #: else is local and stays out of the report entirely.
 EXTERNAL_PREFIXES = ("mcp__",)
@@ -218,8 +243,13 @@ def find_transcripts(root: str) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
-def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
-    groups = find_transcripts(root)
+def scan(root=None, min_sessions: int = 1) -> dict:
+    roots = [root] if isinstance(root, str) else list(root or default_roots())
+    roots = [r for r in roots if os.path.isdir(r)] or roots[:1]
+    groups: dict[str, list[str]] = {}
+    for r in roots:
+        for sid, paths in find_transcripts(r).items():
+            groups[f"{os.path.basename(os.path.dirname(r))}:{sid}"] = paths
     all_sessions = [read_session(sid, paths) for sid, paths in groups.items()]
     transcripts_read = sum(len(p) for p in groups.values())
     tool_results_seen = sum(s["tool_results"] for s in all_sessions)
@@ -288,7 +318,8 @@ def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
     rows.sort(key=lambda r: (-r["sessions"], -r["failures"], r["tool"]))
     return {
         "version": __version__,
-        "root": root,
+        "root": roots[0],
+        "roots": roots,
         "transcripts_read": transcripts_read,
         "sessions_read": len(all_sessions),
         "tool_results_seen": tool_results_seen,
@@ -310,10 +341,10 @@ def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
 def render_table(report: dict) -> str:
     out = []
     n = report["sessions_scanned"]
-    shown = report["root"]
     home = os.path.expanduser("~")
-    if shown.startswith(home):
-        shown = "~" + shown[len(home):]
+    def fold(p):
+        return "~" + p[len(home):] if p.startswith(home) else p
+    shown = ", ".join(fold(r) for r in report.get("roots", [report["root"]]))
     read = report["transcripts_read"]
     sess = report["sessions_read"]
     out.append(f"read {read} transcript{'s' if read != 1 else ''} from {sess} "
@@ -465,8 +496,10 @@ def _shape(path: str, limit: int = 4000) -> dict:
 
 def diagnose() -> str:
     home = os.path.expanduser("~")
-    out = [f"python {sys.version.split()[0]} on {sys.platform}",
-           f"home resolves to {home}", ""]
+    out = [f"python {sys.version.split()[0]} on {sys.platform}"
+           + (" (WSL)" if _under_wsl() else ""),
+           f"home resolves to {home}",
+           f"roots the scanner will read by default: {', '.join(default_roots())}", ""]
     for cand in CANDIDATE_ROOTS:
         root = _expand(cand)
         if not os.path.isdir(root):
@@ -504,7 +537,9 @@ def diagnose() -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="failecho-scan", description=__doc__.split("\n\n")[0])
-    ap.add_argument("--root", default=DEFAULT_ROOT, help="transcripts root (default ~/.claude/projects)")
+    ap.add_argument("--root", default=None,
+                    help="transcripts root; default is ~/.claude/projects plus, under WSL, "
+                         "each Windows user's C:\\Users\\<name>\\.claude\\projects")
     ap.add_argument("--min-sessions", type=int, default=1,
                     help="only show failures seen in at least this many sessions")
     ap.add_argument("--json", action="store_true", help="print the full report as JSON")
@@ -518,10 +553,11 @@ def main(argv: list[str] | None = None) -> int:
         print(diagnose())
         return 0
 
-    if not os.path.isdir(args.root):
-        print(f"no transcripts at {args.root}", file=sys.stderr)
+    roots = [args.root] if args.root else default_roots()
+    if not any(os.path.isdir(r) for r in roots):
+        print(f"no transcripts at {', '.join(roots)}", file=sys.stderr)
         return 2
-    report = scan(args.root, args.min_sessions)
+    report = scan(roots, args.min_sessions)
     if args.html:
         with open(args.html, "w", encoding="utf-8") as fh:
             fh.write(render_html(report))

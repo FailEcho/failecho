@@ -274,3 +274,33 @@ def test_diagnose_prints_structure_and_never_content(transcripts, monkeypatch):
     assert "SUPERSECRET" not in text and "unknown field" not in text
     assert "issue #42" not in text
     assert "no content was read past the JSON parser" in text
+
+
+def test_under_wsl_the_windows_home_is_scanned_too(tmp_path, monkeypatch):
+    """The first laptop run happened inside WSL. The interpreter's home was
+    /home/lenovo with two stray sessions; the desktop app's months of history
+    were under /mnt/c/Users/LENOVO. Both must be read, as one report."""
+    import failecho_scan
+
+    linux_home = tmp_path / "linux" / ".claude" / "projects"
+    win_home = tmp_path / "mnt" / "c" / "Users" / "LENOVO" / ".claude" / "projects"
+    _write_sessions(win_home)                      # the real history
+    (linux_home / "-stray").mkdir(parents=True)    # WSL's own, empty
+    (linux_home / "-stray" / "x.jsonl").write_text(
+        _line("2026-09-12T00:00:00Z", "x", "hello", "user"))
+
+    monkeypatch.setattr(failecho_scan, "DEFAULT_ROOT", str(linux_home))
+    monkeypatch.setattr(failecho_scan, "_under_wsl", lambda: True)
+    monkeypatch.setattr(failecho_scan.os.path, "isdir",
+                        lambda p: (p == "/mnt/c/Users") or __import__("os").path.exists(p))
+    monkeypatch.setattr(failecho_scan.os, "listdir",
+                        lambda p: ["LENOVO", "Public"] if p == "/mnt/c/Users" else __import__("os").listdir(p))
+    real_join = failecho_scan.os.path.join
+    monkeypatch.setattr(failecho_scan.os.path, "join",
+                        lambda *a: str(win_home) if a[:3] == ("/mnt/c/Users", "LENOVO", ".claude") else real_join(*a))
+
+    roots = failecho_scan.default_roots()
+    assert str(win_home) in roots, roots
+    report = failecho_scan.scan(roots)
+    assert report["transcripts_read"] == 3
+    assert report["repeated_failures"] == 1, "the Windows history was not read"
