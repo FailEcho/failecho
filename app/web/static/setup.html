@@ -191,6 +191,31 @@ VS Code       .vscode/mcp.json        "servers"      type + url</code></pre>
       keeps its MCP config and use the shape above.
     </p>
     <p class="band-sub">
+      Agent frameworks take the URL directly &mdash; neither of these has a
+      registry to be listed in, so there is nothing to wait for. Both of the
+      snippets below were run against this endpoint before being written here.
+    </p>
+    <figure class="snip">
+      <pre><code># LlamaIndex &mdash; pip install llama-index-tools-mcp
+from llama_index.tools.mcp import BasicMCPClient
+
+client = BasicMCPClient("{{PUBLIC_URL}}/mcp")
+tools = await client.list_tools()</code></pre>
+    </figure>
+    <figure class="snip">
+      <pre><code># LangChain &mdash; pip install langchain fastmcp
+from langchain.mcp import MCPAdapter
+
+async with MCPAdapter("{{PUBLIC_URL}}/mcp") as adapter:
+    tools = await adapter.list_tools()</code></pre>
+    </figure>
+    <p class="band-sub">
+      Two things we hit doing that, so you do not have to: <code>langchain.mcp</code>
+      is beta as of langchain 1.4.0 and says its API may change, and importing it
+      needs <code>fastmcp</code> present even though installing langchain does not
+      bring it in.
+    </p>
+    <p class="band-sub">
       If your client can only start a local process and cannot speak HTTP, run
       the relay. It is on PyPI, imports only the MCP SDK, and stores nothing
       itself — every call is forwarded to the same network:

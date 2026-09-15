@@ -1530,3 +1530,17 @@ def test_the_footer_github_link_is_marked_external():
         for tag in tags:
             assert 'rel="external noopener"' in tag, f"{name}: GitHub link has no arrow: {tag}"
             assert 'target="_blank"' in tag, f"{name}: GitHub link stays in the tab: {tag}"
+
+
+def test_setup_covers_the_agent_frameworks(client):
+    """Neither LangChain nor LlamaIndex has a registry to be listed in -- they
+    take the URL -- so the only thing standing between a framework user and
+    the network was nobody telling them. Both snippets were run first."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/setup").text)
+    assert "llama-index-tools-mcp" in body and "BasicMCPClient" in body
+    assert "langchain fastmcp" in body and "MCPAdapter" in body
+    # the two caveats found by running them
+    assert "beta as of langchain 1.4.0" in body
+    assert "needs <code>fastmcp</code> present" in body
