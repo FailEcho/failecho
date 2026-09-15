@@ -1544,3 +1544,16 @@ def test_setup_covers_the_agent_frameworks(client):
     # the two caveats found by running them
     assert "beta as of langchain 1.4.0" in body
     assert "needs <code>fastmcp</code> present" in body
+
+
+def test_setup_offers_reporting_without_a_model_deciding(client):
+    """Connecting a framework exposes the tools; it does not make a small
+    local model call them. The wrapper is the answer, and the page has to be
+    honest that it is a file to copy rather than a pip install."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/setup").text)
+    assert "failecho_autoreport" in body and "fe.wrap(tools" in body
+    assert "It is not on PyPI yet; copy the file." in body
+    assert "pip install failecho-autoreport" not in body, "advertising a path that does not exist"
+    assert "FAILECHO_DISABLED=1" in body

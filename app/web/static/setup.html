@@ -210,6 +210,35 @@ async with MCPAdapter("{{PUBLIC_URL}}/mcp") as adapter:
     tools = await adapter.list_tools()</code></pre>
     </figure>
     <p class="band-sub">
+      Connecting makes the four tools available. It does not make an agent
+      <em>use</em> them &mdash; that stays the model's decision, one call at a
+      time, and a small local model reliably will not make it. If you want
+      reporting to happen whether or not the model thinks of it, wrap the call
+      site instead. One file, standard library only, so it brings none of our
+      dependencies with it:
+    </p>
+    <figure class="snip">
+      <pre><code>curl -O https://raw.githubusercontent.com/FailEcho/failecho/main/failecho_autoreport/__init__.py
+
+from failecho_autoreport import FailEcho
+fe = FailEcho()
+
+tools = fe.wrap(tools, service="github-mcp")   # a framework's tool list
+
+@fe.watch(service="api.github.com", operation="create_issue")
+def create_issue(...):                          # or one call site
+    ...</code></pre>
+    </figure>
+    <p class="band-sub">
+      It never raises, never blocks (reports go to a worker thread, so an
+      unreachable FailEcho costs the caller about 3ms rather than a timeout),
+      and returns and raises exactly what your code did. It sends the failure's
+      shape only &mdash; service, operation, error class, code, duration &mdash;
+      never arguments, results or the error text, unless you set
+      <code>FAILECHO_SEND_ERRORS=1</code>. <code>FAILECHO_DISABLED=1</code>
+      turns it off. It is not on PyPI yet; copy the file.
+    </p>
+    <p class="band-sub">
       Two things we hit doing that, so you do not have to: <code>langchain.mcp</code>
       is beta as of langchain 1.4.0 and says its API may change, and importing it
       needs <code>fastmcp</code> present even though installing langchain does not
