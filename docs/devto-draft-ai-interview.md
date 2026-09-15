@@ -213,19 +213,21 @@ than the paragraph they were extending:
    answering under a prior whichever way they go. Naming the boundary is the
    move that works in both rooms.
 
-Sent (47 words). Drafted long, cut twice. A reply that runs longer than the
-comment it answers reads as a lecture, and on a thread this small the only
-job is to keep the other person talking:
+Sent (55 words). Drafted long, cut three times, and the last pass was for
+vocabulary rather than length: "uncheckable", "unfalsifiable" and "asymmetry"
+all went. They are the words the idea arrived in, not the words it is best
+said in, and a comment thread is not the place to make someone parse them.
 
-> Agreed, and worse than uncheckable -- at volume "I review everything" is
-> probably untrue, and they know it, so it costs you. The asymmetry point is
-> the one I missed. Though once "when didn't you use it" becomes a known
-> beat, does it get rehearsed like "greatest weakness"?
+> Agreed, and worse than just hard to check -- at volume "I review
+> everything" probably isn't true, and they know it, so it costs you. The bit
+> about both answers being traps is what I missed. Though once "when didn't
+> you use it" is a normal question, won't people just prepare one, like
+> "greatest weakness"?
 
-What survived the cut, and what did not: the concession, the one new idea
-(implausible beats unfalsifiable), and the question. Gone are the follow-up
-mechanism and the restatement of their own point back at them -- the second
-of which was never worth its words.
+What survived every cut: the concession, one new idea (a claim they already
+doubt is worse than one they cannot check), and a question. Everything else
+was either restating their point back at them or showing work nobody asked
+for.
 
 Why it is built that way:
 
