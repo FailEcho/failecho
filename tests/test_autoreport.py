@@ -237,3 +237,94 @@ def test_the_queue_is_bounded_so_a_retry_storm_cannot_grow_it():
         client._submit({"service": "x", "operation": "y", "outcome": "failure"})
     assert client.dropped > 0, "the queue grew without bound"
     assert MAX_QUEUE > 0
+
+
+# -- what running it against real frameworks turned up ---------------------
+
+
+def test_a_tool_whose_name_is_on_its_metadata_is_still_wrapped():
+    """LangChain puts the name on the tool. LlamaIndex puts it on
+    tool.metadata, and looking only at `.name` skipped every LlamaIndex tool
+    silently -- leaving the caller believing reporting was on."""
+    client = Recorder()
+
+    class Meta:
+        name = "create_issue"
+
+    class LlamaishTool:
+        metadata = Meta()
+
+        def __init__(self):
+            self._fn = self._boom
+
+        @staticmethod
+        def _boom():
+            raise RuntimeError("403 forbidden")
+
+        def call(self):
+            return self._fn()
+
+    tool = LlamaishTool()
+    client.wrap([tool], service="github-mcp")
+    assert client.wrapped >= 1, "the tool was skipped"
+
+    with pytest.raises(RuntimeError):
+        tool.call()
+    drained(client)
+    assert len(client.bodies) == 1
+    assert client.bodies[0]["error_type"] == "auth_error"
+
+
+def test_wrapping_nothing_is_visible_rather_than_silent():
+    """A tool it cannot wrap must show up in a counter. Reporting that is
+    quietly off is worse than reporting that is loudly absent."""
+    client = Recorder()
+
+    class Opaque:
+        pass
+
+    client.wrap([Opaque()], service="x")
+    assert client.wrapped == 0 and client.unwrapped == 1
+
+
+# -- recovery outcomes -----------------------------------------------------
+
+
+def test_an_outcome_attaches_to_the_failure_before_it():
+    """Failure rates say a call is broken; only an outcome says what to do
+    about it, which is the half another agent can use. The fingerprint arrives
+    on the observe response, so it is resolved at send time -- the failure may
+    still be on the queue when recovered() is called, and one worker draining
+    in order is what makes that safe."""
+    client = Recorder()
+    outcomes: list[dict] = []
+
+    def fake_observe(body):
+        client.bodies.append(body)
+        client._fingerprints[(body["service"], body["operation"])] = "fp-1"
+
+    def fake_outcome(body):
+        key = (body["service"], body["operation"])
+        outcomes.append({**body, "fingerprint": client._fingerprints.get(key)})
+
+    client._post = fake_observe
+    client._post_outcome = fake_outcome
+
+    client.record_failure("github-mcp", "create_issue", RuntimeError("422 invalid"))
+    client.recovered("github-mcp", "create_issue", "refresh_schema", True)
+    drained(client)
+
+    assert len(outcomes) == 1
+    assert outcomes[0]["fingerprint"] == "fp-1", "the outcome lost its failure"
+    assert outcomes[0]["action"] == "refresh_schema"
+    assert outcomes[0]["successful"] is True
+
+
+def test_an_orphan_outcome_is_dropped_not_misattached():
+    """With no failure to attach to, inventing a fingerprint would put the
+    outcome on the wrong failure -- worse than losing it."""
+    client = Recorder()
+    client.recovered("never-seen", "op", "guess", True)
+    drained(client)
+    assert client.unmatched == 1
+    assert client.bodies == []

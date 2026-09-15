@@ -60,6 +60,10 @@ import uuid
 
 __all__ = ["FailEcho", "classify"]
 
+
+class _NoFingerprint(Exception):
+    """An outcome arrived with no failure to attach it to."""
+
 __version__ = "0.1.0"
 
 DEFAULT_ENDPOINT = "https://failecho.com"
@@ -155,6 +159,15 @@ class FailEcho:
         self.dropped = 0
         self.sent = 0
         self.failed = 0
+        self.unmatched = 0
+        #: wrap() is best-effort by design, so it counts what it managed.
+        #: wrapped == 0 after wrapping a tool list means nothing is reporting.
+        self.wrapped = 0
+        self.unwrapped = 0
+
+        #: The fingerprint the server gave each (service, operation)'s last
+        #: failure, so an outcome can be attached to it.
+        self._fingerprints: dict[tuple[str, str], str] = {}
 
         self._queue: queue.Queue = queue.Queue(maxsize=MAX_QUEUE)
         self._worker: threading.Thread | None = None
@@ -207,16 +220,28 @@ class FailEcho:
         caller's tool to report on it would be a poor trade.
         """
         for tool in tools or []:
-            name = getattr(tool, "name", None) or getattr(tool, "__name__", None)
+            # LangChain puts the name on the tool; LlamaIndex puts it on
+            # tool.metadata. A tool whose name cannot be found is skipped, and
+            # skipping used to be silent -- which is the worst outcome here,
+            # because the caller believes reporting is on. The counters below
+            # are how you check.
+            name = (getattr(tool, "name", None)
+                    or getattr(getattr(tool, "metadata", None), "name", None)
+                    or getattr(tool, "__name__", None))
             if not name:
+                self.unwrapped += 1
                 continue
             # One layer per calling convention, never two. A LangChain
             # StructuredTool has both `_run` and `func`, and `_run` calls
             # `func` -- wrapping both reports the same failure twice, which is
             # worse than not reporting it, because the network cannot tell a
             # double count from two agents agreeing.
-            for candidates in (("_run", "func", "fn"),
-                               ("_arun", "coroutine", "async_fn")):
+            # Ordered outermost-first per convention, and the first one that
+            # actually takes an assignment wins. LlamaIndex exposes `fn` as a
+            # read-only property over a settable `_fn`, so the public name is
+            # tried and skipped rather than being absent.
+            for candidates in (("_run", "func", "fn", "_fn"),
+                               ("_arun", "coroutine", "async_fn", "_async_fn")):
                 for attr in candidates:
                     target = getattr(tool, attr, None)
                     if target is None or not callable(target):
@@ -227,6 +252,7 @@ class FailEcho:
                         # Frozen models and slotted classes land here. The
                         # tool keeps working; it just goes unreported.
                         continue
+                    self.wrapped += 1
                     break  # this convention is covered; do not wrap deeper
         return tools
 
@@ -260,7 +286,24 @@ class FailEcho:
 
     # -- the wire ----------------------------------------------------------
 
-    def _submit(self, body: dict) -> None:
+    def recovered(self, service: str, operation: str, action: str,
+                  successful: bool = True) -> None:
+        """Report what you tried after a failure, and whether it worked.
+
+        This is the half of the network another agent can actually use: a
+        failure rate says a call is broken, and only an outcome says what to
+        do about it. The wrapper cannot infer the action -- it did not make
+        the fix -- so this stays an explicit call.
+
+        The fingerprint is resolved when the report is sent rather than now,
+        because the failure it belongs to may still be on the queue. One
+        worker draining in order is what makes that safe.
+        """
+        self._submit({"service": service, "operation": operation,
+                      "action": action, "successful": bool(successful)},
+                     kind="outcome")
+
+    def _submit(self, body: dict, kind: str = "observe") -> None:
         if not self.enabled:
             return
         # Reporting FailEcho's own trouble to FailEcho is a loop, and it is
@@ -268,7 +311,7 @@ class FailEcho:
         if body.get("service", "").endswith("failecho.com"):
             return
         try:
-            self._queue.put_nowait(body)
+            self._queue.put_nowait((kind, body))
             self.queued += 1
         except queue.Full:
             self.dropped += 1
@@ -286,12 +329,17 @@ class FailEcho:
     def _drain(self) -> None:
         while True:
             try:
-                body = self._queue.get(timeout=5.0)
+                kind, body = self._queue.get(timeout=5.0)
             except queue.Empty:
                 return
             try:
-                self._post(body)
+                if kind == "outcome":
+                    self._post_outcome(body)
+                else:
+                    self._post(body)
                 self.sent += 1
+            except _NoFingerprint:
+                self.unmatched += 1
             except Exception:
                 self.failed += 1
             finally:
@@ -301,6 +349,37 @@ class FailEcho:
         request = urllib.request.Request(
             f"{self.endpoint}/v1/observe",
             data=json.dumps(body).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "X-Reporter-ID": self.reporter_id,
+                "User-Agent": f"failecho-autoreport/{__version__}",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            payload = response.read()
+        if body.get("outcome") != "failure":
+            return
+        try:
+            fingerprint = json.loads(payload).get("fingerprint")
+        except Exception:
+            return
+        if fingerprint:
+            self._fingerprints[(body["service"], body["operation"])] = fingerprint
+
+    def _post_outcome(self, body: dict) -> None:
+        key = (body["service"], body["operation"])
+        fingerprint = self._fingerprints.get(key)
+        if not fingerprint:
+            # Nothing to attach it to: the failure was dropped, disabled, or
+            # never reported. Silently inventing a fingerprint would put the
+            # outcome on the wrong failure, which is worse than losing it.
+            raise _NoFingerprint(key)
+        request = urllib.request.Request(
+            f"{self.endpoint}/v1/outcome",
+            data=json.dumps({"fingerprint": fingerprint,
+                             "action": body["action"],
+                             "successful": body["successful"]}).encode(),
             headers={
                 "Content-Type": "application/json",
                 "X-Reporter-ID": self.reporter_id,
