@@ -213,27 +213,21 @@ than the paragraph they were extending:
    answering under a prior whichever way they go. Naming the boundary is the
    move that works in both rooms.
 
-Sent:
+Sent (cut to five sentences -- the long version below was drafted first and
+trimmed, because a reply that runs longer than the comment it answers reads
+as a lecture rather than a conversation):
 
-> The falsifiable piece is better than what I wrote, and I think I can say
-> why. "I review everything" isn't only uncheckable -- at any real volume it's
-> probably not true, and the interviewer knows it's probably not true. So it
-> doesn't land as neutral filler. It costs you something.
->
-> A named case where the tool stayed in the box survives the follow-up, and
-> that's the actual test: *what made that one different?* is cheap for them to
-> ask and expensive to fake. The story isn't what does the work. The
-> interviewer's willingness to ask one more question is.
->
-> The asymmetry is the part I missed. A prior needs a yes/no to attach itself
-> to -- naming the boundary refuses the axis rather than picking a side on it,
-> which is exactly why it survives both rooms. That's a cleaner statement of
-> the thing I was circling.
->
-> One worry: once "tell me when you didn't use it" becomes a known beat, it
-> gets rehearsed like "what's your greatest weakness." Do you think the
-> follow-up is enough to keep it honest, or does the boundary answer have a
-> shelf life too?
+> The falsifiable piece is better than what I wrote, and I think it's because
+> "I review everything" isn't only uncheckable -- at any real volume it's
+> probably not true, and the interviewer knows it, so it costs you rather than
+> landing neutral. A named case where the tool stayed in the box survives the
+> follow-up, and that's the real test: "what made that one different?" is
+> cheap for them to ask and expensive to fake. The asymmetry is the part I
+> missed -- a prior needs a yes/no to attach to, so naming the boundary
+> refuses the axis instead of picking a side on it. My one worry is that once
+> "tell me when you didn't use it" becomes a known beat, it gets rehearsed
+> like "greatest weakness." Do you think the follow-up keeps it honest, or
+> does the boundary answer have a shelf life too?
 
 Why it is built that way:
 
