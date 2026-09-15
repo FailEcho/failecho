@@ -137,6 +137,8 @@ def read_session(path: str) -> dict:
     pending: dict[str, tuple[str, float | None]] = {}
     calls: list[dict] = []
     first_ts = None
+    tool_results = 0
+    local_failures: collections.Counter = collections.Counter()
     for line in open(path, encoding="utf-8", errors="ignore"):
         try:
             d = json.loads(line)
@@ -158,7 +160,10 @@ def read_session(path: str) -> dict:
                 pending[c.get("id")] = (name, ts)
             elif kind == "tool_result":
                 name, started = pending.pop(c.get("tool_use_id"), ("?", None))
+                tool_results += 1
                 if not is_external(name):
+                    if c.get("is_error"):
+                        local_failures[name] += 1
                     continue
                 if c.get("is_error"):
                     error_type, code = classify(_result_text(c.get("content"))[:600])
@@ -167,7 +172,8 @@ def read_session(path: str) -> dict:
                 else:
                     calls.append({"tool": name, "ok": True, "ts": started or ts,
                                   "error_type": None, "error_code": None})
-    return {"path": path, "id": os.path.basename(path)[:8], "started": first_ts, "calls": calls}
+    return {"path": path, "id": os.path.basename(path)[:8], "started": first_ts,
+            "calls": calls, "tool_results": tool_results, "local_failures": local_failures}
 
 
 def find_transcripts(root: str) -> list[str]:
@@ -180,8 +186,15 @@ def find_transcripts(root: str) -> list[str]:
 
 
 def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
-    sessions = [read_session(p) for p in find_transcripts(root)]
-    sessions = [s for s in sessions if s["calls"]]
+    paths = find_transcripts(root)
+    all_sessions = [read_session(p) for p in paths]
+    transcripts_read = len(all_sessions)
+    tool_results_seen = sum(s["tool_results"] for s in all_sessions)
+    local_failures: collections.Counter = collections.Counter()
+    for s in all_sessions:
+        local_failures.update(s["local_failures"])
+    # only sessions that touched shared infrastructure take part in the grid
+    sessions = [s for s in all_sessions if s["calls"]]
     sessions.sort(key=lambda s: s["started"] or 0)
 
     # key -> per-session facts
@@ -243,6 +256,9 @@ def scan(root: str = DEFAULT_ROOT, min_sessions: int = 1) -> dict:
     return {
         "version": __version__,
         "root": root,
+        "transcripts_read": transcripts_read,
+        "tool_results_seen": tool_results_seen,
+        "local_failures": [{"tool": t, "failures": n} for t, n in local_failures.most_common(5)],
         "sessions_scanned": len(sessions),
         "session_ids": [s["id"] for s in sessions],
         "distinct_failures": len(rows),
@@ -264,12 +280,24 @@ def render_table(report: dict) -> str:
     home = os.path.expanduser("~")
     if shown.startswith(home):
         shown = "~" + shown[len(home):]
-    out.append(f"scanned {n} session{'s' if n != 1 else ''} under {shown}")
+    read = report["transcripts_read"]
+    out.append(f"read {read} transcript{'s' if read != 1 else ''} under {shown}; "
+               f"{n} used an MCP server or a web tool")
     out.append("")
+    if read == 0:
+        out.append("no transcripts found there. Claude Code writes one .jsonl per session "
+                   "under <root>/<project>/; pass --root if yours live elsewhere.")
+        return "\n".join(out)
     if not report["rows"]:
-        out.append("no external tool failures found. either nothing has broken, or the "
-                   "tools that broke were local ones (Bash, Read, Edit), which this does "
-                   "not count.")
+        out.append("no external tool failures found.")
+        if report["local_failures"]:
+            local = ", ".join(f"{x['tool']} x{x['failures']}" for x in report["local_failures"])
+            out.append(f"the failures in these sessions were all in local tools ({local}). "
+                       "those are not counted: nobody else calling the same service can "
+                       "help with a local error, so there is nothing to remember across "
+                       "sessions or share.")
+        else:
+            out.append(f"{report['tool_results_seen']} tool calls, none of them failed. nothing to report.")
         return "\n".join(out)
     out.append(f"{'tool':<40} {'error':<20} {'sessions':>8} {'failures':>8} {'tax':>5}   next")
     for r in report["rows"]:
