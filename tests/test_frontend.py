@@ -1557,3 +1557,14 @@ def test_setup_offers_reporting_without_a_model_deciding(client):
     assert "It is not on PyPI yet; copy the file." in body
     assert "pip install failecho-autoreport" not in body, "advertising a path that does not exist"
     assert "FAILECHO_DISABLED=1" in body
+
+
+def test_llms_txt_says_what_identifying_yourself_buys_you(client):
+    """The copyable query example is deliberately anonymous, and people copy
+    examples. Without an id `from_other_agents` is null, so a caller cannot
+    tell evidence it generated from evidence somebody else did."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+    assert "`from_other_agents` stops being null" in body
+    assert "hashed before storage and is never required" in body

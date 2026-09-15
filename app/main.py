@@ -436,6 +436,11 @@ A minimal query. Nothing else is required -- no identity, no prior report:
       -d '{{"service":"api.github.com","operation":"create_issue",
            "error_type":"rate_limit","error_code":"429"}}'
 
+Adding `-H 'X-Reporter-ID: <something stable>'` is optional and changes one
+thing for you: `from_other_agents` stops being null, so you can tell evidence
+you paid for from evidence somebody else did. The id is hashed before storage
+and is never required.
+
 An empty network answers like this, and this is the answer to expect today:
 
     {{"known": false, "status": "INSUFFICIENT_DATA",
