@@ -84,3 +84,21 @@ def test_uvicorn_does_not_log_the_uri_a_second_time():
     query string is caller-supplied."""
     unit = (DEPLOY / "failecho.service").read_text()
     assert "--no-access-log" in unit
+
+
+def test_the_autoreport_package_builds_from_the_repo():
+    """`failecho-autoreport` is published as its own zero-dependency
+    distribution, assembled from the canonical source at build time. The
+    manifest the script writes must declare no dependencies -- the whole point
+    is that a LangChain user does not inherit ours."""
+    from pathlib import Path
+    import re
+
+    script = Path("scripts/build_autoreport_package.py").read_text()
+    assert 'name = "failecho-autoreport"' in script
+    assert "dependencies = []" in script
+    assert 'packages = ["failecho_autoreport"]' in script
+    # version comes from the source, never typed twice
+    src = Path("failecho_autoreport/__init__.py").read_text()
+    assert re.search(r'^__version__ = "\d+\.\d+\.\d+"', src, re.M)
+    assert "__version__" in script
