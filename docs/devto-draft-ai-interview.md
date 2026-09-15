@@ -197,3 +197,63 @@ reason the post exists.
   where you check it. Anyone arguing past that has not read it, and the thread
   will see that without your help.
 - **Do not argue with the first critical comment.** Same as always.
+
+## Replies actually sent
+
+### Raknaos, 15 Sep — the falsifiable piece
+
+Their comment agreed with the analogy reading and added two things worth more
+than the paragraph they were extending:
+
+1. **A good answer needs one falsifiable piece.** "I review everything" is not
+   checkable at volume. What is checkable: a named task from last week where
+   the tool stayed in the box, and why it would have made that one worse.
+2. **The question is asymmetric.** "No, I don't" now reads as a missing skill
+   and "yes, constantly" reads as outsourced judgement, so the candidate is
+   answering under a prior whichever way they go. Naming the boundary is the
+   move that works in both rooms.
+
+Sent:
+
+> The falsifiable piece is better than what I wrote, and I think I can say
+> why. "I review everything" isn't only uncheckable -- at any real volume it's
+> probably not true, and the interviewer knows it's probably not true. So it
+> doesn't land as neutral filler. It costs you something.
+>
+> A named case where the tool stayed in the box survives the follow-up, and
+> that's the actual test: *what made that one different?* is cheap for them to
+> ask and expensive to fake. The story isn't what does the work. The
+> interviewer's willingness to ask one more question is.
+>
+> The asymmetry is the part I missed. A prior needs a yes/no to attach itself
+> to -- naming the boundary refuses the axis rather than picking a side on it,
+> which is exactly why it survives both rooms. That's a cleaner statement of
+> the thing I was circling.
+>
+> One worry: once "tell me when you didn't use it" becomes a known beat, it
+> gets rehearsed like "what's your greatest weakness." Do you think the
+> follow-up is enough to keep it honest, or does the boundary answer have a
+> shelf life too?
+
+Why it is built that way:
+
+- **The concession is the first line, not the fourth.** A paragraph of
+  agreement before the "but" reads as throat-clearing; leading with what they
+  got right is what makes the rest land as thinking rather than defending.
+- **It adds one thing that is genuinely new.** Their point was that the claim
+  is unfalsifiable; the addition is that it is also *implausible*, which is
+  strictly worse -- an unfalsifiable claim is neutral, an implausible one
+  costs credibility. If a reply has nothing to add, it should be shorter, not
+  padded to look substantial.
+- **It locates the mechanism somewhere uncomfortable.** The named case only
+  works because the interviewer asks a follow-up. That puts the burden on
+  them, not on the candidate's story, which is the part most people writing
+  interview advice leave out.
+- **It ends on an open question.** A commenter this good is worth keeping in
+  the thread, and the shelf-life worry is real rather than a prompt.
+
+**The lesson for the next one of these:** the best comments extend the
+argument instead of disputing it, and the reply that works concedes in the
+first sentence and then earns its place with one new idea. Thanking someone
+for a good comment and restating their point back at them ends the
+conversation politely, which is the one outcome not worth having.
