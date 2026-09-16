@@ -28,17 +28,15 @@ Whatever the sub's Discussion-type flair is. Not Showcase, not Project. Same
 reasoning as before: the post is a question with a tool attached, and the
 flair should match the post.
 
-## Before posting — pick the install line
+## The install line
 
-If `failecho-autoreport` is on PyPI by Wednesday, use:
+Published to PyPI 2026-09-16 and verified file-by-file against the local
+build, so the post can say:
 
     pip install failecho-autoreport
 
-If not, use the one-file line and **delete the pip line**. Never both, never
-the pip line unpublished — a reader who runs it and gets "no matching
-distribution" is gone.
-
-    curl -O https://raw.githubusercontent.com/FailEcho/failecho/main/failecho_autoreport/__init__.py
+If the post already went out with the one-file curl line, edit it to this;
+the file still works, pip is just shorter.
 
 ---
 

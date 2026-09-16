@@ -218,7 +218,7 @@ async with MCPAdapter("{{PUBLIC_URL}}/mcp") as adapter:
       dependencies with it:
     </p>
     <figure class="snip">
-      <pre><code>curl -O https://raw.githubusercontent.com/FailEcho/failecho/main/failecho_autoreport/__init__.py
+      <pre><code>pip install failecho-autoreport
 
 from failecho_autoreport import FailEcho
 fe = FailEcho()
@@ -238,7 +238,10 @@ fe.recovered("github-mcp", "create_issue", "refresh_schema")  # what fixed it</c
       shape only &mdash; service, operation, error class, code, duration &mdash;
       never arguments, results or the error text, unless you set
       <code>FAILECHO_SEND_ERRORS=1</code>. <code>FAILECHO_DISABLED=1</code>
-      turns it off. It is not on PyPI yet; copy the file.
+      turns it off. Zero dependencies: the wheel is 8KB and pulls in nothing.
+      Declare <code>mutates=True</code> on anything that is not a read, so a
+      write that has never failed can be reported as unverified rather than
+      as success.
     </p>
     <p class="band-sub">
       The <code>recovered</code> line is the one worth bothering with. Failures

@@ -1554,9 +1554,12 @@ def test_setup_offers_reporting_without_a_model_deciding(client):
 
     body = re.sub(r"\s+", " ", client.get("/setup").text)
     assert "failecho_autoreport" in body and "fe.wrap(tools" in body
-    assert "It is not on PyPI yet; copy the file." in body
-    assert "pip install failecho-autoreport" not in body, "advertising a path that does not exist"
+    # published 2026-09-16; the wheel PyPI serves was compared file by file
+    # to the one built here before this line was allowed to exist
+    assert "pip install failecho-autoreport" in body
+    assert "not on PyPI yet" not in body
     assert "FAILECHO_DISABLED=1" in body
+    assert "mutates=True" in body
 
 
 def test_llms_txt_says_what_identifying_yourself_buys_you(client):
