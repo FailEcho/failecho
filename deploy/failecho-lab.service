@@ -11,7 +11,7 @@ Wants=network-online.target
 Type=exec
 User=failecho
 Group=failecho
-WorkingDirectory=/srv/failecho
+WorkingDirectory=/srv/failecho-lab/app
 EnvironmentFile=/etc/failecho-lab.env
 ExecStart=/srv/failecho/.venv/bin/python -m uvicorn app.main:app \
     --host 127.0.0.1 --port 8089 --workers 1 --proxy-headers \

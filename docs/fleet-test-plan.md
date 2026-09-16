@@ -149,6 +149,15 @@ Whatever it shows gets written up as it is. The Reddit post promised that.
 - Kill switch: `systemctl stop failecho-fleet.timer`. The lab instance can be
   deleted whole; nothing in it is anyone's.
 
+## The software under test is frozen
+
+The lab runs from its own checkout, `/srv/failecho-lab/app`, pinned at the
+commit recorded in `/srv/failecho-lab/PINNED_AT`. `deploy/deploy.sh` only
+touches `/srv/failecho`, so production can keep shipping without changing
+the experiment under the fleet. For the first two hours it did not work this
+way, and every deploy restarted the lab with new code; that is noted here
+rather than hidden, and the runs from then are still in the state file.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

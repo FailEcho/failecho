@@ -10,7 +10,7 @@ Requires=failecho-lab.service
 Type=oneshot
 User=failecho
 Group=failecho
-WorkingDirectory=/srv/failecho
+WorkingDirectory=/srv/failecho-lab/app
 # provider keys only; deliberately NOT /etc/failecho.env -- the fleet refuses
 # to start if an operator token is present, and that is the point
 EnvironmentFile=/etc/failecho-agent.env
