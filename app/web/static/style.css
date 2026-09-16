@@ -1468,9 +1468,15 @@ section[id], h2[id] { scroll-margin-top: 100px; }
 /* Only rendered when FIN_LAB_LABEL is set. Sits above the bar so every
    screenshot of a lab page carries what it is. */
 .lab-banner {
-  position: sticky; top: 0; z-index: 13;
   padding: 7px 16px; text-align: center;
   font: 12px var(--sans); letter-spacing: .04em; text-transform: uppercase;
   color: #000; background: var(--accent);
 }
 .lab-banner a { color: #000; text-decoration: underline; }
+/* Survives scrolling so no screenshot of a lab page is unlabelled, without
+   pinning a whole strip to the top. */
+.lab-tag {
+  display: inline-block; margin-left: 10px; padding: 2px 7px; vertical-align: middle;
+  font: 10.5px var(--sans); letter-spacing: .08em; text-transform: uppercase;
+  color: #000; background: var(--accent);
+}

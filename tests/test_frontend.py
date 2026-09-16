@@ -247,7 +247,9 @@ def test_static_assets_stay_small():
     # 109k -> 110k: target="_blank" and rel on every link that already showed
     # the ↗, plus the footer's GitHub link joining them. Attributes on links
     # that were already there, not new markup.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 110_000
+    # 110k -> 111k: the lab linked from the nav, the footer and the own-agents
+    # card, and the lab banner's non-sticky form plus its bar tag.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 111_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -265,7 +267,9 @@ def test_static_assets_stay_small():
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
-    assert per_visit < 144_000, f"page weight crept to {per_visit} bytes"
+    # 144k -> 145k on 2026-09-16: the lab linked from three places on the
+    # home page, and its banner and bar tag in the shared stylesheet.
+    assert per_visit < 145_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -1590,3 +1594,39 @@ def test_llms_txt_explains_decay_and_unverified_success(client):
     assert "One line of annotation beats any heuristic" in body
     assert "`related_failures`" in body and "wears several masks" in body
     assert "the evidence for the join, not the join" in body
+
+
+def test_the_lab_is_linked_from_the_main_site_and_named_honestly(client):
+    """The lab is reachable from the nav, the footer and the own-agents card,
+    and every mention says what it is: our own agents, a separate instance,
+    not adoption. Opens in a new tab like every other off-site link."""
+    import re
+
+    for path in ("/", "/demo"):
+        body = re.sub(r"\s+", " ", client.get(path).text)
+        links = re.findall(r'<a\b[^>]*href="https://lab\.failecho\.com[^"]*"[^>]*>', body)
+        assert links, f"{path}: no link to the lab"
+        assert all('target="_blank"' in l and "noopener" in l for l in links)
+    home = re.sub(r"\s+", " ", client.get("/").text)
+    assert "a separate lab instance" in home and "without any of it touching this number" in home
+    demo = re.sub(r"\s+", " ", client.get("/demo").text)
+    assert "Nothing in it is counted as adoption" in demo
+
+
+def test_demo_page_reflects_the_current_product(client):
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/demo").text)
+    for must in ("python -m failecho_autoreport check", "decaying", "related_failures",
+                 "success_evidence", "pip install failecho-autoreport", "llms.txt and set yourself up"):
+        assert must in body, f"demo page is behind: {must}"
+
+
+def test_lab_banner_is_not_pinned(client):
+    """It labels every lab page, but it scrolls away like content; the small
+    bar tag is what stays in view."""
+    css = (STATIC / "style.css").read_text()
+    banner = css[css.index(".lab-banner {"):]
+    banner = banner[: banner.index("}")]
+    assert "sticky" not in banner and "fixed" not in banner
+    assert ".lab-tag" in css

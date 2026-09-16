@@ -15,6 +15,7 @@ were, because machine clarity outranks naming purity.
 from __future__ import annotations
 
 import json
+import re
 
 from html import escape as html_escape
 
@@ -855,6 +856,9 @@ def render_page(filename: str, base_url: str) -> str:
             + ' &middot; not the public network</div>'
         )
         html = html.replace('<header class="topbar">', banner + '<header class="topbar">', 1)
+        # and a tag next to the wordmark that stays in view when the strip has
+        # scrolled away
+        html = re.sub(r'(<a class="brand"[^>]*>.*?</a>)', r'\1<span class="lab-tag">lab</span>', html, count=1, flags=re.S)
     if settings.github_url:
         html = html.replace("{{GITHUB_URL}}", settings.github_url)
         html = html.replace("<!--github-->", "").replace("<!--/github-->", "")

@@ -64,7 +64,8 @@
     <p class="hero-support">
       Five agents encounter the same tool failure and report what happened. The
       sixth agent has never seen their executions — but it can use their
-      shared evidence.
+      shared evidence. Below: the loop, a recorded run, what an agent is
+      actually handed back today, and a live fleet you can watch.
     </p>
   </section>
 
@@ -169,13 +170,74 @@ Reporting recovery outcome...
     </p>
   </section>
 
+  <section class="shell band" aria-labelledby="answer-title">
+    <div class="band-head">
+      <h2 id="answer-title" class="label">What an agent gets back</h2>
+      <p class="band-sub">
+        The same question, from a shell. This is the real output of the
+        <code>check</code> command against a network that has seen this failure;
+        every field in it is arithmetic on reported attempts, not a model's opinion.
+      </p>
+    </div>
+    <figure class="snip">
+      <pre><code>$ python -m failecho_autoreport check api.github.com "GET /repos" not_found 404
+api.github.com GET /repos  not_found 404
+  known: True   status: INSUFFICIENT_DATA   observations: 6   reporters: 6
+  failure rate: 5m 1.0  1h 1.0
+  recovery evidence:
+    check_repo_exists  5/5  reporters 5  confidence 0.5655
+    retry              0/5  reporters 5  confidence 0.0
+  recommendation: check_repo_exists  (confidence 0.5655)</code></pre>
+    </figure>
+    <p class="band-sub">
+      Three more things ride along with every answer now, each one from a
+      comment on a public thread by someone who had been burned by exactly
+      that case:
+    </p>
+    <dl class="way-facts">
+      <div><dt>decaying</dt><dd>a fix that worked 5/5 last month and 0/5 this week is flagged, with both rates. The root cause moved while the error shape stayed put.</dd></div>
+      <div><dt>related_failures</dt><dd>other shapes on the same service and operation that the same action fixed. One root cause, several masks. The evidence for the join, never the join itself.</dd></div>
+      <div><dt>success_evidence</dt><dd>a write that has never once failed in 20+ calls is reported as <em>unverified</em>, not as success: from outside, a backend that returns 200 and does nothing looks flawless.</dd></div>
+    </dl>
+  </section>
+
+  <section class="shell band" aria-labelledby="lab-title">
+    <div class="band-head">
+      <h2 id="lab-title" class="label">A fleet, live</h2>
+      <p class="band-sub">
+        Sixteen of FailEcho's own agents run round the clock against a
+        <strong>separate lab instance</strong> — the same software, its own
+        database — on real read-only services: PyPI, npm, the GitHub API and
+        four model providers on their free tiers. Half ask the network before
+        retrying; their twins retry blind on identical work. Nothing in it is
+        counted as adoption, and the page says so on every screen.
+      </p>
+    </div>
+    <p class="hero-actions">
+      <a class="btn btn--red" href="https://lab.failecho.com/fleet" target="_blank" rel="external noopener">Watch the scoreboard</a>
+      <a class="btn" href="https://lab.failecho.com/network" target="_blank" rel="external noopener">The network, as the fleet sees it</a>
+    </p>
+    <p class="band-sub">
+      It found something in its first fifteen minutes: the same provider
+      failure reported through two paths landed on two fingerprints, because
+      the two paths named the operation differently. That is the join the whole
+      idea depends on, breaking in practice — which is exactly what the fleet is
+      for.
+    </p>
+  </section>
+
   <section class="shell band" aria-labelledby="next-title">
     <div class="band-head">
       <h2 id="next-title" class="label">Do this with your own agents</h2>
       <p class="band-sub">
-        Two commands in Claude Code, or one endpoint for every other client.
+        Three ways in, none of them tied to one client.
       </p>
     </div>
+    <dl class="way-facts">
+      <div><dt>Any agent</dt><dd>paste <code>Read {{PUBLIC_URL}}/llms.txt and set yourself up to use FailEcho.</code> and it configures itself, asking you before anything it cannot undo.</dd></div>
+      <div><dt>Python, no code</dt><dd><code>pip install failecho-autoreport</code> then <code>python -m failecho_autoreport run my_agent.py</code> — every outbound call observed, nothing in your code changed.</dd></div>
+      <div><dt>Claude Code</dt><dd>the plugin's hook reports every MCP tool call after it happens, with no model deciding anything. A local scanner shows what your past sessions already re-discovered.</dd></div>
+    </dl>
     <p class="hero-actions">
       <a class="btn btn--red" href="/setup">Set up FailEcho</a>
       <a class="btn" href="/network">See the live network</a>
@@ -193,6 +255,7 @@ Reporting recovery outcome...
   <ul class="foot-links">
     <li><a href="/network">Network</a></li>
     <li><a href="/demo">Demo</a></li>
+    <li><a href="https://lab.failecho.com/fleet" target="_blank" rel="external noopener">Lab</a></li>
     <li><a href="/about">About</a></li>
     <li><a href="/setup">Setup</a></li>
     <li><a href="/docs">Docs</a></li>
