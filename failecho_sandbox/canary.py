@@ -41,7 +41,9 @@ import time
 from . import Sandbox, SandboxError, available
 
 LAB_URL = (os.environ.get("CANARY_LAB_URL") or "").rstrip("/")
-STATE_DIR = os.environ.get("STATE_DIRECTORY") or os.environ.get("FLEET_STATE_DIR") or "/tmp/failecho-fleet"
+# systemd joins several StateDirectory= paths with ":"; the first is ours
+STATE_DIR = ((os.environ.get("STATE_DIRECTORY") or "").split(":")[0]
+             or os.environ.get("FLEET_STATE_DIR") or "/tmp/failecho-fleet")
 REPORT_PATH = os.environ.get("CANARY_REPORT_PATH") or os.path.join(STATE_DIR, "canary.json")
 
 RUN_SCRIPT = """import urllib.request

@@ -42,7 +42,9 @@ __version__ = "0.1.0"
 UA = "failecho-fleet/0.1 (+https://failecho.com; lab)"
 
 LAB_ENDPOINT = (os.environ.get("FAILECHO_ENDPOINT") or "").rstrip("/")
-STATE_DIR = os.environ.get("STATE_DIRECTORY") or os.environ.get("FLEET_STATE_DIR") or "/tmp/failecho-fleet"
+# systemd joins several StateDirectory= paths with ":"; the first is ours
+STATE_DIR = ((os.environ.get("STATE_DIRECTORY") or "").split(":")[0]
+             or os.environ.get("FLEET_STATE_DIR") or "/tmp/failecho-fleet")
 REPORT_PATH = os.environ.get("FLEET_REPORT_PATH") or os.path.join(STATE_DIR, "fleet.json")
 LAB_DB = os.environ.get("FLEET_LAB_DB") or ""
 PRODUCTION_HOSTS = ("failecho.com", "www.failecho.com")

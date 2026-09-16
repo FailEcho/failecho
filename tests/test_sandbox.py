@@ -478,3 +478,24 @@ def test_the_canary_unit_is_boxed_like_the_fleet():
     assert "failecho.env" not in unit, "the canary must never hold the operator token"
     timer = (ROOT / "deploy" / "failecho-canary.timer").read_text()
     assert "OnCalendar=*-*-* 04:10:00 UTC" in timer
+
+
+def test_a_joined_state_directory_is_split():
+    """systemd joins several StateDirectory= paths with ':'. The first run of
+    the canary spent 70 seconds installing everything and then failed to
+    write its report to '/var/lib/failecho-fleet:/var/lib/...'."""
+    import importlib
+    import os
+
+    os.environ["STATE_DIRECTORY"] = "/a/fleet:/a/scratch"
+    try:
+        import failecho_fleet
+        import failecho_sandbox.canary as canary
+
+        importlib.reload(canary)
+        importlib.reload(failecho_fleet)
+        assert canary.STATE_DIR == "/a/fleet" and failecho_fleet.STATE_DIR == "/a/fleet"
+    finally:
+        del os.environ["STATE_DIRECTORY"]
+        importlib.reload(canary)
+        importlib.reload(failecho_fleet)
