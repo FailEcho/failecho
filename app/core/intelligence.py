@@ -115,10 +115,27 @@ class LifetimeCounts:
 
     successes: int
     failures: int
+    #: How many live rows declared the operation a write, and how many a read.
+    #: Declarations are only kept on live rows; the aggregates do not carry
+    #: them, and callers who declare tend to keep declaring.
+    declared_write: int = 0
+    declared_read: int = 0
 
     @property
     def total(self) -> int:
         return self.successes + self.failures
+
+    def write_verdict(self, operation: str) -> tuple[bool, str]:
+        """Is this a write, and how do we know.
+
+        A reporter's declaration wins: one line of annotation from the caller
+        beats anything inferred from a name, and GraphQL -- all POST -- cannot
+        be inferred at all. Majority of declarations, in case reporters
+        disagree. Only with none at all does the name heuristic speak.
+        """
+        if self.declared_write + self.declared_read > 0:
+            return self.declared_write >= self.declared_read, "declared"
+        return write_like(operation), "name"
 
 
 async def lifetime_counts(
@@ -131,6 +148,12 @@ async def lifetime_counts(
                     func.sum(case((Observation.outcome == OUTCOME_FAILURE, 1), else_=0)), 0
                 ).label("failures"),
                 func.count().label("total"),
+                func.coalesce(
+                    func.sum(case((Observation.mutates.is_(True), 1), else_=0)), 0
+                ).label("declared_write"),
+                func.coalesce(
+                    func.sum(case((Observation.mutates.is_(False), 1), else_=0)), 0
+                ).label("declared_read"),
             ).where(Observation.service == service, Observation.operation == operation)
         )
     ).one()
@@ -147,11 +170,13 @@ async def lifetime_counts(
     return LifetimeCounts(
         successes=live_successes + int(archived.successes or 0),
         failures=live_failures + int(archived.failures or 0),
+        declared_write=int(live.declared_write or 0),
+        declared_read=int(live.declared_read or 0),
     )
 
 
-def success_is_unverified(operation: str, counts: LifetimeCounts) -> bool:
-    """Many successes, no failure ever, on something that looks like a write.
+def success_is_unverified(is_write: bool, counts: LifetimeCounts) -> bool:
+    """Many successes, no failure ever, on a write.
 
     From outside, a backend that never performs a write and returns 200 is
     indistinguishable from one that is flawless. Both look like this. Reads are
@@ -159,7 +184,7 @@ def success_is_unverified(operation: str, counts: LifetimeCounts) -> bool:
     never failed.
     """
     return (
-        write_like(operation)
+        is_write
         and counts.failures == 0
         and counts.successes >= settings.unverified_success_min_calls
     )

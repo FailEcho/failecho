@@ -618,9 +618,14 @@ failed. From outside, a backend that returns 200 for writes it never performs
 is indistinguishable from one that is flawless, and both look exactly like
 this. So those successes are reported as unverified rather than as success.
 FailEcho cannot tell the two apart; only a check on your side that state
-actually changed can. The write test is a heuristic on the name and is
-labelled as one. Reads are never flagged: a lookup that has never failed is
-just a lookup that has never failed.
+actually changed can. Reads are never flagged: a lookup that has never failed
+is just a lookup that has never failed.
+
+Whether an operation is a write comes from you if you say, and from its name
+if you do not. Send `mutates: true` or `false` with each observation -- HTTP
+GET is a read, anything else is probably a write, and GraphQL is all POST so
+only you can know. `success_evidence.write_source` says which was used:
+`declared` or `name`. One line of annotation beats any heuristic.
 
 Both came from one comment on a Reddit thread, from someone who had been
 burned by exactly these two cases.

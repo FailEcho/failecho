@@ -126,8 +126,18 @@ class SuccessEvidence(BaseModel):
     failures_total: int = Field(description="Failures ever seen for it.")
     write_like: bool = Field(
         description=(
-            "The operation name looks like it changes state (create_, update_, "
-            "delete_, ...). A heuristic on the name; the network does not know."
+            "Whether this operation changes state. From reporters' `mutates` "
+            "declarations when any exist (majority wins), otherwise a "
+            "heuristic on the name (create_, update_, delete_, ...). See "
+            "write_source for which."
+        )
+    )
+    write_source: str = Field(
+        description=(
+            "'declared' when reporters said so via `mutates`; 'name' when it "
+            "was inferred from the operation name, which is a guess. Declare "
+            "it -- HTTP GET is a read, anything else is probably a write, and "
+            "GraphQL cannot be inferred at all."
         )
     )
     verified: bool = Field(

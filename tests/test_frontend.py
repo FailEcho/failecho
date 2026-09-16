@@ -1579,4 +1579,5 @@ def test_llms_txt_explains_decay_and_unverified_success(client):
     assert "`decaying`" in body and "this used to work" in body
     assert "`success_evidence.verified`" in body
     assert "reported as unverified rather than as success" in body
-    assert "heuristic on the name" in body
+    assert "Send `mutates: true` or `false`" in body
+    assert "One line of annotation beats any heuristic" in body

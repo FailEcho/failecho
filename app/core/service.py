@@ -40,7 +40,6 @@ from app.core.intelligence import (
     recovery_actions,
     scope_counts,
     success_is_unverified,
-    write_like,
 )
 from app.core.normalize import normalize_error
 from app.db.models import (
@@ -228,6 +227,7 @@ async def record_observation(
             error_code=payload.error_code,
             normalized_error=normalized,
             latency_ms=payload.latency_ms,
+            mutates=payload.mutates,
             reporter_hash=reporter_hash,
             source=source,
         )
@@ -378,12 +378,14 @@ async def query_intelligence(
     # Computed on the whole history, not a window: "never failed once" is the
     # pattern, and it only means something over many calls.
     lifetime = await lifetime_counts(session, service, payload.operation)
+    is_write, write_source = lifetime.write_verdict(payload.operation)
     success_evidence = (
         SuccessEvidence(
             successes_total=lifetime.successes,
             failures_total=lifetime.failures,
-            write_like=write_like(payload.operation),
-            verified=not success_is_unverified(payload.operation, lifetime),
+            write_like=is_write,
+            write_source=write_source,
+            verified=not success_is_unverified(is_write, lifetime),
         )
         if lifetime.total > 0
         else None

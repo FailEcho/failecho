@@ -53,6 +53,18 @@ class ObserveRequest(CallIdentity):
         description="Observed call latency in milliseconds.",
         examples=[421],
     )
+    mutates: bool | None = Field(
+        default=None,
+        description=(
+            "Does this operation change state? Declare it if you know: HTTP "
+            "GET is a read, anything else is probably a write, GraphQL is all "
+            "POST so only the caller can say. Where declared, this decides "
+            "whether a never-failing operation is reported as an unverified "
+            "success; where absent, a heuristic on the name is used and "
+            "labelled as such."
+        ),
+        examples=[True],
+    )
 
     @model_validator(mode="after")
     def _failures_need_a_signature(self) -> "ObserveRequest":

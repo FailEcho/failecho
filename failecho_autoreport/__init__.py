@@ -183,12 +183,16 @@ class FailEcho:
 
     # -- the call sites ----------------------------------------------------
 
-    def watch(self, service: str, operation: str | None = None):
+    def watch(self, service: str, operation: str | None = None,
+              mutates: bool | None = None):
         """Decorate a callable so its failures and successes are reported.
 
-        `operation` defaults to the function's own name. Works on both sync
-        and async callables; the wrapper returns what the callable returned
-        and re-raises what it raised, unchanged.
+        `operation` defaults to the function's own name. `mutates` declares
+        whether the call changes state -- say True for anything that is not a
+        read. One line here beats any heuristic the network could apply to the
+        name, and for GraphQL it is the only way it can know. Works on both
+        sync and async callables; the wrapper returns what the callable
+        returned and re-raises what it raised, unchanged.
         """
         def decorate(func):
             name = operation or getattr(func, "__name__", "call")
@@ -200,9 +204,9 @@ class FailEcho:
                     try:
                         result = await func(*args, **kwargs)
                     except BaseException as exc:
-                        self.record_failure(service, name, exc, _elapsed(started))
+                        self.record_failure(service, name, exc, _elapsed(started), mutates)
                         raise
-                    self.record_success(service, name, _elapsed(started))
+                    self.record_success(service, name, _elapsed(started), mutates)
                     return result
                 return async_wrapper
 
@@ -212,15 +216,20 @@ class FailEcho:
                 try:
                     result = func(*args, **kwargs)
                 except BaseException as exc:
-                    self.record_failure(service, name, exc, _elapsed(started))
+                    self.record_failure(service, name, exc, _elapsed(started), mutates)
                     raise
-                self.record_success(service, name, _elapsed(started))
+                self.record_success(service, name, _elapsed(started), mutates)
                 return result
             return wrapper
         return decorate
 
-    def wrap(self, tools, service: str):
+    def wrap(self, tools, service: str, mutates: bool | None = None):
         """Wrap a list of framework tool objects in place.
+
+        `mutates` applies to every tool in the list; pass a dict keyed by tool
+        name to declare them individually, e.g. {"create_issue": True,
+        "get_issue": False}. Undeclared tools are left for the network's name
+        heuristic, which is a guess.
 
         LangChain and LlamaIndex tools both expose a name and one or two
         invoke methods. Anything with a recognisable pair is wrapped; anything
@@ -254,8 +263,9 @@ class FailEcho:
                     target = getattr(tool, attr, None)
                     if target is None or not callable(target):
                         continue
+                    declared = mutates.get(name) if isinstance(mutates, dict) else mutates
                     try:
-                        setattr(tool, attr, self.watch(service, name)(target))
+                        setattr(tool, attr, self.watch(service, name, declared)(target))
                     except Exception:
                         # Frozen models and slotted classes land here. The
                         # tool keeps working; it just goes unreported.
@@ -267,7 +277,8 @@ class FailEcho:
     # -- recording ---------------------------------------------------------
 
     def record_failure(self, service: str, operation: str,
-                       exc: BaseException, latency_ms: int | None = None) -> None:
+                       exc: BaseException, latency_ms: int | None = None,
+                       mutates: bool | None = None) -> None:
         error_type, error_code = classify(exc)
         body = {
             "service": service,
@@ -279,17 +290,22 @@ class FailEcho:
             body["error_code"] = error_code
         if latency_ms is not None:
             body["latency_ms"] = latency_ms
+        if mutates is not None:
+            body["mutates"] = bool(mutates)
         if self.send_errors:
             body["error_message"] = f"{type(exc).__name__}: {exc}"[:2000]
         self._submit(body)
 
     def record_success(self, service: str, operation: str,
-                       latency_ms: int | None = None) -> None:
+                       latency_ms: int | None = None,
+                       mutates: bool | None = None) -> None:
         if not self.report_success:
             return
         body = {"service": service, "operation": operation, "outcome": "success"}
         if latency_ms is not None:
             body["latency_ms"] = latency_ms
+        if mutates is not None:
+            body["mutates"] = bool(mutates)
         self._submit(body)
 
     # -- the wire ----------------------------------------------------------

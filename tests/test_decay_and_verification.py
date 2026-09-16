@@ -157,3 +157,62 @@ def test_write_like_is_a_name_heuristic_and_says_so(client):
     from app.schemas.query import SuccessEvidence
 
     assert "heuristic" in SuccessEvidence.model_fields["write_like"].description
+
+
+# -- the caller's declaration beats the name --------------------------------
+
+
+def test_a_declared_write_with_a_read_shaped_name_is_still_a_write(client):
+    """GraphQL: everything is POST and the operation is called `query`. Only
+    the caller knows it mutates. When they say so, the name heuristic is not
+    consulted at all."""
+    for _ in range(20):
+        observe(client, operation="query", outcome="success", error_type=None,
+                error_code=None, error_message=None, mutates=True)
+    ev = query(client, operation="query")["success_evidence"]
+    assert ev["write_like"] is True and ev["write_source"] == "declared"
+    assert ev["verified"] is False
+
+
+def test_a_declared_read_with_a_write_shaped_name_is_a_read(client):
+    """`create_issue` on a service where that call is actually a dry run.
+    Declared reads are never flagged, whatever they are called."""
+    for _ in range(20):
+        observe(client, outcome="success", error_type=None, error_code=None,
+                error_message=None, mutates=False)
+    ev = query(client)["success_evidence"]
+    assert ev["write_like"] is False and ev["write_source"] == "declared"
+    assert ev["verified"] is True
+
+
+def test_undeclared_falls_back_to_the_name_and_says_so(client):
+    for _ in range(20):
+        insert_observation(outcome="success", error_type=None, error_code=None,
+                           normalized_error=None, minutes_ago=5)
+    ev = query(client)["success_evidence"]
+    assert ev["write_source"] == "name"
+
+
+def test_the_column_is_added_to_a_database_that_predates_it(tmp_path):
+    """create_all never alters an existing table. A production database made
+    before `mutates` existed must gain the column on startup, and a second
+    startup must be a no-op."""
+    import sqlite3
+
+    from sqlalchemy import create_engine
+
+    from app.db.database import _add_missing_columns
+
+    db = tmp_path / "old.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE observations (id INTEGER PRIMARY KEY, service TEXT)")
+    con.commit(); con.close()
+
+    engine = create_engine(f"sqlite:///{db}")
+    with engine.begin() as c:
+        _add_missing_columns(c)
+    with engine.begin() as c:
+        _add_missing_columns(c)  # idempotent
+    con = sqlite3.connect(db)
+    cols = {r[1] for r in con.execute("PRAGMA table_info(observations)")}
+    assert "mutates" in cols

@@ -49,6 +49,10 @@ class Observation(Base):
     # PRIVACY: normalized only. The raw message never reaches this column.
     normalized_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Declared by the reporter: does this operation change state? Null when
+    #: not declared. One line of annotation from the caller beats any
+    #: heuristic on the name, so where this is set it wins.
+    mutates: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     # --- provenance ------------------------------------------------------
     # PRIVACY: salted hash of an optional X-Reporter-ID, or NULL (anonymous).

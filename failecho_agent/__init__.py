@@ -172,8 +172,11 @@ class Agent:
         self.providers = [p for p in providers if p.get("key")]
         self.tools = Tools()
         # every tool call is reported: service is the host the tool talks to
+        # every tool here is a read; declaring it keeps the network from
+        # having to guess from the name
         for name, service in TOOL_SERVICE.items():
-            setattr(self.tools, name, fe.watch(service=service, operation=name)(getattr(self.tools, name)))
+            setattr(self.tools, name,
+                    fe.watch(service=service, operation=name, mutates=False)(getattr(self.tools, name)))
         self.model_calls = 0
         self.tool_calls = 0
         self.failures: list[tuple[str, str, str, str | None]] = []  # (service, op, error_type, code)

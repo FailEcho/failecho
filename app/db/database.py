@@ -60,10 +60,33 @@ SessionLocal = async_sessionmaker(
 )
 
 
+#: Columns added after a table first shipped. create_all() creates missing
+#: tables and never touches existing ones, so each of these is checked and
+#: added on startup. Additive only, nullable only -- a column with a default
+#: or a rewrite belongs to a real migration tool, not to this list.
+ADDED_COLUMNS = (
+    ("observations", "mutates", "BOOLEAN"),
+)
+
+
+def _add_missing_columns(sync_connection) -> None:
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(sync_connection)
+    for table, column, ddl_type in ADDED_COLUMNS:
+        if table not in inspector.get_table_names():
+            continue  # create_all made it with the column already
+        present = {c["name"] for c in inspector.get_columns(table)}
+        if column not in present:
+            sync_connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
+
+
 async def init_db() -> None:
-    """Create tables if they do not exist. Enough for an MVP; Alembic later."""
+    """Create tables if they do not exist, then add any columns that arrived
+    after a table first shipped. Enough for an MVP; Alembic later."""
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+        await connection.run_sync(_add_missing_columns)
 
 
 def hour_bucket_expr(column):

@@ -348,3 +348,38 @@ def test_operator_token_is_sent_as_bearer_and_only_when_set():
 def test_operator_token_comes_from_the_environment_too(monkeypatch):
     monkeypatch.setenv("FAILECHO_OPERATOR_TOKEN", "env-tok")
     assert FailEcho(endpoint="http://127.0.0.1:9")._headers()["Authorization"] == "Bearer env-tok"
+
+
+def test_mutates_is_sent_only_when_declared():
+    client = Recorder()
+
+    @client.watch(service="api.example", operation="create_thing", mutates=True)
+    def write():
+        return 1
+
+    @client.watch(service="api.example", operation="get_thing")
+    def read():
+        return 1
+
+    write(); read()
+    drained(client)
+    by_op = {b["operation"]: b for b in client.bodies}
+    assert by_op["create_thing"]["mutates"] is True
+    assert "mutates" not in by_op["get_thing"], "undeclared must stay undeclared, not default to a guess"
+
+
+def test_wrap_takes_per_tool_declarations():
+    client = Recorder()
+
+    class T:
+        def __init__(self, name):
+            self.name = name
+            self.func = lambda: 1
+
+    tools = [T("create_issue"), T("get_issue")]
+    client.wrap(tools, service="github-mcp", mutates={"create_issue": True, "get_issue": False})
+    for t in tools:
+        t.func()
+    drained(client)
+    by_op = {b["operation"]: b.get("mutates") for b in client.bodies}
+    assert by_op == {"create_issue": True, "get_issue": False}

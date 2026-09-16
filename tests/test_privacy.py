@@ -108,6 +108,11 @@ def test_observation_columns_are_the_whole_contract(client, rows):
         "latency_ms",
         "reporter_hash",
         "source",
+        # A boolean the reporter declares: does this operation change state?
+        # Exists so a write that has never once failed can be reported as an
+        # unverified success rather than a success. Carries no content.
+        # Added 2026-09-16, deliberately.
+        "mutates",
     }
 
 
