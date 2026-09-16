@@ -1725,3 +1725,18 @@ def test_lab_front_door_is_the_scoreboard(monkeypatch):
     finally:
         object.__setattr__(settings, "lab_label", "")
     assert r.status_code == 302 and r.headers["location"] == "/fleet"
+
+
+def test_a_touched_card_does_not_change_the_column_count_on_a_phone():
+    """Below 620px the grid is one column. The tablet hover rule (two
+    columns while a card is hovered) also matched there, so tapping a card on
+    a phone turned one column into two and crushed everything. The single-
+    column query must override it with equal specificity, later in source."""
+    css = (STATIC / "style.css").read_text()
+    anchor = "@media (max-width: 620px) {\n  .ways { grid-template-columns: minmax(0, 1fr); }"
+    phone = css[css.index(anchor):]
+    phone = phone[: phone.index("\n}\n") + 3]
+    assert ".ways:has(.way:hover), .ways:has(.way:focus-within)" in phone
+    assert phone.count("grid-template-columns: minmax(0, 1fr);") >= 2, "rest and hover both one column"
+    tablet_rule = css.index("@media (max-width: 1080px) {\n  .ways:has(.way:hover)")
+    assert css.index(anchor) > tablet_rule, "phone rule must come after the tablet one"

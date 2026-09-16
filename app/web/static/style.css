@@ -1242,6 +1242,10 @@ footer.shell {
 }
 @media (max-width: 620px) {
   .ways { grid-template-columns: minmax(0, 1fr); }
+  /* the tablet hover rule (two columns) matched here too; a tap crushed everything */
+  .ways:has(.way:hover), .ways:has(.way:focus-within) {
+    grid-template-columns: minmax(0, 1fr);
+  }
   /* One card to a row: nothing to line up with, and the offset is only
      empty space. */
   .way-body { min-height: 0; }
@@ -1364,8 +1368,7 @@ footer.shell {
 }
 
 /* ---- stat cards -------------------------------------------------------- */
-/* The lab's section on the home page, on the lab's picture: 47KB of WebP
-   under a gradient that fades it to the black page at both edges. */
+/* The lab's section: 47KB of WebP under a gradient fading to the page. */
 .band--lab {
   position: relative; isolation: isolate; overflow: hidden;
   background: #000; padding-block: 76px 80px;
@@ -1494,7 +1497,7 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   border-bottom: 2px solid transparent; border-image: var(--lab-gradient) 1;
 }
 .lab-banner a { color: var(--ink); text-decoration: underline; }
-/* In the nav, not beside the brand: the brand moves when the bar opens. */
+/* in the nav, not beside the brand, which moves when the bar opens */
 .lab-tag {
   display: inline-block; margin-right: 8px; padding: 2px 8px;
   font: 10.5px var(--sans); letter-spacing: .08em; text-transform: uppercase;
