@@ -138,6 +138,14 @@ class Settings:
         default_factory=lambda: _env_int("FIN_UNVERIFIED_SUCCESS_MIN_CALLS", 20)
     )
 
+    # ---- a lab instance --------------------------------------------------------
+    # Set on an instance that is NOT the public network: a banner naming what it
+    # is goes on every page, /v1/stats says so, and /fleet serves the scoreboard
+    # written by the fleet scheduler. Empty on production, and everything here
+    # is inert.
+    lab_label: str = field(default_factory=lambda: _env_str("FIN_LAB_LABEL", ""))
+    fleet_report_path: str = field(default_factory=lambda: _env_str("FIN_FLEET_REPORT", ""))
+
     # ---- incident detection (MVP heuristic, deliberately simple) ---------
     # Below this many observations in the long window we refuse to guess.
     min_observations_for_status: int = field(

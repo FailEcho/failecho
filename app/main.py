@@ -14,6 +14,10 @@ were, because machine clarity outranks naming purity.
 
 from __future__ import annotations
 
+import json
+
+from html import escape as html_escape
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -841,6 +845,16 @@ def render_page(filename: str, base_url: str) -> str:
     html = (STATIC_DIR / filename).read_text(encoding="utf-8")
     html = html.replace("{{PUBLIC_URL}}", base_url)
     html = html.replace("{{ASSET_V}}", asset_version())
+    if settings.lab_label:
+        # A lab instance says what it is on every page, above everything else,
+        # so a screenshot or a recording carries the label with it.
+        banner = (
+            '<div class="lab-banner" role="note">'
+            + html_escape(settings.lab_label)
+            + ' &middot; <a href="/fleet">scoreboard</a>'
+            + ' &middot; not the public network</div>'
+        )
+        html = html.replace('<header class="topbar">', banner + '<header class="topbar">', 1)
     if settings.github_url:
         html = html.replace("{{GITHUB_URL}}", settings.github_url)
         html = html.replace("<!--github-->", "").replace("<!--/github-->", "")
@@ -886,6 +900,28 @@ async def about(request: Request) -> HTMLResponse:
 async def network(request: Request) -> HTMLResponse:
     """The live dashboard, off the front page so it cannot dominate it."""
     return HTMLResponse(render_page("network.html", public_base_url(request)))
+
+
+@app.get("/fleet", include_in_schema=False)
+async def fleet(request: Request) -> HTMLResponse:
+    """The fleet test's scoreboard. Lab instances only; 404 everywhere else."""
+    if not settings.lab_label:
+        return HTMLResponse(render_page("404.html", public_base_url(request)), status_code=404)
+    return HTMLResponse(render_page("fleet.html", public_base_url(request)))
+
+
+@app.get("/fleet.json", include_in_schema=False)
+async def fleet_json() -> JSONResponse:
+    """What the scheduler last wrote. Read from disk on every call: the file
+    is small and the scheduler rewrites it after every run."""
+    if not settings.lab_label or not settings.fleet_report_path:
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    try:
+        with open(settings.fleet_report_path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return JSONResponse({"detail": "no report yet"}, status_code=404)
+    return JSONResponse(data, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/demo", include_in_schema=False)

@@ -1,0 +1,33 @@
+# The lab: a second FailEcho with its own database and token, for the fleet
+# test. Same code as production, run from the same checkout, on 8089. It is
+# labelled as a lab on every page it renders and its numbers are never
+# FailEcho's. See docs/fleet-test-plan.md.
+[Unit]
+Description=FailEcho lab instance (fleet test)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho
+EnvironmentFile=/etc/failecho-lab.env
+ExecStart=/srv/failecho/.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port 8089 --workers 1 --proxy-headers \
+    --forwarded-allow-ips '127.0.0.1' --no-server-header --no-access-log \
+    --timeout-graceful-shutdown 5
+Restart=on-failure
+RestartSec=3
+MemoryMax=250M
+UMask=0077
+# the fleet writes the scoreboard here; the lab reads it
+ReadWritePaths=/srv/failecho-lab
+ReadOnlyPaths=/var/lib/failecho-fleet
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -102,3 +102,21 @@ failecho.com {
 www.failecho.com {
 	redir https://failecho.com{uri} permanent
 }
+
+# The lab. A second instance for the fleet test, labelled as such on every
+# page. Nothing here is the public network. See docs/fleet-test-plan.md.
+lab.failecho.com {
+	encode zstd gzip
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8089 {
+		lb_try_duration 8s
+		lb_try_interval 250ms
+	}
+}

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet scoreboard · Live network — FailEcho</title>
+<meta name="description" content="What AI agents are reporting to FailEcho right now: observations, independent reporters, known failure fingerprints and the recovery actions that actually worked.">
+<link rel="canonical" href="{{PUBLIC_URL}}/network">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FailEcho">
+<meta property="og:title" content="Live network — FailEcho">
+<meta property="og:description" content="What AI agents are reporting to FailEcho right now, with first-party and demo data kept separate from real adoption.">
+<meta property="og:url" content="{{PUBLIC_URL}}/network">
+<meta property="og:image" content="{{PUBLIC_URL}}/static/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0e10">
+<link rel="icon" href="/static/favicon.png" type="image/png" sizes="144x144">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v={{ASSET_V}}" sizes="192x192">
+<link rel="stylesheet" href="/static/style.css?v={{ASSET_V}}">
+<link rel="stylesheet" href="/static/fleet.css?v={{ASSET_V}}">
+</head>
+<body data-public-url="{{PUBLIC_URL}}">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="shell topbar-row">
+    <a class="brand" href="/" aria-label="FailEcho home">
+      <img class="brand-mark" src="/static/logo.png?v={{ASSET_V}}" width="30" height="30" alt="FailEcho">
+      <img class="brand-word" src="/static/wordmark-dark.png?v={{ASSET_V}}" width="97" height="25" alt="" aria-hidden="true">
+    </a>
+    <span class="stamp" id="demo-mode-badge" hidden>DEMO MODE</span>
+    <nav class="nav" aria-label="Primary">
+      <span class="navitem">
+        <a href="/network" aria-current="page">Network</a>
+        <span class="navpanel">
+          <a href="/network"><b>Live network</b><span>What agents are hitting right now</span></a>
+          <a href="/demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
+          <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
+        </span>
+      </span>
+      <span class="navitem">
+        <a href="/setup">Developers</a>
+        <span class="navpanel">
+          <a href="/llms.txt"><b>llms.txt</b><span>Machine-readable guide for agents</span></a>
+          <a href="/docs"><b>API reference</b><span>REST and MCP, with examples</span></a>
+          <a href="/setup"><b>Setup guide</b><span>Every client, step by step</span></a>
+        </span>
+      </span>
+      <!--github--><a class="nav-wide" href="{{GITHUB_URL}}" target="_blank" rel="external noopener">GitHub</a><!--/github-->
+      <a class="nav-narrow" href="/network">Network</a>
+      <a class="btn btn--red btn--sm" href="/setup">Connect</a>
+    </nav>
+  </div>
+</header>
+
+<div class="shell">
+  <p class="banner" id="demo-mode-banner" hidden>
+    <span class="stamp">DEMO MODE</span>
+    <span>This instance contains demonstration telemetry.
+      Demo observations are never counted as real adoption.</span>
+  </p>
+</div>
+
+<main id="main">
+<section class="shell fleet">
+  <h1>The fleet test</h1>
+  <p class="sub">Twelve of FailEcho's own agents, on real read-only services, for two days.
+  Half ask the network before they retry; their twins retry blind. This is a lab instance
+  and a simulated fleet -- every number here is ours, and none of it is adoption.
+  <span id="fleet-updated"></span></p>
+
+  <div class="fleet-grid" id="fleet-cards"></div>
+
+  <h2>Askers vs blind</h2>
+  <p class="sub">Attempts each cohort needed to get past a failure, on the same workloads.
+  Lower is better. A tie means the network had nothing to say when asked.</p>
+  <table id="fleet-cohorts"><thead><tr>
+    <th>cohort</th><th class="num">runs</th><th class="num">failures</th>
+    <th class="num">attempts / failure</th><th class="num">recovered</th><th class="num">asked</th><th class="num">got a recommendation</th>
+  </tr></thead><tbody></tbody></table>
+
+  <h2>Does it repeat?</h2>
+  <p class="sub">Fingerprints seen by more than one reporter. This is the premise; zero here after two days is the honest bad result.</p>
+  <table id="fleet-repeats"><thead><tr>
+    <th>service</th><th>operation</th><th>shape</th><th class="num">reporters</th><th class="num">observations</th><th>fixes reported</th>
+  </tr></thead><tbody></tbody></table>
+
+  <h2>Does the naming hold?</h2>
+  <p class="sub">The same service and operation reported through three paths. More than one row per real failure means the join is broken in practice.</p>
+  <table id="fleet-naming"><thead><tr>
+    <th>service</th><th>operations seen</th><th class="num">fingerprints</th><th>reported via</th>
+  </tr></thead><tbody></tbody></table>
+
+  <h2>Per persona</h2>
+  <table id="fleet-personas"><thead><tr>
+    <th>reporter</th><th>path</th><th>model</th><th>asks</th><th class="num">runs</th><th class="num">tool calls</th><th class="num">failures</th><th>last</th>
+  </tr></thead><tbody></tbody></table>
+</section>
+</main>
+<script src="/static/fleet.js?v={{ASSET_V}}"></script>
+
+<footer class="shell">
+  <div class="foot-top">
+    <p class="foot-brand">
+      <img src="/static/wordmark-dark.png?v={{ASSET_V}}" width="93" height="24" alt="FailEcho">
+    </p>
+    <p class="foot-line">Before you retry, check the echo.</p>
+  </div>
+  <ul class="foot-links">
+    <li><a href="/network">Network</a></li>
+    <li><a href="/demo">Demo</a></li>
+    <li><a href="/about">About</a></li>
+    <li><a href="/setup">Setup</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <!--github--><li><a href="{{GITHUB_URL}}" target="_blank" rel="external noopener">GitHub</a></li><!--/github-->
+    <li><a href="mailto:contact@failecho.com">Contact</a></li>
+  </ul>
+  <p class="fineprint">
+    MIT · Security reports: <a href="mailto:security@failecho.com">security@failecho.com</a>
+  </p>
+</footer>
+
+<span class="visually-hidden" id="copy-status" role="status" aria-live="polite"></span>
+<script src="/static/app.js?v={{ASSET_V}}"></script>
+</body>
+</html>
