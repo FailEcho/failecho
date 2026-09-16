@@ -14,6 +14,8 @@ detection and *not* statistically calibrated. Thresholds live in
 
 from __future__ import annotations
 
+import re
+
 import math
 from dataclasses import dataclass
 
@@ -91,6 +93,76 @@ def _counts_select(filters: list, seconds: int) -> Select:
             func.sum(case((Observation.outcome == OUTCOME_FAILURE, 1), else_=0)), 0
         ).label("failures"),
     ).where(*filters, Observation.created_at >= ago(seconds))
+
+
+#: Operation names that look like they change state. A heuristic, said to be
+#: one in every place it is surfaced: an unknown API's naming is not ours.
+WRITE_LIKE = re.compile(
+    r"^(create|update|delete|remove|destroy|put|post|patch|write|insert|upsert|"
+    r"send|publish|set|add|merge|push|commit|submit|cancel|approve|reject)"
+    r"(_|[A-Z]|$)"
+)
+
+
+def write_like(operation: str) -> bool:
+    return bool(WRITE_LIKE.match(operation))
+
+
+@dataclass(frozen=True)
+class LifetimeCounts:
+    """Everything ever seen for one service+operation: live rows plus the
+    hourly aggregates that outlive retention."""
+
+    successes: int
+    failures: int
+
+    @property
+    def total(self) -> int:
+        return self.successes + self.failures
+
+
+async def lifetime_counts(
+    session: AsyncSession, service: str, operation: str
+) -> LifetimeCounts:
+    live = (
+        await session.execute(
+            select(
+                func.coalesce(
+                    func.sum(case((Observation.outcome == OUTCOME_FAILURE, 1), else_=0)), 0
+                ).label("failures"),
+                func.count().label("total"),
+            ).where(Observation.service == service, Observation.operation == operation)
+        )
+    ).one()
+    archived = (
+        await session.execute(
+            select(
+                func.coalesce(func.sum(HourlyStat.success_count), 0).label("successes"),
+                func.coalesce(func.sum(HourlyStat.failure_count), 0).label("failures"),
+            ).where(HourlyStat.service == service, HourlyStat.operation == operation)
+        )
+    ).one()
+    live_failures = int(live.failures or 0)
+    live_successes = int(live.total or 0) - live_failures
+    return LifetimeCounts(
+        successes=live_successes + int(archived.successes or 0),
+        failures=live_failures + int(archived.failures or 0),
+    )
+
+
+def success_is_unverified(operation: str, counts: LifetimeCounts) -> bool:
+    """Many successes, no failure ever, on something that looks like a write.
+
+    From outside, a backend that never performs a write and returns 200 is
+    indistinguishable from one that is flawless. Both look like this. Reads are
+    not flagged: a lookup that has never failed is merely a lookup that has
+    never failed.
+    """
+    return (
+        write_like(operation)
+        and counts.failures == 0
+        and counts.successes >= settings.unverified_success_min_calls
+    )
 
 
 async def window_counts(
@@ -270,6 +342,10 @@ class RecoveryAction:
     effective_attempts: int | None = None
     effective_successes: int | None = None
     unique_reporters: int = 0
+    #: The same action inside the decay window (default 24h). Compared against
+    #: everything before it to notice a fix that has stopped working.
+    recent_attempts: int = 0
+    recent_successes: int = 0
     #: Salted hashes of the reporters behind this action. Server-side only --
     #: never serialised into any response. Used solely to answer "did this
     #: evidence come from somebody other than the caller?".
@@ -297,6 +373,41 @@ class RecoveryAction:
         return (
             self.capped_successes / self.capped_attempts if self.capped_attempts else 0.0
         )
+
+    @property
+    def recent_success_rate(self) -> float | None:
+        if self.recent_attempts <= 0:
+            return None
+        return self.recent_successes / self.recent_attempts
+
+    @property
+    def prior_success_rate(self) -> float | None:
+        prior_attempts = self.attempts - self.recent_attempts
+        if prior_attempts <= 0:
+            return None
+        return (self.successes - self.recent_successes) / prior_attempts
+
+    @property
+    def decaying(self) -> bool:
+        """A fix that used to work and, recently, does not.
+
+        Requires enough history to have been a fix (prior attempts at the
+        recommendation floor, prior rate at the recommendation threshold),
+        enough recent attempts to mean something, and a drop of at least
+        ``decay_min_drop``. "5/5 last month, 0/5 this week" is the case; two
+        recent attempts that both failed is not yet.
+        """
+        prior_attempts = self.attempts - self.recent_attempts
+        prior, recent = self.prior_success_rate, self.recent_success_rate
+        if prior is None or recent is None:
+            return False
+        if prior_attempts < settings.min_recovery_attempts:
+            return False
+        if prior < settings.min_recovery_success_rate:
+            return False
+        if self.recent_attempts < settings.decay_min_recent_attempts:
+            return False
+        return (prior - recent) >= settings.decay_min_drop
 
     @property
     def diversity_factor(self) -> float:
@@ -358,6 +469,27 @@ async def recovery_actions(
         )
     ).all()
 
+    # The recent window, from the live rows. Retention keeps raw outcomes well
+    # past the decay window, so nothing here depends on the hourly aggregates.
+    recent_rows = (
+        await session.execute(
+            select(
+                RecoveryOutcome.action,
+                func.count().label("attempts"),
+                func.coalesce(
+                    func.sum(case((RecoveryOutcome.successful.is_(True), 1), else_=0)),
+                    0,
+                ).label("successes"),
+            )
+            .where(
+                RecoveryOutcome.fingerprint == fingerprint,
+                RecoveryOutcome.created_at >= ago(settings.decay_window_seconds),
+            )
+            .group_by(RecoveryOutcome.action)
+        )
+    ).all()
+    recent = {r.action: (int(r.attempts), int(r.successes or 0)) for r in recent_rows}
+
     totals: dict[str, dict] = {}
     for row in rows:
         entry = totals.setdefault(
@@ -416,6 +548,8 @@ async def recovery_actions(
                 effective_successes=live["eff_s"] + (int(old.eff_s) if old else 0),
                 unique_reporters=max(len(live["reporters"]), archived_reporters),
                 reporter_hashes=frozenset(live["reporters"]),
+                recent_attempts=recent.get(action, (0, 0))[0],
+                recent_successes=recent.get(action, (0, 0))[1],
             )
         )
 

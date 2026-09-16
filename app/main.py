@@ -598,6 +598,33 @@ is arithmetic, not a model output, and you can recompute it from the attempts
 and successes returned alongside it. When evidence is insufficient the
 recommendation is null. FailEcho never fabricates confidence.
 
+## Two signals that qualify the numbers above
+
+**`decaying`**, on each recovery action and on the recommendation. True when
+an action that used to work has recently stopped: at least 5 prior attempts at
+60%+ success, at least 3 attempts inside the last 24 hours, and a drop of 0.4
+or more between the two rates. "5/5 last month, 0/5 this week" is the case.
+It is the early warning that the root cause changed while the error shape
+stayed the same -- a renamed field behind the same 422. The action is still
+recommended, because it is still the best evidence on record, but the
+recommendation carries `warning` text and both rates are returned. Read it as
+"this used to work", not "this works", and prefer a non-decaying alternative
+if one qualifies.
+
+**`success_evidence.verified`**, for the service+operation you asked about.
+False when the operation name looks like a write (`create_`, `update_`,
+`delete_`, ...), it has 20 or more successes on record, and it has never once
+failed. From outside, a backend that returns 200 for writes it never performs
+is indistinguishable from one that is flawless, and both look exactly like
+this. So those successes are reported as unverified rather than as success.
+FailEcho cannot tell the two apart; only a check on your side that state
+actually changed can. The write test is a heuristic on the name and is
+labelled as one. Reads are never flagged: a lookup that has never failed is
+just a lookup that has never failed.
+
+Both came from one comment on a Reddit thread, from someone who had been
+burned by exactly these two cases.
+
 ## Privacy
 
 Send failure metadata only: service, operation, version, schema_hash, outcome,

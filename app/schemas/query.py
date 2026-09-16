@@ -98,6 +98,48 @@ class RecoveryActionStats(BaseModel):
             "sample size, so 5/5 ranks below 117/124."
         )
     )
+    recent_attempts: int = Field(
+        default=0,
+        description="Attempts inside the decay window (default 24h).",
+    )
+    recent_success_rate: float | None = Field(
+        default=None,
+        description="successes / attempts inside the decay window; null when none.",
+    )
+    decaying: bool = Field(
+        default=False,
+        description=(
+            "True when this action used to work and recently has not: at "
+            "least 5 prior attempts at 60%+ success, at least 3 recent "
+            "attempts, and a drop of 0.4 or more. The early warning that the "
+            "root cause changed while the error shape stayed the same. Flagged, "
+            "never silently re-ranked -- both rates are here for you to weigh."
+        ),
+    )
+
+
+class SuccessEvidence(BaseModel):
+    """Whether the successes counted for this service+operation can be
+    believed, from the outside."""
+
+    successes_total: int = Field(description="Successes ever seen for this service+operation.")
+    failures_total: int = Field(description="Failures ever seen for it.")
+    write_like: bool = Field(
+        description=(
+            "The operation name looks like it changes state (create_, update_, "
+            "delete_, ...). A heuristic on the name; the network does not know."
+        )
+    )
+    verified: bool = Field(
+        description=(
+            "False when the operation looks like a write, has 20 or more "
+            "successes, and has never once failed. From outside, a backend that "
+            "returns 200 for writes it never performs is indistinguishable from a "
+            "flawless one, so such successes are reported as unverified rather "
+            "than as success. Only state-checking tests on your side can tell "
+            "the two apart."
+        )
+    )
 
 
 class Recommendation(BaseModel):
@@ -132,6 +174,19 @@ class Recommendation(BaseModel):
             "before anyone else has joined. Null when you did not send a "
             "reporter id, because then it cannot be known."
         ),
+    )
+    decaying: bool = Field(
+        default=False,
+        description=(
+            "True when the recommended action's recent success rate has "
+            "dropped well below its long-run rate. It is still the best "
+            "evidence on record, which is why it is recommended; treat it as "
+            "'this used to work' rather than 'this works'."
+        ),
+    )
+    warning: str | None = Field(
+        default=None,
+        description="Plain-language note when decaying is true; null otherwise.",
     )
 
 
@@ -172,6 +227,13 @@ class QueryResponse(StrictModel):
     recovery_actions: list[RecoveryActionStats] = Field(
         default_factory=list,
         description="All reported recovery actions, strongest evidence first.",
+    )
+    success_evidence: SuccessEvidence | None = Field(
+        default=None,
+        description=(
+            "Whether this service+operation's successes can be believed from "
+            "outside. Null when nothing has been observed for it at all."
+        ),
     )
     recommendation: Recommendation | None = Field(
         default=None,

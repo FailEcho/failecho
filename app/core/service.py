@@ -35,9 +35,12 @@ from app.core.intelligence import (
     classify_status,
     fingerprint_stats,
     is_cross_reporter_evidence,
+    lifetime_counts,
     recommend,
     recovery_actions,
     scope_counts,
+    success_is_unverified,
+    write_like,
 )
 from app.core.normalize import normalize_error
 from app.db.models import (
@@ -56,6 +59,7 @@ from app.schemas.query import (
     QueryResponse,
     Recommendation,
     RecoveryActionStats,
+    SuccessEvidence,
 )
 
 
@@ -370,6 +374,21 @@ async def query_intelligence(
     actions = await recovery_actions(session, fingerprint) if known else []
     chosen = recommend(actions)
 
+    # Can the successes for this service+operation be believed from outside?
+    # Computed on the whole history, not a window: "never failed once" is the
+    # pattern, and it only means something over many calls.
+    lifetime = await lifetime_counts(session, service, payload.operation)
+    success_evidence = (
+        SuccessEvidence(
+            successes_total=lifetime.successes,
+            failures_total=lifetime.failures,
+            write_like=write_like(payload.operation),
+            verified=not success_is_unverified(payload.operation, lifetime),
+        )
+        if lifetime.total > 0
+        else None
+    )
+
     looks_new = bool(
         catalogue is not None
         and catalogue.first_seen >= ago(settings.window_short_seconds)
@@ -403,9 +422,13 @@ async def query_intelligence(
                 effective_successes=a.capped_successes,
                 unique_reporters=a.unique_reporters,
                 confidence=round(min(a.evidence_score, settings.max_confidence), 4),
+                recent_attempts=a.recent_attempts,
+                recent_success_rate=round_or_none(a.recent_success_rate),
+                decaying=a.decaying,
             )
             for a in actions
         ],
+        success_evidence=success_evidence,
         recommendation=(
             Recommendation(
                 action=chosen[0].action,
@@ -417,6 +440,17 @@ async def query_intelligence(
                 from_other_agents=(
                     is_cross_reporter_evidence(chosen[0], reporter_hash)
                     if reporter_hash
+                    else None
+                ),
+                decaying=chosen[0].decaying,
+                warning=(
+                    f"{chosen[0].action} succeeded "
+                    f"{round((chosen[0].prior_success_rate or 0) * 100)}% of the time before "
+                    f"the last {settings.decay_window_seconds // 3600}h and "
+                    f"{round((chosen[0].recent_success_rate or 0) * 100)}% inside it "
+                    f"({chosen[0].recent_successes}/{chosen[0].recent_attempts}). "
+                    "The root cause may have changed while the error shape stayed the same."
+                    if chosen[0].decaying
                     else None
                 ),
             )

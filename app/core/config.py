@@ -114,6 +114,30 @@ class Settings:
         default_factory=lambda: _env_int("FIN_WINDOW_LONG_SECONDS", 3600)  # 1 hour
     )
 
+    # ---- a fix that used to work and has stopped ----------------------------
+    # A (fingerprint, action) whose recent success rate has dropped well below
+    # its long-run rate is the early warning that the root cause changed while
+    # the error shape stayed put. Flagged, never silently re-ranked: the caller
+    # sees both rates and decides.
+    decay_window_seconds: int = field(
+        default_factory=lambda: _env_int("FIN_DECAY_WINDOW_SECONDS", 86400)  # 24 hours
+    )
+    decay_min_recent_attempts: int = field(
+        default_factory=lambda: _env_int("FIN_DECAY_MIN_RECENT_ATTEMPTS", 3)
+    )
+    decay_min_drop: float = field(
+        default_factory=lambda: _env_float("FIN_DECAY_MIN_DROP", 0.4)
+    )
+
+    # ---- successes nobody has ever seen fail ----------------------------------
+    # A write-shaped operation with many successes and no failure ever is either
+    # flawless or unobservable -- a catch-all fallback returning 200 for writes
+    # the backend never performed looks exactly like this from outside. Such
+    # successes are reported as unverified, not as success.
+    unverified_success_min_calls: int = field(
+        default_factory=lambda: _env_int("FIN_UNVERIFIED_SUCCESS_MIN_CALLS", 20)
+    )
+
     # ---- incident detection (MVP heuristic, deliberately simple) ---------
     # Below this many observations in the long window we refuse to guess.
     min_observations_for_status: int = field(

@@ -1568,3 +1568,15 @@ def test_llms_txt_says_what_identifying_yourself_buys_you(client):
     body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
     assert "`from_other_agents` stops being null" in body
     assert "hashed before storage and is never required" in body
+
+
+def test_llms_txt_explains_decay_and_unverified_success(client):
+    """Two fields an agent will see in every query response, and what they
+    mean, in the same register as the rest of the file."""
+    import re
+
+    body = re.sub(r"\s+", " ", client.get("/llms.txt").text)
+    assert "`decaying`" in body and "this used to work" in body
+    assert "`success_evidence.verified`" in body
+    assert "reported as unverified rather than as success" in body
+    assert "heuristic on the name" in body
