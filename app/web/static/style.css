@@ -1073,7 +1073,7 @@ footer.shell {
 .way::before {
   content: ""; position: absolute; inset: 0; z-index: 0;
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.50), rgba(0, 0, 0, 0.82)),
+    linear-gradient(rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.80)),
     url("/static/card-abstract2.webp");
   background-size: auto, 300% auto;
   background-repeat: no-repeat, no-repeat;
@@ -1084,9 +1084,9 @@ footer.shell {
 .way:hover::before, .way:focus-within::before { opacity: 0; }
 /* one render, four crops: violet ribbon, peach crossing, cyan sweep, lit arc */
 .way--a::before { background-position: 0 0, 4% 30%; }
-.way--b::before { background-position: 0 0, 50% 58%; }
-.way--c::before { background-position: 0 0, 96% 28%; }
-.way--d::before { background-position: 0 0, 58% 96%; }
+.way--b::before { background-position: 0 0, 50% 60%; }
+.way--c::before { background-position: 0 0, 90% 38%; }
+.way--d::before { background-position: 0 0, 74% 66%; }
 
 /* Two faces, one box: the facts and the command occupy the same space, so
    the card does not resize when they trade places. Both start the same
