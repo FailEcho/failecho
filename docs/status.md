@@ -1,4 +1,4 @@
-# Where everything stands — 2026-09-16, 11:40 UTC
+# Where everything stands — 2026-09-16, 16:00 UTC
 
 One page. Every line says built or not, tested how, and whether reality has
 confirmed it yet. "Live" means production. "Lab" means lab.failecho.com.
@@ -50,7 +50,8 @@ not run by us.
 | | Status |
 |---|---|
 | First-party agent, production, every 30 min | running since 05:30 UTC; all `first_party`; label self-check on every run; 4 real provider failures seen (Gemini timeouts, a 503); **zero recovery outcomes yet** — nothing retryable has failed |
-| Fleet, lab, 16 personas, 4 providers, every 3 min | running since ~09:00 UTC; code frozen at `9f91a5d` since 11:30; 53 runs, 28 failures, **6 fingerprints across 2+ independent reporters**, 14 recovery outcomes, **0 recommendations delivered yet** |
+| Fleet, lab, 18 personas, 4 providers, every 2 min | running since ~09:00 UTC; frozen at `9f91a5d` 11:30–15:45, re-pinned to `76a4559` at 15:45 to add two builders (first sixteen rows pinned by a test); 139 runs, 102 failures, **11 fingerprints across 2+ reporters**, 68 recovery outcomes, **cross_agent_help 3** |
+| Sandbox: Firecracker microVM for model-written code | installed 2026-09-16; selftest 9/9 as root and as `failecho`; first scheduled builder run 15:50 UTC, 7.1 s, task done, 5 GitHub calls reported from inside the VM; `docs/sandbox.md` |
 
 What the fleet has shown in three hours: the naming split (same Groq 400 on
 two fingerprints via two paths); real provider failures from all four
@@ -95,4 +96,5 @@ separate pinned checkout it never touches.
    Production has 0 independent reporters. Nothing we run can answer this.
 3. **How bad is the naming split?** The fleet's naming table, in 48 hours.
 4. **Does decay ever fire on real data?** Never observed.
-5. **Will anyone use it?** Unchanged.
+5. **How much of an agent's failure is its own?** The builders' local/shared share, on `/fleet`, from tonight.
+6. **Will anyone use it?** Unchanged.
