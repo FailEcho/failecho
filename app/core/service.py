@@ -38,6 +38,7 @@ from app.core.intelligence import (
     lifetime_counts,
     recommend,
     recovery_actions,
+    related_failures,
     scope_counts,
     success_is_unverified,
 )
@@ -57,7 +58,9 @@ from app.schemas.query import (
     QueryRequest,
     QueryResponse,
     Recommendation,
+    FixEvidence,
     RecoveryActionStats,
+    RelatedFailure,
     SuccessEvidence,
 )
 
@@ -377,6 +380,12 @@ async def query_intelligence(
     # Can the successes for this service+operation be believed from outside?
     # Computed on the whole history, not a window: "never failed once" is the
     # pattern, and it only means something over many calls.
+    # Neighbours: other shapes on this service+operation and what fixed them.
+    # Computed whether or not this shape is known -- a new mask on a service
+    # whose other masks share a fix is exactly when this helps most.
+    my_fixes = {a.action for a in actions if a.successes > 0}
+    neighbours = await related_failures(session, service, payload.operation, fingerprint)
+
     lifetime = await lifetime_counts(session, service, payload.operation)
     is_write, write_source = lifetime.write_verdict(payload.operation)
     success_evidence = (
@@ -431,6 +440,17 @@ async def query_intelligence(
             for a in actions
         ],
         success_evidence=success_evidence,
+        related_failures=[
+            RelatedFailure(
+                fingerprint=n.fingerprint,
+                error_type=n.error_type,
+                error_code=n.error_code,
+                observations=n.observations,
+                fixed_by=[FixEvidence(action=a, successes=s_, attempts=t) for a, s_, t in n.fixed_by],
+                shares_a_fix_with_you=any(a in my_fixes for a, _s, _t in n.fixed_by),
+            )
+            for n in neighbours
+        ],
         recommendation=(
             Recommendation(
                 action=chosen[0].action,

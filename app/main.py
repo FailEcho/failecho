@@ -627,8 +627,19 @@ GET is a read, anything else is probably a write, and GraphQL is all POST so
 only you can know. `success_evidence.write_source` says which was used:
 `declared` or `name`. One line of annotation beats any heuristic.
 
-Both came from one comment on a Reddit thread, from someone who had been
-burned by exactly these two cases.
+**`related_failures`**: other failure shapes on the same service+operation
+that some action has been seen to fix, most-seen first, at most five. One
+root cause often wears several masks -- an expired token surfaces as
+not_found from one client, auth_error from another, a timeout from a third
+-- and each shape alone may never reach the recommendation floor. What joins
+them is the fix. Each neighbour lists what fixed it and whether that action
+has also fixed the shape you asked about (`shares_a_fix_with_you`). This is
+the evidence for the join, not the join: you decide whether three masks are
+one thing. It is returned even when your shape is unknown, because a new mask
+on a service whose other masks share a fix is exactly when it helps.
+
+All three came from one Reddit thread, from people who had been burned by
+exactly these cases.
 
 ## Privacy
 

@@ -33,6 +33,7 @@ from app.core.config import (
 )
 from app.db.database import hour_bucket_expr
 from app.db.models import (
+    Fingerprint,
     HourlyRecoveryStat,
     HourlyStat,
     Observation,
@@ -581,6 +582,85 @@ async def recovery_actions(
     # Strongest evidence first, ties broken by volume then name (stable output).
     actions.sort(key=lambda a: (-a.evidence_score, -a.capped_attempts, a.action))
     return actions
+
+
+@dataclass(frozen=True)
+class RelatedFailure:
+    """Another failure shape on the same service+operation that a recovery
+    action has been seen to fix."""
+
+    fingerprint: str
+    error_type: str | None
+    error_code: str | None
+    observations: int
+    fixed_by: tuple[tuple[str, int, int], ...]  # (action, successes, attempts)
+
+
+async def related_failures(
+    session: AsyncSession, service: str, operation: str, fingerprint: str, limit: int = 5
+) -> list[RelatedFailure]:
+    """Other fingerprints on this service+operation, and what fixed them.
+
+    One root cause often wears several masks: an expired token surfaces as
+    not_found from one client, auth_error from another, a timeout from a
+    third. The error shapes differ, so they are three fingerprints, and each
+    alone may never reach the recommendation floor. What joins them is the
+    fix. If the same action resolved all three, they are probably one thing.
+
+    This returns the evidence and leaves the inference to the caller: it is
+    a list of neighbours with their fixes, not a recommendation, and it only
+    includes neighbours that were actually fixed by something -- a neighbour
+    nobody has recovered from carries no signal here.
+    """
+    rows = (
+        await session.execute(
+            select(
+                Fingerprint.fingerprint,
+                Fingerprint.error_type,
+                Fingerprint.error_code,
+                Fingerprint.observation_count,
+                RecoveryOutcome.action,
+                func.count().label("attempts"),
+                func.coalesce(
+                    func.sum(case((RecoveryOutcome.successful.is_(True), 1), else_=0)), 0
+                ).label("successes"),
+            )
+            .join(RecoveryOutcome, RecoveryOutcome.fingerprint == Fingerprint.fingerprint)
+            .where(
+                Fingerprint.service == service,
+                Fingerprint.operation == operation,
+                Fingerprint.fingerprint != fingerprint,
+            )
+            .group_by(
+                Fingerprint.fingerprint, Fingerprint.error_type, Fingerprint.error_code,
+                Fingerprint.observation_count, RecoveryOutcome.action,
+            )
+        )
+    ).all()
+
+    by_fp: dict[str, dict] = {}
+    for r in rows:
+        if int(r.successes or 0) <= 0:
+            continue  # tried, never worked: not a fix, no signal
+        entry = by_fp.setdefault(
+            r.fingerprint,
+            {"error_type": r.error_type, "error_code": r.error_code,
+             "observations": int(r.observation_count or 0), "fixed_by": []},
+        )
+        entry["fixed_by"].append((r.action, int(r.successes), int(r.attempts)))
+
+    related = [
+        RelatedFailure(
+            fingerprint=fp,
+            error_type=e["error_type"],
+            error_code=e["error_code"],
+            observations=e["observations"],
+            fixed_by=tuple(sorted(e["fixed_by"], key=lambda t: (-t[1], t[0]))),
+        )
+        for fp, e in by_fp.items()
+    ]
+    related.sort(key=lambda r: (-r.observations, r.fingerprint))
+    return related[:limit]
 
 
 def recommend(actions: list[RecoveryAction]) -> tuple[RecoveryAction, float] | None:

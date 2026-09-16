@@ -152,6 +152,39 @@ class SuccessEvidence(BaseModel):
     )
 
 
+class FixEvidence(BaseModel):
+    action: str = Field(description="Recovery action that resolved the neighbouring failure.")
+    successes: int = Field(description="Times it did.")
+    attempts: int = Field(description="Times it was tried.")
+
+
+class RelatedFailure(BaseModel):
+    """Another failure shape on the same service+operation, with what fixed it.
+
+    One root cause often wears several masks: an expired token surfaces as
+    not_found from one client, auth_error from another, a timeout from a
+    third. Each shape alone may never reach the recommendation floor; what
+    joins them is the fix. This is the evidence for that join, not the join
+    itself -- if the same action fixed this and the failure you asked about,
+    they are probably one thing, and you are the one who decides.
+    """
+
+    fingerprint: str
+    error_type: str | None
+    error_code: str | None
+    observations: int = Field(description="How often this neighbouring shape has been seen.")
+    fixed_by: list[FixEvidence] = Field(
+        description="Actions with at least one success against this neighbour, best first."
+    )
+    shares_a_fix_with_you: bool = Field(
+        description=(
+            "True when one of these actions has also succeeded against the "
+            "failure you asked about. The strongest hint here that the two "
+            "shapes are one cause."
+        )
+    )
+
+
 class Recommendation(BaseModel):
     """The single action the network would try next, when evidence allows."""
 
@@ -243,6 +276,16 @@ class QueryResponse(StrictModel):
         description=(
             "Whether this service+operation's successes can be believed from "
             "outside. Null when nothing has been observed for it at all."
+        ),
+    )
+    related_failures: list[RelatedFailure] = Field(
+        default_factory=list,
+        description=(
+            "Other failure shapes on the same service+operation that something "
+            "has fixed, most-seen first, at most five. Present even when the "
+            "failure you asked about is unknown: a brand-new shape on a "
+            "service where two other shapes were both fixed by refresh_schema "
+            "is worth knowing about before your first retry."
         ),
     )
     recommendation: Recommendation | None = Field(

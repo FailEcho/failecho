@@ -1581,3 +1581,5 @@ def test_llms_txt_explains_decay_and_unverified_success(client):
     assert "reported as unverified rather than as success" in body
     assert "Send `mutates: true` or `false`" in body
     assert "One line of annotation beats any heuristic" in body
+    assert "`related_failures`" in body and "wears several masks" in body
+    assert "the evidence for the join, not the join" in body

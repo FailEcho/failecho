@@ -216,3 +216,72 @@ def test_the_column_is_added_to_a_database_that_predates_it(tmp_path):
     con = sqlite3.connect(db)
     cols = {r[1] for r in con.execute("PRAGMA table_info(observations)")}
     assert "mutates" in cols
+
+
+# -- one root cause wearing three masks -------------------------------------
+
+
+def _shape(client, error_type, code, fixed_by=None, fixed=True, n=1):
+    fp = observe(client, error_type=error_type, error_code=code, error_message=None)["fingerprint"]
+    if fixed_by:
+        for i in range(n):
+            insert_recovery(fingerprint=fp, action=fixed_by, successful=fixed,
+                            minutes_ago=10 + i, reporter_hash=f"r{i}")
+    return fp
+
+
+def test_three_shapes_one_fix_shows_the_neighbours_and_the_shared_fix(client):
+    """An expired token seen as not_found, auth_error and a timeout. Three
+    fingerprints, none of which alone reaches the recommendation floor. What
+    joins them is that refresh_token fixed all three."""
+    me = _shape(client, "not_found", "404", fixed_by="refresh_token", n=2)
+    _shape(client, "auth_error", "401", fixed_by="refresh_token", n=3)
+    _shape(client, "timeout", None, fixed_by="refresh_token", n=1)
+
+    d = query(client, error_type="not_found", error_code="404", error_message=None)
+    assert d["fingerprint"] == me
+    rel = d["related_failures"]
+    assert {r["error_type"] for r in rel} == {"auth_error", "timeout"}, "me excluded, both masks present"
+    assert all(r["shares_a_fix_with_you"] for r in rel)
+    assert all(r["fixed_by"][0]["action"] == "refresh_token" for r in rel)
+    assert len(rel) == 2
+
+
+def test_a_neighbour_nobody_has_fixed_carries_no_signal(client):
+    _shape(client, "not_found", "404", fixed_by="refresh_token")
+    _shape(client, "server_error", "503", fixed_by="retry", fixed=False, n=4)  # tried, never worked
+    _shape(client, "rate_limit", "429")  # never even tried
+    rel = query(client, error_type="not_found", error_code="404", error_message=None)["related_failures"]
+    assert rel == []
+
+
+def test_a_different_fix_is_a_neighbour_but_not_a_shared_one(client):
+    _shape(client, "not_found", "404", fixed_by="refresh_token")
+    _shape(client, "rate_limit", "429", fixed_by="backoff", n=2)
+    rel = query(client, error_type="not_found", error_code="404", error_message=None)["related_failures"]
+    assert len(rel) == 1 and rel[0]["error_type"] == "rate_limit"
+    assert rel[0]["shares_a_fix_with_you"] is False
+
+
+def test_neighbours_are_scoped_to_the_same_operation(client):
+    _shape(client, "not_found", "404", fixed_by="refresh_token")
+    observe(client, operation="get_issue", error_type="auth_error", error_code="401", error_message=None)
+    fp_other = query(client, operation="get_issue", error_type="auth_error", error_code="401",
+                     error_message=None)["fingerprint"]
+    insert_recovery(fingerprint=fp_other, action="refresh_token", successful=True, minutes_ago=5)
+    rel = query(client, error_type="not_found", error_code="404", error_message=None)["related_failures"]
+    assert rel == [], "a different operation is a different scope"
+
+
+def test_an_unknown_shape_still_sees_its_neighbours(client):
+    """The case this exists for: a brand-new mask on a service where two
+    other masks were both fixed the same way. Nothing is known about the
+    new shape, and the neighbours are the only evidence there is."""
+    _shape(client, "auth_error", "401", fixed_by="refresh_token", n=3)
+    _shape(client, "timeout", None, fixed_by="refresh_token", n=2)
+    d = query(client, error_type="connection_error", error_code=None, error_message=None)
+    assert d["known"] is False and d["recommendation"] is None
+    assert {r["error_type"] for r in d["related_failures"]} == {"auth_error", "timeout"}
+    assert all(r["shares_a_fix_with_you"] is False for r in d["related_failures"]), (
+        "nothing has fixed the new shape yet, so nothing can be shared with it"
+    )
