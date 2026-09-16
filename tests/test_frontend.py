@@ -114,7 +114,10 @@ def test_the_live_line_separates_external_from_our_own(client):
 
 def test_the_trust_claims_survive_the_trim(client):
     body = client.get("/").text
-    assert "No prompts. No secrets. No tool arguments or results." in body
+    flat = " ".join(body.split())
+    assert "the API has no field for them" in flat
+    assert "Error text is off by default and normalized when sent" in flat
+    assert "No secrets." not in flat, "stronger than the normalizer can guarantee"
     assert "INSUFFICIENT_DATA" in body
     assert 'href="/about"' in body
 

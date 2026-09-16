@@ -162,9 +162,14 @@ when independent reporters agree. Thin evidence returns `INSUFFICIENT_DATA`
 rather than a guess. Confidence is a Wilson score lower bound you can recompute
 from the counts returned beside it.
 
-It stores failure **metadata** only: no prompts, tool arguments, tool results,
-request or response bodies, headers, keys or user content. Raw error text is
-discarded after normalization.
+It stores failure **metadata** only. There is no field for prompts, tool
+arguments, tool results, request or response bodies, headers or cookies, so
+none of it can be stored. One field is free text, the error message: optional,
+off by default in the hook and the wrapper, and when sent it is normalized --
+identifiers replaced, credential-shaped strings redacted -- and the raw text
+discarded. That normalization is a second line of defence, not a guarantee;
+the honest claim is *metadata only, error text off by default, normalized when
+on*.
 
 **Live:** <https://failecho.com> · [/docs](https://failecho.com/docs) ·
 [/openapi.json](https://failecho.com/openapi.json) ·

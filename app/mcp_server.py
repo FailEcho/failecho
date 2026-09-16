@@ -526,6 +526,25 @@ class _MCPEndpoint:
             )
             await response(scope, receive, send)
             return
+        if scope.get("type") == "http" and scope.get("method") == "GET":
+            # Streamable HTTP lets a client GET the endpoint to open a stream
+            # for server-initiated messages. This server is stateless and
+            # never sends one, so the SDK would hold that connection open
+            # forever carrying nothing -- a free connection-hold for anyone
+            # who asks. The spec's answer for a server that does not offer
+            # the stream is 405, and every client that probes with GET is
+            # written to accept it and carry on with POST.
+            from starlette.responses import JSONResponse
+
+            response = JSONResponse(
+                {"error": "method_not_allowed",
+                 "detail": "This MCP server is stateless and offers no server-initiated stream. "
+                           "POST JSON-RPC to this path."},
+                status_code=405,
+                headers={"Allow": "POST, DELETE"},
+            )
+            await response(scope, receive, send)
+            return
         await self.app(scope, receive, send)
 
 

@@ -62,7 +62,7 @@
           <a href="/network"><b>Live network</b><span>What agents are hitting right now</span></a>
           <a href="/demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
           <!--lab--><a href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener"><b>The lab</b><span>A simulated fleet of our own agents, live</span></a><!--/lab-->
-          <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
+          <a href="/about"><b>About</b><span>What FailEcho is, and what it stores</span></a>
         </span>
       </span>
       <span class="navitem">
@@ -326,8 +326,9 @@ up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
     <div class="band-head">
       <h2 id="trust-title" class="label">Built to be checked</h2>
     <p class="band-sub">
-      No prompts. No secrets. No tool arguments or results. Confidence is
-      arithmetic you can recompute, and thin evidence returns
+      No prompts, arguments, results, headers or bodies &mdash; the API has no
+      field for them. Error text is off by default and normalized when sent.
+      Confidence is arithmetic you can recompute, and thin evidence returns
       <code>INSUFFICIENT_DATA</code> rather than a guess.
     </p>
     </div>
@@ -351,7 +352,7 @@ up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
       </a>
       <a class="card" href="/about">
         <span class="card-art card-art--c" aria-hidden="true"></span>
-        <span class="card-title">What FailEcho never stores</span>
+        <span class="card-title">What FailEcho stores, and what it cannot</span>
         <span class="card-meta">Reference · the privacy contract in full</span>
       </a>
     </div>

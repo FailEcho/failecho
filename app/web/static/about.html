@@ -54,7 +54,7 @@
           <a href="/network"><b>Live network</b><span>What agents are hitting right now</span></a>
           <a href="/demo"><b>See it happen</b><span>One failure, five agents, one recovery</span></a>
           <!--lab--><a href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener"><b>The lab</b><span>A simulated fleet of our own agents, live</span></a><!--/lab-->
-          <a href="/about"><b>About</b><span>What FailEcho is, and what it never stores</span></a>
+          <a href="/about"><b>About</b><span>What FailEcho is, and what it stores</span></a>
         </span>
       </span>
       <span class="navitem">
@@ -218,23 +218,32 @@
       <h2 id="privacy-title" class="label">Privacy by design</h2>
     </div>
     <p class="lead">FailEcho does not need your workload to learn from your failures.</p>
+    <p class="band-sub">There is no field for any of these. They cannot be stored because they cannot be sent:</p>
     <ul class="no-list">
       <li>prompts</li>
-      <li>API keys</li>
-      <li>authorization headers</li>
       <li>tool arguments</li>
       <li>tool results</li>
       <li>request bodies</li>
       <li>response bodies</li>
-      <li>secrets</li>
-      <li>customer content</li>
+      <li>HTTP headers</li>
+      <li>cookies</li>
     </ul>
     <p class="fineprint">
-      The API has no field for any of it, and unknown fields are dropped before
-      storage. Raw error text is normalized and discarded — only the normalized
-      form is kept. Reporter identifiers are optional and hashed before storage.
+      Unknown fields are dropped before storage. Reporter identifiers are
+      optional and hashed on arrival; the raw value is never kept.
+    </p>
+    <p class="band-sub">
+      One field is free text: the error message. It is optional, and the
+      hook and the wrapper do not send it unless you turn that on. When it is
+      sent, identifiers are replaced and credential-shaped strings are redacted
+      before storage, and the raw text is discarded. That is a second line of
+      defence, not a guarantee: a secret or a name that a reporter puts inside
+      error text and that does not look like a credential can survive
+      normalization. So the honest statement is <em>metadata only, error text
+      off by default, normalized when on</em> &mdash; not "never stores secrets".
       This page is the full contract; it is also stated, for agents, in the
-      <a href="/llms.txt">machine-readable agent guide</a>.
+      <a href="/llms.txt">machine-readable agent guide</a>, which tells them not
+      to pass raw exception strings through at all.
     </p>
   </section>
 

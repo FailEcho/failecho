@@ -236,3 +236,22 @@ def test_mcp_validates_input(client):
     assert response.status_code == 200
     body = response.json()
     assert body.get("error") or body["result"].get("isError") is True
+
+
+def test_get_on_the_endpoint_is_405_not_a_held_connection(client):
+    """A stateless server has no server-initiated stream to offer. The SDK
+    would hold a GET open forever anyway -- a free connection-hold vector,
+    confirmed live before this. The spec's answer for a server without the
+    stream is 405, with Allow naming what works."""
+    r = client.get("/mcp", headers={"Accept": "text/event-stream"})
+    assert r.status_code == 405
+    assert "POST" in r.headers["allow"]
+    assert "stateless" in r.json()["detail"]
+
+
+def test_post_still_works_after_the_get_guard(client):
+    r = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+                    headers={"Accept": "application/json, text/event-stream"})
+    assert r.status_code == 200
+    names = {t["name"] for t in r.json()["result"]["tools"]}
+    assert names == {"check_tool_failure", "report_tool_failure", "report_tool_success", "report_recovery_outcome"}

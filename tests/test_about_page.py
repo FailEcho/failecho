@@ -41,10 +41,17 @@ def test_the_network_effect_is_explained(client):
 def test_privacy_contract_is_stated(client):
     body = client.get("/about").text
     assert "Privacy by design" in body
-    for refused in ("prompts", "API keys", "tool arguments", "tool results", "secrets"):
+    # what there is no field for -- true by construction
+    for refused in ("prompts", "tool arguments", "tool results", "request bodies",
+                    "response bodies", "HTTP headers", "cookies"):
         assert f"<li>{refused}</li>" in body
-    assert "Raw error text is normalized and discarded" in body
-    assert "hashed before storage" in body
+    # and the one free-text field, stated honestly rather than promised away:
+    # "never stores secrets" was stronger than a normalizer can guarantee
+    assert "<li>secrets</li>" not in body and "<li>API keys</li>" not in body
+    flat = " ".join(body.split())
+    assert "a second line of defence, not a guarantee" in flat
+    assert "metadata only, error text off by default, normalized when on" in flat
+    assert "hashed on arrival" in flat
 
 
 def test_intelligence_is_described_as_evidence(client):
