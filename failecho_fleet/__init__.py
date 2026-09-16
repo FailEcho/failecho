@@ -81,6 +81,26 @@ CRON_CALLS = [
     ("github_release", "astral-sh/uv"),
 ]
 
+#: The test-service job: the same eleven calls every run. Enough 429s, 503s
+#: and timeouts to give the recovery loop something to do, and three writes
+#: that never fail so the unverified-success flag has something to fire on.
+TEST_CALLS = [
+    ("tool", "flaky_read"), ("tool", "flaky_read"), ("tool", "flaky_read"),
+    ("tool", "throttled_read"), ("tool", "throttled_read"),
+    ("tool", "always_broken"), ("tool", "slow_read"),
+    ("tool", "echo_write"), ("tool", "echo_write"), ("tool", "echo_write"),
+    ("pypi", "requests"),
+]
+
+#: Twenty real GitHub calls per run. The unauthenticated limit is 60 an hour
+#: per IP, shared by the whole fleet -- which is exactly how a real fleet
+#: behind one NAT experiences it. Some hours this crosses the line and the
+#: 403s are real.
+GH_REPOS = ["FailEcho/failecho", "modelcontextprotocol/python-sdk", "modelcontextprotocol/typescript-sdk",
+            "langchain-ai/langchain", "run-llama/llama_index", "astral-sh/uv", "pallets/flask",
+            "psf/requests", "encode/httpx", "fastapi/fastapi"]
+GH_HEAVY = [("github", r) for r in GH_REPOS] + [("github_release", r) for r in GH_REPOS]
+
 PERSONAS = [
     # reporter,           path,        provider, asks,  workload
     ("fleet-decor-ask-a",  "decorator", "groq",   True,  PYPI_NPM),
@@ -95,7 +115,14 @@ PERSONAS = [
     ("fleet-mcp-blind",    "mcp",       "gemini", False, GITHUB),
     ("fleet-cron-a",       "decorator", None,     True,  CRON_CALLS),
     ("fleet-cron-b",       "decorator", None,     False, CRON_CALLS),
+    # test targets: a service that returns what it is asked for
+    ("fleet-test-ask",     "decorator", None,     True,  TEST_CALLS),
+    ("fleet-test-blind",   "decorator", None,     False, TEST_CALLS),
+    # real target, real limit: twenty GitHub calls a run from a shared IP
+    ("fleet-gh-ask",       "decorator", None,     True,  GH_HEAVY),
+    ("fleet-gh-blind",     "decorator", None,     False, GH_HEAVY),
 ]
+TEST_PERSONAS = {"fleet-test-ask", "fleet-test-blind"}
 
 
 def log(msg: str) -> None:
@@ -149,10 +176,47 @@ def github_latest_release(owner: str, repo: str) -> dict:
     return {"tag": d["tag_name"]}
 
 
+# httpbingo.org exists to return whatever status you ask for. Calling it is its
+# intended use. These are the failure classes the real targets rarely produce,
+# and one write that "succeeds" forever while persisting nothing -- the
+# fake-success case from the r/AI_Agents thread, as a live service.
+def _bingo(path: str, method: str = "GET", timeout: int = 20) -> dict:
+    req = urllib.request.Request(f"https://httpbingo.org{path}", method=method,
+                                 data=b"{}" if method == "POST" else None,
+                                 headers={"User-Agent": UA, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return {"status": r.status}
+
+
+def flaky_read() -> dict:            # 503 one time in three; retry genuinely helps
+    return _bingo("/status/200,200,503")
+
+
+def throttled_read() -> dict:        # 429 half the time; backoff genuinely helps
+    return _bingo("/status/200,429")
+
+
+def always_broken() -> dict:         # 503 every time; nothing helps, and the network should learn that
+    return _bingo("/status/503")
+
+
+def slow_read() -> dict:             # 10s server, 8s client: a timeout every time
+    return _bingo("/delay/10", timeout=8)
+
+
+def echo_write() -> dict:            # 200 forever, persists nothing: a write that cannot be verified
+    return _bingo("/post", method="POST")
+
+
 TOOLS = {"pypi_latest_version": pypi_latest_version, "npm_latest_version": npm_latest_version,
-         "github_repo": github_repo, "github_latest_release": github_latest_release}
+         "github_repo": github_repo, "github_latest_release": github_latest_release,
+         "flaky_read": flaky_read, "throttled_read": throttled_read, "always_broken": always_broken,
+         "slow_read": slow_read, "echo_write": echo_write}
 TOOL_SERVICE = {"pypi_latest_version": "pypi.org", "npm_latest_version": "registry.npmjs.org",
-                "github_repo": "api.github.com", "github_latest_release": "api.github.com"}
+                "github_repo": "api.github.com", "github_latest_release": "api.github.com",
+                "flaky_read": "httpbingo.org", "throttled_read": "httpbingo.org", "always_broken": "httpbingo.org",
+                "slow_read": "httpbingo.org", "echo_write": "httpbingo.org"}
+TOOL_MUTATES = {"echo_write": True}   # everything else is a read
 TOOL_SCHEMAS = [
     {"type": "function", "function": {"name": "pypi_latest_version", "description": "Latest version of a PyPI package.",
      "parameters": {"type": "object", "properties": {"package": {"type": "string"}}, "required": ["package"]}}},
@@ -183,7 +247,8 @@ class Run:
         self.tools = {}
         for name, fn in TOOLS.items():
             if path == "decorator":
-                self.tools[name] = self.fe.watch(service=TOOL_SERVICE[name], operation=name, mutates=False)(fn)
+                self.tools[name] = self.fe.watch(service=TOOL_SERVICE[name], operation=name,
+                                                 mutates=TOOL_MUTATES.get(name, False))(fn)
             else:
                 self.tools[name] = fn  # auto and mcp report by other means
         if path == "auto":
@@ -293,7 +358,9 @@ class Run:
 
     def run_cron(self, calls: list) -> str:
         for kind, arg in calls:
-            if kind == "pypi":
+            if kind == "tool":
+                self.call(arg, {})
+            elif kind == "pypi":
                 self.call("pypi_latest_version", {"package": arg})
             elif kind == "npm":
                 self.call("npm_latest_version", {"package": arg})
@@ -378,13 +445,13 @@ def _save(state: dict) -> None:
 def write_report(state: dict) -> None:
     runs = state["runs"]
     by_persona: dict[str, dict] = {}
-    cohorts = {"ask": {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0},
-               "blind": {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0}}
+    blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0}
+    cohorts = {"real / ask": blank(), "real / blind": blank(), "test / ask": blank(), "test / blind": blank()}
     for r in runs:
         p = by_persona.setdefault(r["reporter"], {"reporter": r["reporter"], "path": r["path"], "provider": r["provider"] or "none",
                                                    "asks": r["asks"], "runs": 0, "tool_calls": 0, "failures": 0, "last": ""})
         p["runs"] += 1; p["tool_calls"] += r["tool_calls"]; p["failures"] += len(r["failures"]); p["last"] = r["at"]
-        c = cohorts["ask" if r["asks"] else "blind"]
+        c = cohorts[("test" if r["reporter"] in TEST_PERSONAS else "real") + (" / ask" if r["asks"] else " / blind")]
         c["runs"] += 1
         for f in r["failures"]:
             c["failures"] += 1; c["attempts"] += f["attempts"]; c["recovered"] += int(f["recovered"])
