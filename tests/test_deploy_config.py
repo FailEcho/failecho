@@ -120,3 +120,20 @@ def test_deploy_script_refuses_a_dirty_checkout_and_checks_the_site():
     assert "/llms.txt" in script and "/setup" in script
     # writes go through the failecho user, never root
     assert "sudo -u failecho git" in script
+
+
+def test_agent_unit_is_first_party_and_boxed():
+    """The agent must read the same token file the server does, so the two
+    cannot disagree; must be memory-capped below the server; and must run as
+    the unprivileged user."""
+    from pathlib import Path
+
+    unit = Path("deploy/failecho-agent.service").read_text()
+    assert "EnvironmentFile=/etc/failecho.env" in unit, "token must come from the server's own file"
+    assert "EnvironmentFile=/etc/failecho-agent.env" in unit
+    assert "User=failecho" in unit and "Type=oneshot" in unit
+    assert "MemoryMax=150M" in unit
+    assert "FAILECHO_REPORTER_ID=operator-agent" in unit
+    assert "ProtectSystem=strict" in unit and "NoNewPrivileges=yes" in unit
+    timer = Path("deploy/failecho-agent.timer").read_text()
+    assert "OnCalendar=*:00/30" in timer

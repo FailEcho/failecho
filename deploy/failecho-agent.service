@@ -1,0 +1,41 @@
+# FailEcho's own agent: one read-only task against real services, every run
+# reported first-party. See failecho_agent/__init__.py for what it will and
+# will not do. Started by failecho-agent.timer.
+[Unit]
+Description=FailEcho first-party agent (one run)
+After=network-online.target failecho.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho
+
+# FIN_FIRST_PARTY_TOKEN comes from the service's own env file, so the agent
+# and the server can never disagree about what the token is. The provider
+# keys live in their own root-only file.
+EnvironmentFile=/etc/failecho.env
+EnvironmentFile=/etc/failecho-agent.env
+Environment="FAILECHO_ENDPOINT=https://failecho.com"
+Environment="FAILECHO_REPORTER_ID=operator-agent"
+Environment="FAILECHO_AGENT_MAX_RUNS_PER_DAY=48"
+
+ExecStart=/srv/failecho/.venv/bin/python -m failecho_agent
+TimeoutStartSec=240
+
+# A python process with urllib in it. If it ever wants more than this,
+# something is wrong and it should die rather than compete with the server.
+MemoryMax=150M
+StateDirectory=failecho-agent
+UMask=0077
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes

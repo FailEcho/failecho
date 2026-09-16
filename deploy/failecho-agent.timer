@@ -1,0 +1,13 @@
+# Every half hour, a little jitter so the runs are not on the exact minute.
+# The daily budget lives in the agent itself, so a misconfigured timer can
+# only ever run it less, never more.
+[Unit]
+Description=FailEcho first-party agent, every 30 minutes
+
+[Timer]
+OnCalendar=*:00/30
+RandomizedDelaySec=180
+Persistent=false
+
+[Install]
+WantedBy=timers.target
