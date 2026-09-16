@@ -1073,19 +1073,20 @@ footer.shell {
 .way::before {
   content: ""; position: absolute; inset: 0; z-index: 0;
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.52), rgba(0, 0, 0, 0.82)),
-    url("/static/card-abstract1.webp");
-  background-size: auto, 260% auto;
+    linear-gradient(rgba(0, 0, 0, 0.50), rgba(0, 0, 0, 0.82)),
+    url("/static/card-abstract2.webp");
+  background-size: auto, 300% auto;
   background-repeat: no-repeat, no-repeat;
   transition: opacity 0.32s ease;
 }
 .way > * { position: relative; z-index: 1; }
 .way:hover, .way:focus-within { border-color: var(--line-2); }
 .way:hover::before, .way:focus-within::before { opacity: 0; }
-.way--a::before { background-position: 0 0, 6% 18%; }
-.way--b::before { background-position: 0 0, 38% 72%; }
-.way--c::before { background-position: 0 0, 66% 26%; }
-.way--d::before { background-position: 0 0, 98% 62%; }
+/* one render, four crops: violet ribbon, peach crossing, cyan sweep, lit arc */
+.way--a::before { background-position: 0 0, 4% 30%; }
+.way--b::before { background-position: 0 0, 50% 58%; }
+.way--c::before { background-position: 0 0, 96% 28%; }
+.way--d::before { background-position: 0 0, 58% 96%; }
 
 /* Two faces, one box: the facts and the command occupy the same space, so
    the card does not resize when they trade places. Both start the same
