@@ -411,7 +411,7 @@ def write_report(state: dict) -> None:
                                "expected": len({o for o in ops if not o.startswith(("GET ", "POST "))}) or 1, "paths": paths})
             totals_db["cross_reporter_fingerprints"] = len(repeats)
             totals_db["recovery_outcomes"] = c.execute("select count(*) from recovery_outcomes").fetchone()[0]
-            totals_db["cross_agent_help"] = (c.execute("select coalesce(sum(count),0) from daily_counters where name='cross_agent_help'").fetchone() or [0])[0]
+            totals_db["cross_agent_help"] = (c.execute("select coalesce(sum(value),0) from daily_counters where name='cross_agent_help'").fetchone() or [0])[0]
         except sqlite3.Error as e:
             totals_db["db_error"] = str(e)
 
