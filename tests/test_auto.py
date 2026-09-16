@@ -157,3 +157,146 @@ def test_a_self_hosted_endpoint_on_the_same_host_does_not_hide_other_local_calls
     requests.get(f"{server}/ok")
     rec.flush(5)
     assert len(rec.bodies) == 1
+
+
+# -- recovery outcomes, inferred from the sequence ----------------------------
+
+
+class Ledger(FailEcho):
+    """Keeps what would be queued, in order, with its kind."""
+
+    def __init__(self):
+        super().__init__(endpoint="http://127.0.0.1:9", reporter_id="t")
+        self.items = []
+
+    def _submit(self, body, kind="observe"):
+        self.items.append((kind, body))
+
+
+@pytest.fixture
+def ledger(monkeypatch):
+    led = Ledger()
+    monkeypatch.setattr(auto, "_fe", led)
+    monkeypatch.setattr(auto, "_infer", True)
+    auto._pending.clear()
+    return led
+
+
+def outcomes(led):
+    return [b for k, b in led.items if k == "outcome"]
+
+
+def test_a_transient_failure_then_the_same_url_succeeding_is_a_retry(ledger):
+    url = "https://api.github.com/repos/o/r"
+    auto._report("GET", url, 0.0, 503, None)
+    auto._report("GET", url, 0.0, 200, None)
+    assert outcomes(ledger) == [{"service": "api.github.com", "operation": "GET /repos", "action": "retry",
+                                 "successful": True, "error_type": "server_error", "error_code": "503"}]
+    assert ledger.inferred == 1
+    # and the order on the wire is failure, outcome, success -- the outcome
+    # never overtakes the failure it belongs to
+    assert [k for k, _ in ledger.items] == ["observe", "outcome", "observe"]
+
+
+def test_waiting_first_makes_it_a_backoff(ledger, monkeypatch):
+    url = "https://api.github.com/repos/o/r"
+    clock = [100.0]
+    monkeypatch.setattr(auto.time, "monotonic", lambda: clock[0])
+    auto._report("GET", url, 0.0, 429, None)
+    clock[0] += 2.5
+    auto._report("GET", url, 0.0, 200, None)
+    assert outcomes(ledger)[0]["action"] == "backoff"
+
+
+def test_failing_again_is_the_retry_not_working(ledger):
+    url = "https://x.example/thing"
+    auto._report("GET", url, 0.0, 503, None)
+    auto._report("GET", url, 0.0, 503, None)
+    auto._report("GET", url, 0.0, 200, None)
+    got = [(o["action"], o["successful"]) for o in outcomes(ledger)]
+    assert got == [("retry", False), ("retry", True)]
+
+
+def test_a_different_url_succeeding_is_not_a_recovery(ledger):
+    """Route-level names would make GET /repos/a failing and GET /repos/b
+    succeeding look like a fix. The key is the exact URL, in memory only."""
+    auto._report("GET", "https://api.github.com/repos/a/b", 0.0, 503, None)
+    auto._report("GET", "https://api.github.com/repos/c/d", 0.0, 200, None)
+    assert outcomes(ledger) == []
+
+
+@pytest.mark.parametrize("status", [404, 401, 403, 400, 422])
+def test_nothing_is_inferred_for_errors_a_retry_does_not_fix(ledger, status):
+    url = "https://x.example/item"
+    auto._report("GET", url, 0.0, status, None)
+    auto._report("GET", url, 0.0, 200, None)
+    assert outcomes(ledger) == []
+
+
+def test_an_old_failure_is_not_recovered_from(ledger, monkeypatch):
+    url = "https://x.example/thing"
+    clock = [0.0]
+    monkeypatch.setattr(auto.time, "monotonic", lambda: clock[0])
+    auto._report("GET", url, 0.0, 503, None)
+    clock[0] += auto.INFER_WINDOW + 1
+    auto._report("GET", url, 0.0, 200, None)
+    assert outcomes(ledger) == []
+
+
+def test_the_query_string_does_not_split_a_url(ledger):
+    auto._report("GET", "https://x.example/search?page=1", 0.0, 503, None)
+    auto._report("GET", "https://x.example/search?page=1&retry=1", 0.0, 200, None)
+    assert len(outcomes(ledger)) == 1
+
+
+def test_the_pending_table_is_bounded(ledger):
+    for i in range(auto.MAX_PENDING + 20):
+        auto._report("GET", f"https://x.example/{i}/thing", 0.0, 503, None)
+    assert len(auto._pending) == auto.MAX_PENDING
+
+
+def test_inference_can_be_turned_off(ledger, monkeypatch):
+    monkeypatch.setenv("FAILECHO_INFER_RECOVERY", "0")
+    auto.enable()
+    url = "https://x.example/thing"
+    auto._report("GET", url, 0.0, 503, None)
+    auto._report("GET", url, 0.0, 200, None)
+    assert outcomes(ledger) == [] and auto._infer is False
+
+
+def test_the_url_never_leaves_the_process(ledger):
+    auto._report("GET", "https://api.github.com/repos/secret-org/secret-repo", 0.0, 503, None)
+    auto._report("GET", "https://api.github.com/repos/secret-org/secret-repo", 0.0, 200, None)
+    flat = repr(ledger.items)
+    assert "secret" not in flat and "GET /repos" in flat
+
+
+def test_an_outcome_attaches_to_the_shape_it_names():
+    """Two shapes of one operation in flight: the outcome for the 503 must
+    not land on the 429's fingerprint just because the 429 came later."""
+    fe = FailEcho(endpoint="http://127.0.0.1:9", reporter_id="t")
+    fe._fingerprints[("s", "op")] = "fp-latest-429"
+    fe._fingerprints[("s", "op", "rate_limit", "429")] = "fp-latest-429"
+    fe._fingerprints[("s", "op", "server_error", "503")] = "fp-503"
+    assert fe._fingerprint_for({"service": "s", "operation": "op", "error_type": "server_error", "error_code": "503"}) == "fp-503"
+    assert fe._fingerprint_for({"service": "s", "operation": "op"}) == "fp-latest-429"
+    # a shape never reported falls back to the operation's latest failure
+    assert fe._fingerprint_for({"service": "s", "operation": "op", "error_type": "timeout", "error_code": None}) == "fp-latest-429"
+
+
+def test_a_failure_report_files_its_fingerprint_under_both_keys(monkeypatch):
+    import io
+    import json as _json
+
+    fe = FailEcho(endpoint="http://127.0.0.1:9", reporter_id="t")
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(auto.urllib.request, "urlopen", lambda req, timeout: Resp(_json.dumps({"fingerprint": "fp1"}).encode()))
+    fe._post({"service": "s", "operation": "op", "outcome": "failure", "error_type": "server_error", "error_code": "503"})
+    assert fe._fingerprints == {("s", "op"): "fp1", ("s", "op", "server_error", "503"): "fp1"}

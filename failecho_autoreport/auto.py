@@ -30,6 +30,20 @@ What is not touched: calls to the FailEcho endpoint itself (the wrapper
 already refuses those), and anything through a client library that is not
 installed. Patching is idempotent; importing this twice patches once.
 
+Recovery outcomes, inferred. The decorator cannot know what a program did
+between a failure and the next call, so there `recovered()` is explicit.
+This module sees every call in order, and one pattern is unambiguous: the
+same URL fails with a transient error -- 429, 5xx, a timeout, a connection
+error -- and then succeeds, inside two minutes. That is a retry, and if the
+program waited a second or more first, a backoff. Both are reported as
+outcomes on the failure they followed, which is the half of the network
+another agent can act on and the half zero-code reporting used to leave
+empty. A second failure of the same URL is reported as the retry not
+working. Nothing is inferred for 404s, auth or validation errors: a success
+after those is a different request, not a fix. The URL is the key only in
+this process's memory; what leaves is still host and route.
+FAILECHO_INFER_RECOVERY=0 turns this off.
+
 Everything here fails open. If a patch cannot be applied, the client keeps
 working unobserved; if reporting raises, the caller never sees it.
 """
@@ -40,10 +54,24 @@ import time
 import urllib.parse
 import urllib.request
 
-from . import FailEcho, default
+import os
+
+from . import FailEcho, classify, default
 
 _PATCHED: set[str] = set()
 _fe: FailEcho | None = None
+
+#: A failure followed by a success on the same URL inside this window is a
+#: recovery; a wait of at least BACKOFF_GAP before the success makes it a
+#: backoff rather than a bare retry.
+INFER_WINDOW = 120.0
+BACKOFF_GAP = 1.0
+TRANSIENT = frozenset({"rate_limit", "server_error", "timeout", "connection_error"})
+MAX_PENDING = 256
+#: URL -> (when it failed, error_type, error_code), for failures a later
+#: call might turn out to have recovered from. Never leaves the process.
+_pending: dict[str, tuple[float, str, str | None]] = {}
+_infer = True
 
 
 def client() -> FailEcho:
@@ -86,14 +114,45 @@ def _report(method: str, url: str, started: float, status: int | None, exc: Base
         if _netloc(url) == _netloc(client().endpoint):
             return
         elapsed = int((time.monotonic() - started) * 1000)
-        if exc is not None:
-            client().record_failure(service, operation, exc, elapsed, _mutates(method))
-        elif status is not None and status >= 400:
-            client().record_failure(service, operation, _StatusError(status), elapsed, _mutates(method))
+        failure = exc if exc is not None else (_StatusError(status) if status is not None and status >= 400 else None)
+        if failure is not None:
+            _infer_outcome(method, url, service, operation, failure)
+            client().record_failure(service, operation, failure, elapsed, _mutates(method))
         else:
+            _infer_outcome(method, url, service, operation, None)
             client().record_success(service, operation, elapsed, _mutates(method))
     except Exception:  # noqa: BLE001 - reporting must never surface
         pass
+
+
+def _url_key(method: str, url: str) -> str:
+    p = urllib.parse.urlsplit(url)
+    return f"{method.upper()} {(p.hostname or '').lower()}{p.path}"
+
+
+def _infer_outcome(method: str, url: str, service: str, operation: str, failure: BaseException | None) -> None:
+    """File an outcome for an earlier transient failure of this exact URL,
+    then remember this call if it is one a later call could recover from."""
+    if not _infer:
+        return
+    now = time.monotonic()
+    key = _url_key(method, url)
+    previous = _pending.pop(key, None)
+    if previous is not None:
+        when, prev_type, prev_code = previous
+        gap = now - when
+        if gap <= INFER_WINDOW:
+            action = "backoff" if gap >= BACKOFF_GAP else "retry"
+            client().recovered(service, operation, action, failure is None,
+                               error_type=prev_type, error_code=prev_code)
+            client().inferred += 1
+    if failure is not None:
+        error_type, error_code = classify(failure)
+        if error_type in TRANSIENT:
+            if len(_pending) >= MAX_PENDING:
+                oldest = min(_pending, key=lambda k: _pending[k][0])
+                del _pending[oldest]
+            _pending[key] = (now, error_type, error_code)
 
 
 def _netloc(url: str) -> tuple[str, int | None]:
@@ -216,6 +275,8 @@ def _patch_httpx() -> None:
 
 def enable() -> list[str]:
     """Patch whatever is installed. Returns the names of the libraries patched."""
+    global _infer
+    _infer = os.environ.get("FAILECHO_INFER_RECOVERY", "1").strip().lower() not in ("0", "false", "no", "off")
     for patch in (_patch_urllib, _patch_requests, _patch_httpx):
         try:
             patch()

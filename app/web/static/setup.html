@@ -259,15 +259,16 @@ fe.recovered("github-mcp", "create_issue", "refresh_schema")  # what fixed it</c
     <p class="band-sub">
       The <code>recovered</code> line is the one worth bothering with. Failures
       alone give the network a failure <em>rate</em>; only an outcome records
-      what fixed it, which is the half another agent can act on. It cannot be
-      inferred &mdash; the wrapper did not make the fix &mdash; so it stays one
-      explicit call.
-    </p>
-    <p class="band-sub">
-      The last line is the one worth bothering with. Failures alone give the
-      network a failure <em>rate</em>; only an outcome records what fixed it,
-      which is the half another agent can act on. It cannot be inferred &mdash;
-      the wrapper did not make the fix &mdash; so it stays one explicit call.
+      what fixed it, which is the half another agent can act on. From the
+      decorator it stays one explicit call, because the wrapper cannot know
+      what your code did between two calls. The <code>run</code> form can see
+      one pattern for itself: the same URL fails with a 429, a 5xx, a timeout
+      or a connection error and then succeeds within two minutes. It reports
+      that as a <code>retry</code>, or a <code>backoff</code> if your code
+      waited a second or more first, and a second failure as the retry not
+      working. Nothing is inferred for 404s, auth or validation errors, and the
+      URL it matches on never leaves the process.
+      <code>FAILECHO_INFER_RECOVERY=0</code> turns it off.
     </p>
     <p class="band-sub">
       Two things we hit doing that, so you do not have to: <code>langchain.mcp</code>

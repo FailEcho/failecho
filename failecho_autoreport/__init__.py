@@ -43,6 +43,8 @@ Environment:
     FAILECHO_REPORT_SUCCESS=0  do not report successful calls
     FAILECHO_OPERATOR_TOKEN  FailEcho's own agents only. Marks reports as
                              first-party so they are never counted as adoption.
+    FAILECHO_INFER_RECOVERY=0  `run` mode only: do not infer retry/backoff
+                             outcomes from a failure followed by a success.
 """
 
 from __future__ import annotations
@@ -66,7 +68,7 @@ __all__ = ["FailEcho", "classify"]
 class _NoFingerprint(Exception):
     """An outcome arrived with no failure to attach it to."""
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 DEFAULT_ENDPOINT = "https://failecho.com"
 
@@ -168,14 +170,20 @@ class FailEcho:
         self.sent = 0
         self.failed = 0
         self.unmatched = 0
+        #: Outcomes the auto module inferred from the sequence of calls
+        #: (a transient failure, then the same URL succeeding), as opposed
+        #: to ones the program reported through recovered().
+        self.inferred = 0
+        self.sent_outcomes = 0
         #: wrap() is best-effort by design, so it counts what it managed.
         #: wrapped == 0 after wrapping a tool list means nothing is reporting.
         self.wrapped = 0
         self.unwrapped = 0
 
-        #: The fingerprint the server gave each (service, operation)'s last
-        #: failure, so an outcome can be attached to it.
-        self._fingerprints: dict[tuple[str, str], str] = {}
+        #: The fingerprint the server gave the last failure of each
+        #: (service, operation), and of each exact shape (with error_type and
+        #: code), so an outcome can be attached to the failure it belongs to.
+        self._fingerprints: dict[tuple, str] = {}
 
         self._queue: queue.Queue = queue.Queue(maxsize=MAX_QUEUE)
         self._worker: threading.Thread | None = None
@@ -311,21 +319,34 @@ class FailEcho:
     # -- the wire ----------------------------------------------------------
 
     def recovered(self, service: str, operation: str, action: str,
-                  successful: bool = True) -> None:
+                  successful: bool = True, *, error_type: str | None = None,
+                  error_code: str | None = None) -> None:
         """Report what you tried after a failure, and whether it worked.
 
         This is the half of the network another agent can actually use: a
         failure rate says a call is broken, and only an outcome says what to
-        do about it. The wrapper cannot infer the action -- it did not make
-        the fix -- so this stays an explicit call.
+        do about it. The wrapper cannot know what a program did between two
+        calls -- it did not make the fix -- so from the decorator this stays
+        an explicit call. `run` mode is the exception: it sees the sequence,
+        and a transient failure followed by the same URL succeeding is a
+        retry (or a backoff, if the program waited), which it reports as
+        such. See auto.py.
+
+        error_type and error_code name the failure this outcome belongs to
+        when several shapes of the same operation are in flight; without
+        them it attaches to the operation's most recent failure.
 
         The fingerprint is resolved when the report is sent rather than now,
         because the failure it belongs to may still be on the queue. One
         worker draining in order is what makes that safe.
         """
-        self._submit({"service": service, "operation": operation,
-                      "action": action, "successful": bool(successful)},
-                     kind="outcome")
+        body = {"service": service, "operation": operation,
+                "action": action, "successful": bool(successful)}
+        if error_type:
+            body["error_type"] = error_type
+            if error_code:
+                body["error_code"] = error_code
+        self._submit(body, kind="outcome")
 
     def _submit(self, body: dict, kind: str = "observe") -> None:
         if not self.enabled:
@@ -359,6 +380,7 @@ class FailEcho:
             try:
                 if kind == "outcome":
                     self._post_outcome(body)
+                    self.sent_outcomes += 1
                 else:
                     self._post(body)
                 self.sent += 1
@@ -398,10 +420,23 @@ class FailEcho:
             return
         if fingerprint:
             self._fingerprints[(body["service"], body["operation"])] = fingerprint
+            self._fingerprints[(body["service"], body["operation"],
+                                body["error_type"], body.get("error_code"))] = fingerprint
+
+    def _fingerprint_for(self, body: dict) -> str | None:
+        """The failure an outcome belongs to: the exact shape when the outcome
+        names one and that shape has been reported, else the operation's most
+        recent failure."""
+        key = (body["service"], body["operation"])
+        if body.get("error_type"):
+            exact = self._fingerprints.get(key + (body["error_type"], body.get("error_code")))
+            if exact:
+                return exact
+        return self._fingerprints.get(key)
 
     def _post_outcome(self, body: dict) -> None:
         key = (body["service"], body["operation"])
-        fingerprint = self._fingerprints.get(key)
+        fingerprint = self._fingerprint_for(body)
         if not fingerprint:
             # Nothing to attach it to: the failure was dropped, disabled, or
             # never reported. Silently inventing a fingerprint would put the

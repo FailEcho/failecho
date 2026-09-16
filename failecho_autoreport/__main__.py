@@ -92,8 +92,12 @@ def _run(argv: list[str]) -> int:
     finally:
         fe = auto.client()
         fe.flush(timeout=10)
-        print(f"[failecho] reported {fe.sent} call{'s' if fe.sent != 1 else ''}"
+        calls = fe.sent - fe.sent_outcomes
+        print(f"[failecho] reported {calls} call{'s' if calls != 1 else ''}"
+              + (f", {fe.sent_outcomes} recovery outcome{'s' if fe.sent_outcomes != 1 else ''}"
+                 + (" inferred" if fe.inferred else "") if fe.sent_outcomes else "")
               + (f", {fe.failed} could not be sent" if fe.failed else "")
+              + (f", {fe.unmatched} outcome{'s' if fe.unmatched != 1 else ''} unmatched" if fe.unmatched else "")
               + (f", {fe.dropped} dropped" if fe.dropped else ""), file=sys.stderr)
     return 0
 

@@ -237,7 +237,7 @@ api.github.com GET /repos  not_found 404
     </div>
     <dl class="way-facts">
       <div><dt>Any agent</dt><dd>paste <code>Read {{PUBLIC_URL}}/llms.txt and set yourself up to use FailEcho.</code> and it configures itself, asking you before anything it cannot undo.</dd></div>
-      <div><dt>Python, no code</dt><dd><code>pip install failecho-autoreport</code> then <code>python -m failecho_autoreport run my_agent.py</code> — every outbound call observed, nothing in your code changed.</dd></div>
+      <div><dt>Python, no code</dt><dd><code>pip install failecho-autoreport</code> then <code>python -m failecho_autoreport run my_agent.py</code> — every outbound call observed, retries and backoffs that worked reported as outcomes, nothing in your code changed.</dd></div>
       <div><dt>Claude Code</dt><dd>the plugin's hook reports every MCP tool call after it happens, with no model deciding anything. A local scanner shows what your past sessions already re-discovered.</dd></div>
     </dl>
     <p class="hero-actions">

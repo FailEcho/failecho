@@ -37,22 +37,27 @@ debootstrap --variant=minbase --components=main,universe \
     --include=python3,python3-venv,python3-pip,ca-certificates,iproute2 \
     noble rootfs-build http://archive.ubuntu.com/ubuntu
 
-chroot rootfs-build /bin/sh -c '
-    pip install --quiet --break-system-packages --no-cache-dir uv requests httpx failecho-autoreport
+# the wrapper version the guest gets is the one in this checkout, from PyPI
+AR_VERSION=$(sed -n 's/^__version__ = "\([^"]*\)"/\1/p' "$REPO/failecho_autoreport/__init__.py")
+chroot rootfs-build /bin/sh -c "
+    pip install --quiet --break-system-packages --no-cache-dir uv requests httpx failecho-autoreport==$AR_VERSION
     useradd -m -u 1000 -s /bin/sh runner
     apt-get clean
     rm -rf /var/lib/apt/lists/* /var/cache/apt/* /usr/share/doc/* /usr/share/man/*
     echo sandbox > /etc/hostname
-    printf "127.0.0.1 localhost sandbox\n" > /etc/hosts
-    printf "nameserver 127.0.0.1\n" > /etc/resolv.conf
-'
+    printf '127.0.0.1 localhost sandbox\n' > /etc/hosts
+    printf 'nameserver 127.0.0.1\n' > /etc/resolv.conf
+"
 install -m 755 "$REPO/failecho_sandbox/guest_init.py" rootfs-build/usr/local/bin/sandbox-init
 mkdir -p rootfs-build/work
 
-rm -f rootfs.ext4
-truncate -s "${SIZE_MB}M" rootfs.ext4
-mkfs.ext4 -q -F -d rootfs-build -L sandbox-root rootfs.ext4
+# built beside the live image and swapped in atomically: a VM booting
+# during the build still finds a complete image
+rm -f rootfs.ext4.new
+truncate -s "${SIZE_MB}M" rootfs.ext4.new
+mkfs.ext4 -q -F -d rootfs-build -L sandbox-root rootfs.ext4.new
 rm -rf rootfs-build
-chmod 644 vmlinux rootfs.ext4
+chmod 644 vmlinux rootfs.ext4.new
+mv -f rootfs.ext4.new rootfs.ext4
 ls -lh vmlinux rootfs.ext4
 echo "built; run: python -m failecho_sandbox selftest"
