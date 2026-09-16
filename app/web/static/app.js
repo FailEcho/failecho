@@ -594,69 +594,6 @@
     measure();
   }
 
-  // -- typed labels ---------------------------------------------------------
-  // A button label types itself out on hover. This replaced a scramble that
-  // swapped each character for another of the same width: matching widths
-  // stopped the box moving, but a word made of the right-width wrong letters
-  // reads as the word warped rather than as the word arriving. Revealing the
-  // real characters in order cannot look like anything but itself, and with
-  // the box pinned for the run nothing moves either.
-  function typeOut(node, perFrame) {
-    if (node.getAttribute("data-typing") === "1") return;
-    var text = node.textContent.trim();
-    if (!text) return;
-    node.setAttribute("data-typing", "1");
-
-    // Hold the size the finished label has, so a half-typed one cannot
-    // shrink the button and a caret cannot widen it.
-    var box = node.getBoundingClientRect();
-    var hadWidth = node.style.width;
-    var hadHeight = node.style.height;
-    var hadWrap = node.style.whiteSpace;
-    node.style.width = box.width + "px";
-    node.style.height = box.height + "px";
-    // The caret is a character wide, so "Get started" plus a caret is wider
-    // than "Get started" -- and the box is pinned to the label's own width.
-    // The last frame of every run wrapped onto a second line for one frame,
-    // which is the drop everyone saw. Nothing wraps while it types.
-    node.style.whiteSpace = "nowrap";
-
-    var shown = 0;
-
-    function tick() {
-      shown += perFrame || 1;
-      if (shown >= text.length) {
-        node.textContent = text;
-        node.style.width = hadWidth;
-        node.style.height = hadHeight;
-        node.style.whiteSpace = hadWrap;
-        node.removeAttribute("data-typing");
-        return;
-      }
-      node.textContent = text.slice(0, Math.floor(shown)) + "\u258c";
-      window.setTimeout(tick, 22);
-    }
-
-    tick();
-  }
-
-  function wireTypedLabels() {
-    var reduced = window.matchMedia
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) return;
-
-    // Not the copy controls: their label is their feedback, and a button that
-    // says "Copied" must not be busy typing something else when it does.
-    Array.prototype.forEach.call(
-      document.querySelectorAll(".btn:not([data-copy-target]):not(.nav .btn)"),
-      function (button) {
-        function run() { typeOut(button, 0.8); }
-        button.addEventListener("mouseenter", run);
-        button.addEventListener("focus", run);
-      }
-    );
-  }
-
   // -- the demo terminal ----------------------------------------------------
   // The transcript is in the markup, so it is there for a reader without a
   // script and for anyone who would rather read than watch. With a script it
@@ -783,7 +720,6 @@
   wireTopbar();
   wireMenus();
   wireWays();
-  wireTypedLabels();
   wireRunner();
   if (el("stat-real-24h")) {
     refresh();

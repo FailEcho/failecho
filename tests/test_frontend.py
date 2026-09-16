@@ -783,20 +783,15 @@ def test_the_bar_s_growth_is_one_length_the_margin_can_cancel():
     assert ".topbar.is-open .brand { transform: scale(1.28); }" in CSS
 
 
-def test_a_button_label_types_itself_rather_than_scrambling():
-    """Matching character widths stopped the box moving, but a word made of
-    the right-width wrong letters reads as the word warped, not as the word
-    arriving. Revealing the real characters in order cannot look like
-    anything but itself."""
-    assert "function typeOut(" in JS
-    assert "text.slice(0, Math.floor(shown))" in JS
-    assert "\\u258c" in JS, "no caret while it types"
-    assert "var NOISE" not in JS and "measureText" not in JS, "the scramble is back"
-    # The box is still pinned, so a half-typed label cannot shrink the button.
-    assert "node.style.width = box.width" in JS
-    assert "node.style.width = hadWidth;" in JS
-    # And the copy controls keep their own label.
-    assert ".btn:not([data-copy-target])" in JS
+def test_button_labels_do_not_animate():
+    """The labels used to type themselves out on hover (and before that,
+    scramble). Removed 2026-09-16: a button whose text is still arriving
+    reads as a toy, and the site is asking to be trusted with telemetry. The
+    only animated button text left is state -- "Copied", "Playing" -- which
+    is feedback, not decoration."""
+    assert "typeOut" not in JS and "wireTypedLabels" not in JS
+    assert "\\u258c" not in JS, "a typing caret is back"
+    assert "data-typing" not in JS and "var NOISE" not in JS and "measureText" not in JS
 
 
 def test_the_lede_is_left_alone():
@@ -866,15 +861,6 @@ def test_the_loop_shrinks_with_the_window():
     assert "width: var(--node); height: var(--node)" in CSS
     assert "width: calc(100% - var(--node))" in CSS
     assert "282px" not in CSS.split("--node: clamp")[1].split("}")[0] or True
-
-
-def test_a_typing_label_cannot_wrap_onto_a_second_line():
-    """The caret is a character wide, so the label plus a caret is wider than
-    the label -- and the box is pinned to the label's own width. The last
-    frame of every run wrapped for one frame, which is the drop you could
-    see. Measured: one height, one width, for the whole run."""
-    assert 'node.style.whiteSpace = "nowrap"' in JS
-    assert "node.style.whiteSpace = hadWrap;" in JS
 
 
 def test_a_restored_page_does_not_arrive_with_a_menu_open():
@@ -1033,9 +1019,7 @@ def test_the_bar_button_hovers_like_the_hero_button():
     hover = CSS[CSS.index(".btn--red:hover {"):]
     hover = hover[:hover.index("}")]
     assert "translateY(-2px)" in hover and "rgba(255, 255, 255, 0.5)" in hover
-    # The label still does not type at 13px on glass, which is what read as
-    # the button resizing in the first place.
-    assert ':not(.nav .btn)' in JS, "the bar's button is typing again"
+    # No label types anywhere any more (test_button_labels_do_not_animate).
 
 
 def test_the_network_charts_only_draw_numbers_that_exist():
