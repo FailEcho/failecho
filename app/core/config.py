@@ -147,6 +147,8 @@ class Settings:
     #: Where the public site links to its lab. Empty means no lab is linked --
     #: a self-hosted copy should not advertise ours.
     lab_url: str = field(default_factory=lambda: _env_str("FIN_LAB_URL", ""))
+    #: On a lab instance: where the real site is, so the banner can link back.
+    lab_home_url: str = field(default_factory=lambda: _env_str("FIN_LAB_HOME_URL", ""))
     fleet_report_path: str = field(default_factory=lambda: _env_str("FIN_FLEET_REPORT", ""))
 
     # ---- incident detection (MVP heuristic, deliberately simple) ---------

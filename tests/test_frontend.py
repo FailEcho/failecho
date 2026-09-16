@@ -267,18 +267,16 @@ def test_static_assets_stay_small():
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-dark.png").stat().st_size
         + (STATIC / "card-abstract1.webp").stat().st_size
-        + (STATIC / "purple_lab.webp").stat().st_size
     )
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
     # 144k -> 145k on 2026-09-16: the lab linked from three places on the
     # home page, and its banner and bar tag in the shared stylesheet.
-    # 145k -> 195k the same day: the site carries one picture again, on
-    # request -- purple_lab.webp behind the live band. Delivered as 47KB of
-    # WebP at 1200px from a 2.1MB PNG that was never committed. Below this
-    # is still under a fifth of what the hero ground used to cost.
-    assert per_visit < 195_000, f"page weight crept to {per_visit} bytes"
+    # (purple_lab.webp was briefly behind the live band here; it belongs to
+    # the lab's scoreboard and is loaded by fleet.css only, so the public
+    # page is back under its old budget.)
+    assert per_visit < 145_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -1657,14 +1655,39 @@ def test_lab_banner_is_not_pinned(client):
 
 
 
-def test_the_live_band_picture_is_small_webp_not_the_png(client):
-    """The source was a 2.1MB PNG. What ships is WebP under 60KB, and the PNG
-    is neither in static nor referenced anywhere."""
+def test_the_lab_picture_is_small_webp_and_loaded_by_the_lab_only(client):
+    """The source was a 2.1MB PNG. What ships is WebP under 60KB, referenced
+    from fleet.css -- which only the lab's scoreboard loads -- and never from
+    the shared stylesheet, so the public site never downloads it."""
     assert (STATIC / "purple_lab.webp").stat().st_size < 60_000
     assert not (STATIC / "purple_lab.png").exists()
+    assert 'url("purple_lab.webp")' in (STATIC / "fleet.css").read_text()
+    shared = (STATIC / "style.css").read_text()
+    assert "purple_lab" not in shared and "purple_lab" not in HTML
+
+
+def test_lab_banner_links_home_and_the_tag_is_off_the_brand():
+    """A lab with no way out reads as the product, and a tag beside the brand
+    collides with it when the bar opens."""
+    import re
+
+    from app.core.config import settings
+    from app.main import render_page
+
+    object.__setattr__(settings, "lab_label", "Lab")
+    object.__setattr__(settings, "lab_home_url", "https://example.com")
+    try:
+        html = render_page("index.html", "http://lab.test")
+    finally:
+        object.__setattr__(settings, "lab_label", "")
+        object.__setattr__(settings, "lab_home_url", "")
+    assert 'href="https://example.com">back to example.com</a>' in html
+    nav = html[html.index('<nav class="nav"'):]
+    assert nav.startswith('<nav class="nav" aria-label="Primary"><span class="lab-tag">')
+    brand = re.search(r'<a class="brand".*?</a>(.{0,40})', html, re.S).group(1)
+    assert "lab-tag" not in brand
     css = (STATIC / "style.css").read_text()
-    assert 'url("purple_lab.webp")' in css
-    assert "purple_lab.png" not in css and "purple_lab.png" not in HTML
+    assert "--lab-gradient: linear-gradient(90deg, #7c3aed" in css
 
 
 def test_lab_front_door_is_the_scoreboard(monkeypatch):

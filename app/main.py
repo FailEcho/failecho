@@ -849,17 +849,23 @@ def render_page(filename: str, base_url: str) -> str:
     html = html.replace("{{ASSET_V}}", asset_version())
     if settings.lab_label:
         # A lab instance says what it is on every page, above everything else,
-        # so a screenshot or a recording carries the label with it.
+        # so a screenshot or a recording carries the label with it -- and it
+        # says where the real site is, because a lab with no way out reads as
+        # the product.
+        home = (f' &middot; <a href="{html_escape(settings.lab_home_url)}">'
+                f'back to {html_escape(settings.lab_home_url.split("//")[-1].rstrip("/"))}</a>'
+                if settings.lab_home_url else "")
         banner = (
             '<div class="lab-banner" role="note">'
             + html_escape(settings.lab_label)
             + ' &middot; <a href="/fleet">scoreboard</a>'
-            + ' &middot; not the public network</div>'
+            + ' &middot; not the public network' + home + '</div>'
         )
         html = html.replace('<header class="topbar">', banner + '<header class="topbar">', 1)
-        # and a tag next to the wordmark that stays in view when the strip has
-        # scrolled away
-        html = re.sub(r'(<a class="brand"[^>]*>.*?</a>)', r'\1<span class="lab-tag">lab</span>', html, count=1, flags=re.S)
+        # a small tag that stays in view once the strip has scrolled away. In
+        # the nav, not beside the brand: the brand moves when the bar opens.
+        html = html.replace('<nav class="nav" aria-label="Primary">',
+                            '<nav class="nav" aria-label="Primary"><span class="lab-tag">lab</span>', 1)
     for marker, value, placeholder in (("github", settings.github_url, "{{GITHUB_URL}}"),
                                        ("lab", settings.lab_url, "{{LAB_URL}}")):
         open_, close = f"<!--{marker}-->", f"<!--/{marker}-->"
