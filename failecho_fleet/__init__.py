@@ -48,10 +48,20 @@ MAX_RUNS_PER_DAY = int(os.environ.get("FLEET_MAX_RUNS_PER_DAY") or 600)
 
 PROVIDERS = {
     "groq": {"host": "api.groq.com", "url": "https://api.groq.com/openai/v1/chat/completions",
-             "key": os.environ.get("GROQ_API_KEY"), "model": "openai/gpt-oss-20b"},
+             "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 400},
     "gemini": {"host": "generativelanguage.googleapis.com",
                "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-               "key": os.environ.get("GEMINI_API_KEY"), "model": "gemini-flash-latest"},
+               "key": os.environ.get("GEMINI_API_KEY"), "models": ["gemini-flash-latest"], "daily_cap": 400},
+    # Free-tier key, zero spend, no limit set -- checked before this was added.
+    # Three free models verified to make real tool calls; rotated per run so
+    # no single one carries the persona. Free models are rate-limited hard,
+    # and those 429s are real data. The daily cap keeps us a polite tenant.
+    "openrouter": {"host": "openrouter.ai", "url": "https://openrouter.ai/api/v1/chat/completions",
+                   "key": os.environ.get("OPEN_ROUTER_API_KEY"),
+                   "models": ["nex-agi/nex-n2.5-mini:free", "liquid/lfm-2.5-2.6b:free",
+                              "inclusionai/ling-3.0-flash-vl:free"],
+                   "headers": {"HTTP-Referer": "https://failecho.com", "X-Title": "FailEcho fleet lab"},
+                   "daily_cap": 120},
 }
 
 # ---------------------------------------------------------------------------
@@ -107,12 +117,12 @@ PERSONAS = [
     ("fleet-decor-ask-b",  "decorator", "gemini", True,  GITHUB),
     ("fleet-decor-blind-a","decorator", "groq",   False, PYPI_NPM),
     ("fleet-decor-blind-b","decorator", "gemini", False, GITHUB),
-    ("fleet-auto-ask-a",   "auto",      "groq",   True,  MIXED),
-    ("fleet-auto-ask-b",   "auto",      "gemini", True,  MIXED),
-    ("fleet-auto-blind-a", "auto",      "groq",   False, MIXED),
-    ("fleet-auto-blind-b", "auto",      "gemini", False, MIXED),
-    ("fleet-mcp-ask",      "mcp",       "groq",   True,  GITHUB),
-    ("fleet-mcp-blind",    "mcp",       "gemini", False, GITHUB),
+    ("fleet-auto-ask-a",   "auto",      "openrouter", True,  MIXED),
+    ("fleet-auto-ask-b",   "auto",      "gemini",     True,  MIXED),
+    ("fleet-auto-blind-a", "auto",      "openrouter", False, MIXED),
+    ("fleet-auto-blind-b", "auto",      "gemini",     False, MIXED),
+    ("fleet-mcp-ask",      "mcp",       "groq",       True,  GITHUB),
+    ("fleet-mcp-blind",    "mcp",       "groq",       False, GITHUB),
     ("fleet-cron-a",       "decorator", None,     True,  CRON_CALLS),
     ("fleet-cron-b",       "decorator", None,     False, CRON_CALLS),
     # test targets: a service that returns what it is asked for
@@ -243,6 +253,7 @@ class Run:
         self.fe = FailEcho(endpoint=LAB_ENDPOINT, reporter_id=reporter)
         self.tool_calls = 0
         self.model_calls = 0
+        self.model: str | None = None
         self.failures: list[dict] = []   # one per failure: shape, asked, recommended, attempts, recovered
         self.tools = {}
         for name, fn in TOOLS.items():
@@ -370,19 +381,23 @@ class Run:
                 o, r = arg.split("/"); self.call("github_latest_release", {"owner": o, "repo": r})
         return f"cron: {len(calls)} calls"
 
-    def run_model(self, task: str) -> str:
+    def run_model(self, task: str, run_index: int = 0, used_today: int = 0) -> str:
         p = PROVIDERS[self.provider]
         if not p["key"]:
             return "(no provider key)"
+        if used_today >= p.get("daily_cap", 10**9):
+            return f"(provider {self.provider} daily cap reached; run skipped)"
+        model = p["models"][run_index % len(p["models"])]
+        self.model = model
         messages = [{"role": "system", "content": "Use the tools to answer with real data. If a tool errors you may "
                                                    "try once more, then answer with what you have. Under 60 words."},
                     {"role": "user", "content": task}]
 
         def chat():
-            body = {"model": p["model"], "messages": messages, "tools": TOOL_SCHEMAS, "tool_choice": "auto", "max_tokens": 500}
+            body = {"model": model, "messages": messages, "tools": TOOL_SCHEMAS, "tool_choice": "auto", "max_tokens": 500}
             req = urllib.request.Request(p["url"], data=json.dumps(body).encode(), method="POST",
                                          headers={"Content-Type": "application/json", "User-Agent": UA,
-                                                  "Authorization": f"Bearer {p['key']}"})
+                                                  "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
             try:
                 with urllib.request.urlopen(req, timeout=60) as r:
                     return json.load(r)
@@ -513,15 +528,20 @@ def main(argv: list[str] | None = None) -> int:
     reporter, path, provider, asks, workload = PERSONAS[idx]
     run = Run(reporter, path, provider, asks)
     started = time.monotonic()
+    state.setdefault("provider_calls_today", {})
+    if state.get("provider_day") != today:
+        state["provider_day"], state["provider_calls_today"] = today, {}
     if provider is None:
         answer = run.run_cron(workload)
     else:
         task = workload[(state["runs_today"] // len(PERSONAS)) % len(workload)]
-        answer = run.run_model(task)
+        answer = run.run_model(task, run_index=state["runs_today"],
+                               used_today=state["provider_calls_today"].get(provider, 0))
+        state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
     run.fe.flush(timeout=20)
 
     record = {"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "reporter": reporter, "path": path,
-              "provider": provider, "asks": asks, "tool_calls": run.tool_calls, "model_calls": run.model_calls,
+              "provider": provider, "model": getattr(run, "model", None), "asks": asks, "tool_calls": run.tool_calls, "model_calls": run.model_calls,
               "failures": run.failures, "seconds": round(time.monotonic() - started, 1)}
     state["runs"].append(record)
     state["runs"] = state["runs"][-5000:]
