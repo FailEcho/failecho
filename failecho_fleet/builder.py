@@ -120,7 +120,7 @@ SHARED_SIGNALS = (
     ("rate_limit", re.compile(r"HTTP Error 429|\b429\b|rate.?limit|Too Many Requests", re.I)),
     ("auth_error", re.compile(r"HTTP Error 40[13]\b|\b403 Forbidden\b", re.I)),
     ("connection_error", re.compile(r"ConnectionError|ConnectionReset|RemoteDisconnected|Connection refused|"
-                                    r"Failed to establish a new connection|ProxyError|Tunnel connection failed|"
+                                    r"Failed to establish a new connection|ProxyError|"
                                     r"error sending request|Network is unreachable", re.I)),
     ("server_error", re.compile(r"HTTP Error 5\d\d|status(?: code)? 5\d\d|\b50[234]\b|Bad Gateway|Service Unavailable", re.I)),
     # pip's generic wrapper line, after the specific signals so a status in
@@ -132,9 +132,18 @@ SHARED_SIGNALS = (
 INDEX_HOSTS = re.compile(r"(files\.pythonhosted\.org|pypi\.org)")
 
 
+#: The fence refusing a host is the sandbox's doing, not the world's. A
+#: builder that reached for github.com when only api.github.com was allowed
+#: put a github.com "auth_error/443" into the lab on night one; the host is
+#: allowed now, and any future refusal is filed as local.
+_FENCE = re.compile(r"Tunnel connection failed: 403|403 Forbidden.*172\.16\.0\.1|Network is unreachable", re.I)
+
+
 def classify_output(stderr: str, stdout: str = "") -> tuple[str, str | None]:
     """('shared', error_type) or ('local', None) for a failed run's output."""
     text = (stderr or "")[-8000:] + "\n" + (stdout or "")[-2000:]
+    if _FENCE.search(text):
+        return "local", None
     for et, pattern in SHARED_SIGNALS:
         if pattern.search(text):
             return "shared", et

@@ -182,6 +182,9 @@ def test_the_guest_refuses_paths_outside_work():
      "ERROR: Could not fetch URL https://pypi.org/simple/rich/: connection error", ("shared", "timeout")),
     ("error: Failed to fetch: `https://pypi.org/simple/requests/`\n  Caused by: error sending request for url", ("shared", "connection_error")),
     ("ERROR: Could not fetch URL https://files.pythonhosted.org/packages/x.whl: 503 Service Unavailable", ("shared", "server_error")),
+    # the fence, not the world: filed as local so the lab never learns a "github.com auth_error" from the sandbox
+    ("urllib.error.URLError: <urlopen error Tunnel connection failed: 403 Forbidden>", ("local", None)),
+    ("OSError: [Errno 101] Network is unreachable", ("local", None)),
 ])
 def test_a_failed_run_is_filed_as_local_or_shared(stderr, expected):
     """Local bugs never reach the network; shared failures do. A local bug
