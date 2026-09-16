@@ -110,13 +110,17 @@
   </tr></thead><tbody></tbody></table>
 
   <h2>Onboarding from llms.txt</h2>
-  <p class="sub">Every two hours a free model gets a clean VM, a shell, and one sentence: <em>Read llms.txt and set
-  yourself up to use FailEcho.</em> No hints. Graded from the disk, not by a model: config written in the project,
-  a pre-existing server left intact, one read-only query to verify, nothing reported, no client-owned file
-  touched, no hook installed. The failing column is the line of llms.txt to rewrite next.
-  <span id="fleet-onboard-when"></span></p>
+  <p class="sub">Every hour a free model gets a clean VM, a shell, and one sentence: <em>Read llms.txt and set
+  yourself up to use FailEcho.</em> No hints. What it finds on disk is one of five scenes the document has a rule
+  for: a clean project (write the config, verify with one query); a project with another server already configured
+  (add, do not clobber); one where FailEcho is already there (stop, say so); a home directory full of projects (ask,
+  do not write); a project that cannot be written (use the REST query, say so). Graded from the disk, not by a model.
+  The failing column is the line of llms.txt to rewrite next. <span id="fleet-onboard-when"></span></p>
+  <table id="fleet-onboard-scenarios"><thead><tr>
+    <th>scene</th><th class="num">graded</th><th class="num">passed</th><th>fails most on</th>
+  </tr></thead><tbody></tbody></table>
   <table id="fleet-onboard"><thead><tr>
-    <th>model</th><th class="num">runs</th><th class="num">passed</th><th class="num">asked instead</th>
+    <th>model</th><th class="num">runs</th><th class="num">passed</th>
     <th class="num">provider failed</th><th>fails most on</th><th>last</th>
   </tr></thead><tbody></tbody></table>
 

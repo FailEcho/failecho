@@ -46,12 +46,19 @@
     }));
     var o = d.onboard, ot = (o && o.totals) || {};
     el("fleet-onboard-when").textContent = o ? (ot.graded + " graded runs, " + ot.passed + " passed; " +
-      ot.seeded_preserved + " kept the existing server, " + ot.seeded_clobbered + " clobbered it; " +
+      ot.other_preserved + " kept another server intact, " + ot.other_clobbered + " clobbered it; " +
       ot.said_restart + " said a restart is needed.") : "Not run yet.";
+    var scenes = { clean: "clean project", other: "another server already there", present: "FailEcho already there",
+                   home: "home directory, many projects", readonly: "project cannot be written" };
+    fill("fleet-onboard-scenarios", ((o && o.scenarios) || []).map(function (b) {
+      return [td(scenes[b.scenario] || b.scenario), td(b.graded, "num"),
+              td(b.graded ? b.passed + " / " + b.graded : "-", "num " + (b.graded && b.passed === b.graded ? "ok" : b.graded ? "warn" : "")),
+              td(b.worst || "-")];
+    }));
     fill("fleet-onboard", ((o && o.models) || []).map(function (m) {
       return [td(m.model + " (" + m.provider + ")"), td(m.runs, "num"),
               td(m.graded ? m.passed + " / " + m.graded : "-", "num " + (m.graded && m.passed === m.graded ? "ok" : m.graded ? "warn" : "")),
-              td(m.asked, "num"), td(m.provider_failed, "num"), td(m.worst || "-"), td((m.last || "").replace("T", " ").slice(0, 16))];
+              td(m.provider_failed, "num"), td(m.worst || "-"), td((m.last || "").replace("T", " ").slice(0, 16))];
     }));
     var c = d.canary;
     el("fleet-canary-when").textContent = c ? ("Last run " + (c.at || "").replace("T", " ").slice(0, 16) + " UTC: " +

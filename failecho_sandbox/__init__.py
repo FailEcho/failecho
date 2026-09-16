@@ -214,13 +214,18 @@ class Sandbox:
     # -- tasks ---------------------------------------------------------------
 
     def run(self, argv: list[str], files: dict[str, str] | None = None, timeout: int = 60,
-            env: dict[str, str] | None = None) -> Result:
+            env: dict[str, str] | None = None, as_root: bool = False) -> Result:
         """Run argv as the guest's unprivileged user in /work. Never raises for
         the task's own failure; that is the result. Raises SandboxError only
-        if the VM itself is gone."""
+        if the VM itself is gone.
+
+        as_root runs the command as the guest's root, for the host to arrange
+        a scene (a directory the task cannot write, say). It is a host-side
+        argument only; nothing a task does can ask for it."""
         if self.proc is None or self.proc.poll() is not None:
             raise SandboxError("sandbox is not running")
-        req = {"argv": list(argv), "files": files or {}, "timeout": int(timeout), "env": env or {}}
+        req = {"argv": list(argv), "files": files or {}, "timeout": int(timeout), "env": env or {},
+               "as_root": bool(as_root)}
         return Result(self._exchange(req, timeout=timeout + 15))
 
     def python(self, code: str, timeout: int = 60, env: dict[str, str] | None = None,

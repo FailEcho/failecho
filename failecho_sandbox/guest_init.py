@@ -134,8 +134,12 @@ def run_task(req: dict) -> dict:
         os.chown(path, 1000, 1000)
     started = time.monotonic()
     timed_out = False
+    # The host may run a setup step as root (to make a directory the task
+    # cannot write, for instance). Tasks themselves always run as runner: the
+    # flag arrives only over vsock, which only the host holds.
+    who = {} if req.get("as_root") is True else {"user": "runner", "group": "runner"}
     try:
-        p = subprocess.Popen(argv, cwd=WORK, env=env, user="runner", group="runner",
+        p = subprocess.Popen(argv, cwd=WORK, env=env, **who,
                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              start_new_session=True)
     except OSError as e:

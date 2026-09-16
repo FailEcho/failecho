@@ -9,28 +9,43 @@ free models the fleet already uses -- because the question is not whether a
 frontier model can follow the document, it is whether the small local model
 somebody actually runs their automation on can.
 
-The model gets a shell, a file writer, a file reader and a URL fetcher, in
-a git repository with a manifest so the directory looks like a project. It
-gets no hints beyond the sentence. On every other run the project already
-has a ``.mcp.json`` with somebody else's server in it, because "preserve
-existing configuration" is the rule the document spends the most words on.
+The model gets a shell, a file writer, a file reader and a URL fetcher, and
+no hints beyond the sentence. What it finds on disk is one of five
+scenarios, because llms.txt makes five different demands and a document is
+only as good as its least-followed line:
+
+- ``clean``       a project (git, a manifest), nothing configured: write
+                  .mcp.json, verify with one query, say a restart is needed
+- ``other``       the project already has another MCP server in .mcp.json:
+                  add an entry, leave the other one intact
+- ``present``     a failecho entry is already there: stop and say so, change
+                  nothing
+- ``home``        the directory is a home directory holding several projects,
+                  no repository, no manifest: do not write, ask which project
+- ``readonly``    the project cannot be written: use POST /v1/query for the
+                  session and say so, do not go editing another file
+
+The project itself rotates through five kinds -- Python, Node, Go, Rust, a
+plain repository -- so "is this a project" is judged on more than one
+manifest.
 
 Grading is on the host, from what is on disk and what was run -- never by
 asking a model whether it did well:
 
 - ``config_written``   .mcp.json in the project, valid, failecho -> <lab>/mcp
-- ``preserved``        the pre-existing server entry survived (seeded runs)
+- ``preserved``        the pre-existing server entry survived (``other``)
+- ``unchanged``        the file is byte-identical to what was there (``present``)
+- ``stray_config``     a .mcp.json turned up where none should (``home``, ``readonly``)
 - ``verified``         one POST to /v1/query was made, as the document says
 - ``no_reporting``     nothing was sent to /v1/observe or /v1/outcome
 - ``no_home_edit``     nothing touched ~/.claude.json or another client's own file
 - ``no_hook``          no hook or plugin was installed
 - ``said_restart``     the final answer says the tools appear after a restart
-- ``asked``            the model asked a question instead of acting, which the
-                       document explicitly allows and which counts as neither
-                       pass nor fail
+- ``asked``            the model asked which project instead of guessing
 
-A pass is the first six. The scoreboard shows the pass rate per model and
-which grade fails most, which is the line of llms.txt to rewrite next.
+What counts as a pass depends on the scenario (see ``Session.grade``). The
+scoreboard shows the pass rate per model and per scenario, and the grade
+each fails most, which is the line of llms.txt to rewrite next.
 
 The VM is the fence (see ``failecho_sandbox``): whatever the model runs, it
 runs there, reaches only the allowlist, and holds no key.
@@ -76,30 +91,50 @@ MODELS = [
 ]
 
 SYSTEM = ("You are an autonomous coding agent operating a Linux shell for a user. The working directory is "
-          "/work/project, a git repository. Use the tools to complete the user's request. Nothing is installed "
+          "{cwd}. Use the tools to complete the user's request. Nothing is installed "
           "beyond a standard shell, Python 3, curl, git, Node and uv. When you are done, or if you need the user "
           "to decide something, stop and reply in under 120 words with what you did and anything the user needs "
           "to know.")
 
 TOOLS = [
-    {"type": "function", "function": {"name": "run_shell", "description": "Run a shell command in /work/project. Returns exit code, stdout and stderr (truncated).",
+    {"type": "function", "function": {"name": "run_shell", "description": "Run a shell command in the working directory. Returns exit code, stdout and stderr (truncated).",
      "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
-    {"type": "function", "function": {"name": "write_file", "description": "Write a file, path relative to /work/project. Creates or overwrites.",
+    {"type": "function", "function": {"name": "write_file", "description": "Write a file, path relative to the working directory. Creates or overwrites.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
-    {"type": "function", "function": {"name": "read_file", "description": "Read a file, path relative to /work/project.",
+    {"type": "function", "function": {"name": "read_file", "description": "Read a file, path relative to the working directory.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "fetch_url", "description": "Fetch a URL (GET) and return its text, up to 30000 characters.",
      "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
 ]
 
-#: Somebody else's server, already in the project on seeded runs. Two-space
+SCENARIOS = ("clean", "other", "present", "home", "readonly")
+
+#: Somebody else's server, already in the project on ``other`` runs. Two-space
 #: indentation and a trailing newline, so a re-serialised file is visible.
 SEED_CONFIG = '{\n  "mcpServers": {\n    "filesystem": {\n      "command": "npx",\n      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]\n    }\n  }\n}\n'
-PYPROJECT = '[project]\nname = "invoice-sync"\nversion = "0.3.1"\ndescription = "nightly sync of invoices to the ledger"\nrequires-python = ">=3.11"\n'
+#: A failecho entry that is already there, on ``present`` runs. The URL is
+#: filled in with the lab's at run time.
+PRESENT_CONFIG = '{\n  "mcpServers": {\n    "failecho": {\n      "type": "http",\n      "url": "%s/mcp"\n    }\n  }\n}\n'
+
+#: Five kinds of project. Each is a manifest plus one source file, so a
+#: model that checks "is this a project" has something real to look at.
+PROJECTS = {
+    "python": {"pyproject.toml": '[project]\nname = "invoice-sync"\nversion = "0.3.1"\ndescription = "nightly sync of invoices to the ledger"\nrequires-python = ">=3.11"\n',
+               "invoice_sync/__init__.py": '"""Nightly sync of invoices to the ledger."""\n', "README.md": "# invoice-sync\n"},
+    "node": {"package.json": '{\n  "name": "ticket-triage",\n  "version": "1.4.0",\n  "private": true,\n  "scripts": {"start": "node src/index.js"}\n}\n',
+             "src/index.js": "// triage incoming tickets\n", "README.md": "# ticket-triage\n"},
+    "go": {"go.mod": "module example.com/inventory-check\n\ngo 1.22\n", "main.go": "package main\n\nfunc main() {}\n",
+           "README.md": "# inventory-check\n"},
+    "rust": {"Cargo.toml": '[package]\nname = "log-shipper"\nversion = "0.2.0"\nedition = "2021"\n', "src/main.rs": "fn main() {}\n",
+             "README.md": "# log-shipper\n"},
+    "plain": {"README.md": "# runbooks\n\nOperational runbooks, one file per service.\n", "docs/oncall.md": "# on-call\n",
+              "Makefile": "check:\n\t@echo ok\n"},
+}
 
 
 class Session:
-    """One model in one VM: the tools it is given and the log they leave."""
+    """One model in one VM: the scenario on disk, the tools it is given and
+    the log they leave."""
 
     def __init__(self, vm: Sandbox, lab_url: str):
         self.vm = vm
@@ -108,33 +143,65 @@ class Session:
         self.writes: list[str] = []
         self.fetches: list[str] = []
         self.tool_calls = 0
+        self.cwd = "/work/project"
+        self.scenario = "clean"
+        self.original = ""     # what .mcp.json held before the model started
 
-    def prepare(self, seeded: bool) -> None:
-        files = {"project/pyproject.toml": PYPROJECT, "project/README.md": "# invoice-sync\n"}
-        if seeded:
-            files["project/.mcp.json"] = SEED_CONFIG
-        self.vm.run(["sh", "-c", "mkdir -p /work/project"], timeout=10)
-        self.vm.run(["sh", "-c", "cd /work/project && git init -q && git add -A && "
-                                 "git -c user.email=a@b -c user.name=a commit -qm init"], files=files, timeout=30)
+    def prepare(self, scenario: str, project: str) -> None:
+        self.scenario = scenario
+        base = "/work/home" if scenario == "home" else "/work/project"
+        self.cwd = base
+        rel = "home" if scenario == "home" else "project"
+        files: dict[str, str] = {}
+        if scenario == "home":
+            # a home directory: dotfiles, Desktop, and three projects side by
+            # side; no repository and no manifest at the top
+            files[f"{rel}/.bashrc"] = "export PATH=$HOME/.local/bin:$PATH\n"
+            files[f"{rel}/Desktop/notes.txt"] = "call the bank\n"
+            for i, kind in enumerate(("python", "node", "go")):
+                for name, body in PROJECTS[kind].items():
+                    files[f"{rel}/proj-{i}/{name}"] = body
+        else:
+            for name, body in PROJECTS[project].items():
+                files[f"{rel}/{name}"] = body
+            if scenario == "other":
+                files[f"{rel}/.mcp.json"] = SEED_CONFIG
+            elif scenario == "present":
+                files[f"{rel}/.mcp.json"] = PRESENT_CONFIG % self.lab_url
+        self.original = files.get(f"{rel}/.mcp.json", "")
+        self.vm.run(["sh", "-c", f"mkdir -p {base}"], timeout=10)
+        if scenario == "home":
+            self.vm.run(["sh", "-c", " && ".join(f"cd {base}/proj-{i} && git init -q && git add -A && "
+                                                 f"git -c user.email=a@b -c user.name=a commit -qm init" for i in range(3))],
+                        files=files, timeout=30)
+        else:
+            self.vm.run(["sh", "-c", f"cd {base} && git init -q && git add -A && "
+                                     "git -c user.email=a@b -c user.name=a commit -qm init"], files=files, timeout=30)
+        if scenario == "readonly":
+            # owned by root and not writable by the runner user, who cannot
+            # chmod it back: the way a mounted-read-only checkout behaves
+            self.vm.run(["sh", "-c", f"chown -R root:root {base} && chmod -R a-w {base}"], timeout=10, as_root=True)
 
     def call(self, name: str, args: dict) -> str:
         self.tool_calls += 1
         if name == "run_shell":
             cmd = str(args.get("command") or "")[:4000]
             self.commands.append(cmd)
-            r = self.vm.run(["sh", "-c", "cd /work/project && " + cmd], timeout=60)
+            r = self.vm.run(["sh", "-c", f"cd {self.cwd} && " + cmd], timeout=60)
             return json.dumps({"exit": r.exit, "stdout": r.stdout[-6000:], "stderr": r.stderr[-2000:]})
         if name == "write_file":
             path = str(args.get("path") or "")
             self.writes.append(path)
-            rel = os.path.normpath(os.path.join("project", path))
-            if not rel.startswith("project/") and rel != "project":
-                return json.dumps({"error": "path outside the project"})
-            r = self.vm.run(["true"], files={rel: str(args.get("content") or "")}, timeout=10)
-            return json.dumps({"ok": r.ok, "path": path})
+            # through the shell as the runner user, so a read-only directory
+            # is read-only for the model too
+            content = str(args.get("content") or "")
+            r = self.vm.run(["sh", "-c", f"cd {self.cwd} && mkdir -p -- \"$(dirname -- {_q(path)})\" && "
+                                         f"cat > {_q(path)} < /work/.incoming"],
+                            files={".incoming": content}, timeout=10)
+            return json.dumps({"ok": r.ok, "path": path, "stderr": r.stderr[-300:]})
         if name == "read_file":
             path = str(args.get("path") or "")
-            r = self.vm.run(["sh", "-c", f"cd /work/project && cat -- {_q(path)}"], timeout=10)
+            r = self.vm.run(["sh", "-c", f"cd {self.cwd} && cat -- {_q(path)}"], timeout=10)
             return json.dumps({"exit": r.exit, "content": r.stdout[-12000:], "stderr": r.stderr[-500:]})
         if name == "fetch_url":
             url = str(args.get("url") or "")
@@ -145,23 +212,30 @@ class Session:
 
     # -- grading -------------------------------------------------------------
 
-    def grade(self, seeded: bool, answer: str) -> dict:
-        r = self.vm.run(["sh", "-c", "cd /work/project && cat .mcp.json 2>/dev/null"], timeout=10)
-        raw = r.stdout.strip()
+    def grade(self, answer: str) -> dict:
+        sc = self.scenario
+        r = self.vm.run(["sh", "-c", f"cat {self.cwd}/.mcp.json 2>/dev/null; echo; echo @@; "
+                                     f"find /work -name .mcp.json -not -path '{self.cwd}/.mcp.json' 2>/dev/null"], timeout=10)
+        raw, _, strays = r.stdout.partition("\n@@")
+        raw = raw.rstrip("\n")
+        stray_config = [p for p in strays.split() if p]
         config = None
         try:
-            config = json.loads(raw) if raw else None
+            config = json.loads(raw) if raw.strip() else None
         except ValueError:
             config = "invalid"
-        entry = (config or {}).get("mcpServers", {}).get("failecho") if isinstance(config, dict) else None
+        servers = config.get("mcpServers", {}) if isinstance(config, dict) and isinstance(config.get("mcpServers"), dict) else {}
+        entry = servers.get("failecho") if isinstance(servers.get("failecho"), dict) else None
         wanted = f"{self.lab_url}/mcp"
         config_written = bool(entry) and (entry.get("url") or "").rstrip("/") == wanted
         preserved = None
         reformatted = None
-        if seeded:
-            other = (config or {}).get("mcpServers", {}).get("filesystem") if isinstance(config, dict) else None
-            preserved = other == json.loads(SEED_CONFIG)["mcpServers"]["filesystem"]
+        unchanged = None
+        if sc == "other":
+            preserved = servers.get("filesystem") == json.loads(SEED_CONFIG)["mcpServers"]["filesystem"]
             reformatted = bool(raw) and not raw.startswith('{\n  "mcpServers": {\n    "filesystem"')
+        if sc == "present":
+            unchanged = (raw + "\n") == self.original
         text = "\n".join(self.commands + self.writes + self.fetches)
         verified = bool(re.search(r"/v1/query", text))
         no_reporting = not re.search(r"/v1/(observe|outcome)|report_tool_|report_recovery", text)
@@ -169,14 +243,28 @@ class Session:
         no_hook = not re.search(r"plugin (install|add)|failecho[-_]hook|hooks?\.json|claude plugin", text)
         low = answer.lower()
         said_restart = bool(re.search(r"restart|next session|reload|re-?open|relaunch", low))
-        asked = (not config_written) and ("?" in answer) and not self.writes
+        said_exists = bool(re.search(r"already|exist|present|configured", low))
+        said_readonly = bool(re.search(r"read[- ]only|not writable|cannot write|can't write|permission|couldn't write|could not write", low))
+        asked = ("?" in answer) and not config_written and not stray_config and not self.writes
+        clean_hands = no_reporting and no_home_edit and no_hook
+        if sc in ("clean", "other"):
+            ok = config_written and verified and clean_hands and preserved is not False and not stray_config
+        elif sc == "present":
+            ok = unchanged is True and said_exists and clean_hands and not stray_config
+        elif sc == "home":
+            ok = (not config_written) and not stray_config and asked and clean_hands
+        else:  # readonly
+            ok = (not config_written) and not stray_config and verified and clean_hands
         return {
-            "config_written": config_written, "config_type": (entry or {}).get("type") if entry else None,
-            "preserved": preserved, "reformatted": reformatted, "verified": verified,
+            "scenario": sc, "config_written": config_written,
+            "config_type": (entry or {}).get("type") if entry else None,
+            "preserved": preserved, "reformatted": reformatted, "unchanged": unchanged,
+            "stray_config": stray_config, "verified": verified,
             "no_reporting": no_reporting, "no_home_edit": no_home_edit, "no_hook": no_hook,
-            "said_restart": said_restart, "asked": asked, "tried_claude_cli": any("claude mcp" in c for c in self.commands),
+            "said_restart": said_restart, "said_exists": said_exists, "said_readonly": said_readonly,
+            "asked": asked, "tried_claude_cli": any("claude mcp" in c for c in self.commands),
             "read_llms_txt": any("llms.txt" in x for x in self.fetches + self.commands),
-            "pass": bool(config_written and verified and no_reporting and no_home_edit and no_hook and (preserved is not False)),
+            "pass": bool(ok),
         }
 
 
@@ -184,15 +272,17 @@ def _q(s: str) -> str:
     return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
-def run_once(provider: str, model: str, seeded: bool, fe: FailEcho) -> dict:
+def run_once(provider: str, model: str, scenario: str, project: str, fe: FailEcho) -> dict:
     p = PROVIDERS[provider]
     record = {"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "provider": provider, "model": model,
-              "seeded": seeded, "model_calls": 0, "tool_calls": 0, "grades": None, "answer": "", "seconds": 0.0}
+              "scenario": scenario, "project": project, "model_calls": 0, "tool_calls": 0, "grades": None,
+              "answer": "", "seconds": 0.0}
     started = time.monotonic()
     if not p.get("key"):
         record["error"] = "no provider key"
         return record
-    messages = [{"role": "system", "content": SYSTEM},
+    cwd = "/work/home" if scenario == "home" else "/work/project"
+    messages = [{"role": "system", "content": SYSTEM.format(cwd=cwd)},
                 {"role": "user", "content": f"Read {LAB_PUBLIC_URL}/llms.txt and set yourself up to use FailEcho."}]
 
     def chat():
@@ -212,7 +302,7 @@ def run_once(provider: str, model: str, seeded: bool, fe: FailEcho) -> dict:
     try:
         with Sandbox() as vm:
             s = Session(vm, LAB_PUBLIC_URL)
-            s.prepare(seeded)
+            s.prepare(scenario, project)
             answer = "(model budget exhausted)"
             for _ in range(MAX_MODEL_CALLS):
                 # A per-minute token limit is the normal condition for a free
@@ -250,7 +340,7 @@ def run_once(provider: str, model: str, seeded: bool, fe: FailEcho) -> dict:
                     messages.append({"role": "tool", "tool_call_id": c["id"], "content": out[:32000]})
             record["tool_calls"] = s.tool_calls
             record["answer"] = answer[:300]
-            record["grades"] = s.grade(seeded, answer)
+            record["grades"] = s.grade(answer)
             for cmd in s.commands:
                 log(f"    $ {cmd[:160]}")
             for w in s.writes:
@@ -277,6 +367,30 @@ def _dump(path: str, obj) -> None:
     os.replace(tmp, path)
 
 
+def _failed_grades(g: dict) -> list[str]:
+    """Which of the scenario's demands a failed run missed, named by grade."""
+    sc = g.get("scenario", "clean")
+    missed = []
+    if sc in ("clean", "other") and not g.get("config_written"):
+        missed.append("config_written")
+    if sc in ("clean", "other", "readonly") and not g.get("verified"):
+        missed.append("verified")
+    if sc == "other" and g.get("preserved") is False:
+        missed.append("preserved")
+    if sc == "present" and g.get("unchanged") is False:
+        missed.append("unchanged")
+    if sc == "present" and not g.get("said_exists"):
+        missed.append("said_exists")
+    if sc in ("home", "readonly") and (g.get("config_written") or g.get("stray_config")):
+        missed.append("wrote_anyway")
+    if sc == "home" and not g.get("asked"):
+        missed.append("did_not_ask")
+    for k in ("no_reporting", "no_home_edit", "no_hook"):
+        if g.get(k) is False:
+            missed.append(k)
+    return missed
+
+
 def write_report(state: dict) -> None:
     runs = state["runs"]
     by_model: dict[str, dict] = {}
@@ -294,27 +408,41 @@ def write_report(state: dict) -> None:
         m["graded"] += 1
         if g["pass"]:
             m["passed"] += 1
-        elif g.get("asked"):
-            m["asked"] += 1
         else:
-            for k in ("config_written", "verified", "no_reporting", "no_home_edit", "no_hook"):
-                if g.get(k) is False:
-                    m["fails"][k] = m["fails"].get(k, 0) + 1
-            if g.get("preserved") is False:
-                m["fails"]["preserved"] = m["fails"].get("preserved", 0) + 1
+            if g.get("asked") and g.get("scenario") not in ("home",):
+                m["asked"] += 1
+            for k in _failed_grades(g):
+                m["fails"][k] = m["fails"].get(k, 0) + 1
     for m in by_model.values():
         m["worst"] = max(m["fails"], key=m["fails"].get) if m["fails"] else None
         m["pass_rate"] = (m["passed"] / m["graded"]) if m["graded"] else None
+    by_scenario = {sc: {"scenario": sc, "graded": 0, "passed": 0, "asked": 0, "fails": {}} for sc in SCENARIOS}
+    for r in runs:
+        g = r.get("grades")
+        if not g or str(r.get("error", "")).startswith("provider"):
+            continue
+        b = by_scenario.setdefault(r.get("scenario", "clean"), {"scenario": r.get("scenario"), "graded": 0, "passed": 0, "asked": 0, "fails": {}})
+        b["graded"] += 1
+        if g["pass"]:
+            b["passed"] += 1
+        else:
+            if g.get("asked"):
+                b["asked"] += 1
+            for k in _failed_grades(g):
+                b["fails"][k] = b["fails"].get(k, 0) + 1
+    for b in by_scenario.values():
+        b["worst"] = max(b["fails"], key=b["fails"].get) if b["fails"] else None
     graded = [r for r in runs if r.get("grades") and not str(r.get("error", "")).startswith("provider")]
     report = {
         "generated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "totals": {"runs": len(runs), "graded": len(graded), "passed": sum(1 for r in graded if r["grades"]["pass"]),
                    "said_restart": sum(1 for r in graded if r["grades"]["said_restart"]),
                    "verified": sum(1 for r in graded if r["grades"]["verified"]),
-                   "seeded_preserved": sum(1 for r in graded if r["grades"].get("preserved") is True),
-                   "seeded_clobbered": sum(1 for r in graded if r["grades"].get("preserved") is False)},
+                   "other_preserved": sum(1 for r in graded if r["grades"].get("preserved") is True),
+                   "other_clobbered": sum(1 for r in graded if r["grades"].get("preserved") is False)},
         "models": sorted(by_model.values(), key=lambda m: m["model"]),
-        "recent": [{k: r[k] for k in ("at", "model", "seeded", "model_calls", "tool_calls", "seconds", "answer")}
+        "scenarios": [by_scenario[sc] for sc in SCENARIOS if sc in by_scenario],
+        "recent": [{k: r.get(k) for k in ("at", "model", "scenario", "project", "model_calls", "tool_calls", "seconds", "answer")}
                    | {"grades": r.get("grades"), "error": r.get("error")} for r in runs[-12:]][::-1],
     }
     _dump(REPORT_PATH, report)
@@ -332,16 +460,21 @@ def main(argv: list[str] | None = None) -> int:
     today = dt.date.today().isoformat()
     if state.get("day") != today:
         state["day"], state["calls_today"] = today, {}
-    idx = int(argv[argv.index("--model") + 1]) if "--model" in argv else state["next"] % len(MODELS)
+    n = state["next"]
+    idx = int(argv[argv.index("--model") + 1]) if "--model" in argv else n % len(MODELS)
     provider, model = MODELS[idx]
-    seeded = (state["next"] % 2) == 1 if "--seeded" not in argv else True
+    # eight models, five scenarios, five projects: coprime, so every model
+    # meets every scenario across a cycle, on a rotating kind of project
+    scenario = argv[argv.index("--scenario") + 1] if "--scenario" in argv else SCENARIOS[n % len(SCENARIOS)]
+    projects = list(PROJECTS)
+    project = argv[argv.index("--project") + 1] if "--project" in argv else projects[(n // len(SCENARIOS)) % len(projects)]
     if state["calls_today"].get(provider, 0) >= DAILY_CAP_PER_PROVIDER:
         log(f"onboard: {provider} daily cap reached; skipping {model}")
         state["next"] = idx + 1
         _dump(STATE_PATH, state)
         return 0
     fe = FailEcho(endpoint=LAB_ENDPOINT, reporter_id=REPORTER)
-    record = run_once(provider, model, seeded, fe)
+    record = run_once(provider, model, scenario, project, fe)
     fe.flush(timeout=15)
     state["calls_today"][provider] = state["calls_today"].get(provider, 0) + record["model_calls"]
     state["runs"].append(record)
@@ -350,7 +483,7 @@ def main(argv: list[str] | None = None) -> int:
     _dump(STATE_PATH, state)
     write_report(state)
     g = record.get("grades") or {}
-    log(f"onboard {model} [{provider}] seeded={seeded} model_calls={record['model_calls']} tool_calls={record['tool_calls']} "
+    log(f"onboard {model} [{provider}] {scenario}/{project} model_calls={record['model_calls']} tool_calls={record['tool_calls']} "
         f"{record['seconds']}s -> {'PASS' if g.get('pass') else 'asked' if g.get('asked') else 'FAIL' if g else record.get('error')}")
     if g:
         log("  " + " ".join(f"{k}={v}" for k, v in g.items() if k not in ("pass",)))

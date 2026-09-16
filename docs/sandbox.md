@@ -115,22 +115,30 @@ tarball, checksum checked.
 
 ## The onboarding test
 
-`failecho-onboard.timer` runs `python -m failecho_fleet.onboard` every two
-hours. A free model (eight in rotation, across groq, Ollama cloud,
-OpenRouter and Gemini) gets a clean VM, a shell, a file writer, a file
-reader and a URL fetcher, inside a git repository with a manifest, and one
-sentence: *Read <lab>/llms.txt and set yourself up to use FailEcho.* Every
-other run the project already holds a `.mcp.json` with another server in
-it. The host grades from disk and from the command log -- config written
-and pointing at `/mcp`, the other server preserved, one `/v1/query` made,
-nothing reported, no client-owned file touched, no hook -- and a model that
-asks a question instead of acting is recorded as "asked", which the
-document allows. The `/fleet` table shows pass rate per model and the grade
-each fails most, which is the line of llms.txt to rewrite next. First two
-runs: groq's gpt-oss-20b hit its 8,000 tokens-per-minute limit with the
-23 KB document in context (the run now waits the minute out, three times);
-Ollama's gpt-oss:20b passed a seeded run in 12.5 s, preserving the other
-server and verifying over REST, without saying a restart is needed.
+`failecho-onboard.timer` runs `python -m failecho_fleet.onboard` hourly. A
+free model (eight in rotation, across groq, Ollama cloud, OpenRouter and
+Gemini) gets a clean VM, a shell, a file writer, a file reader and a URL
+fetcher, and one sentence: *Read <lab>/llms.txt and set yourself up to use
+FailEcho.* What it finds on disk is one of five scenes the document has a
+rule for -- a clean project; a project with another server already in
+`.mcp.json`; one where FailEcho is already there; a home directory holding
+three projects and no manifest; a project owned by root that cannot be
+written -- on one of five kinds of project (Python, Node, Go, Rust, plain).
+The host grades from disk and the command log, per scene: config written
+and pointing at `/mcp`; the other server preserved; the existing file
+byte-identical and mentioned; nothing written and a question asked; one
+`/v1/query` made and no other file gone looking for. Always: nothing
+reported, no client-owned file touched, no hook. The `/fleet` tables show
+pass rate per scene and per model and the grade each fails most, which is
+the line of llms.txt to rewrite next.
+
+First live runs, 2026-09-16 evening, Ollama gpt-oss:20b: clean/other
+passed once and failed once (skipped the verify query); read-only passed
+(tried to write, probed permissions, used REST); home passed (asked which
+project); present passed (changed nothing, said so). groq's gpt-oss-20b
+hit its 8,000 tokens-per-minute limit with the 23 KB document in context
+(the run waits the minute out, three times) and then a tool-call JSON
+parse error; both counted as provider failures, not the document's.
 
 ## What it is not
 
