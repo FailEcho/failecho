@@ -14,7 +14,12 @@ that exists for one persona run and is killed at the end of it.
 - **A read-only root.** Ubuntu noble minbase with python3, pip, uv,
   requests, httpx and `failecho-autoreport`, mounted `ro` by the kernel.
   Tasks run as the unprivileged `runner` user in `/work`, a fresh 512 MiB
-  scratch disk made on the host for that boot and deleted after it.
+  scratch disk made on the host for that boot and deleted after it. The
+  scratch file lives under `/var/lib/failecho-sandbox-scratch`, on disk:
+  the first version put it in `/run`, which is a tmpfs, so every byte the
+  guest wrote was host RAM and a framework install filled it (the guest saw
+  I/O errors). The guest's `TMPDIR` points at the scratch disk too, because
+  its `/tmp` is a 64 MB tmpfs and pip unpacks wheels there.
 - **No route to the internet.** The guest has one link, to the host, and no
   default route. The only thing the firewall lets it reach on that link is
   `172.16.0.1:8888`, which is the fence.
@@ -84,6 +89,22 @@ The `build` table on `/fleet` shows both and the share.
 The kill switch is the same as the fleet's: `systemctl stop
 failecho-fleet.timer`. Stopping `failecho-sandbox-proxy` alone leaves any VM
 with no way out at all.
+
+## The install canary
+
+`failecho-canary.timer` runs `python -m failecho_sandbox canary` daily at
+04:10 UTC (`failecho_sandbox/canary.py`). A fresh VM with nothing of ours on
+it installs every package the setup page tells a reader to install and does
+what the page says next: imports `failecho-autoreport`, runs `check` against
+the lab, runs a two-line script under `run` and looks for the summary line,
+installs `failecho-mcp` and completes a stdio MCP handshake (initialize,
+tools/list, the same four tools the HTTP endpoint serves), then runs the
+LlamaIndex and LangChain snippets from the page verbatim in their own venvs.
+About 75 seconds. The result is `canary.json` beside the fleet state, shown
+on `/fleet`; a failing step fails the unit. On its first run it found that
+the LlamaIndex snippet's result is a `ListToolsResult`, not a list, and the
+page now says so. The npm relay is not covered because the image has no
+Node; that is the next thing to add to it.
 
 ## What it is not
 

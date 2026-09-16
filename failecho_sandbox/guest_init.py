@@ -71,6 +71,9 @@ def mount_all() -> None:
     else:
         sh("mount", "-t", "tmpfs", "-o", "size=128m", "tmpfs", WORK)
     os.makedirs(f"{WORK}/home", exist_ok=True)
+    # pip unpacks wheels under TMPDIR; /tmp is a 64 MB tmpfs and a framework
+    # install is bigger than that, so temp lives on the scratch disk
+    os.makedirs(f"{WORK}/tmp", exist_ok=True)
     sh("chown", "-R", "runner:runner", WORK)
 
 
@@ -86,6 +89,7 @@ def base_env() -> dict[str, str]:
     return {
         "PATH": "/usr/local/bin:/usr/bin:/bin",
         "HOME": f"{WORK}/home",
+        "TMPDIR": f"{WORK}/tmp", "TEMP": f"{WORK}/tmp", "TMP": f"{WORK}/tmp",
         "USER": "runner",
         "LANG": "C.UTF-8",
         "PYTHONUNBUFFERED": "1",

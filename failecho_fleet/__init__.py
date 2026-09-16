@@ -604,8 +604,17 @@ def write_report(state: dict) -> None:
         except sqlite3.Error as e:
             totals_db["db_error"] = str(e)
 
+    # the install canary writes its own file beside the state; shown, not merged
+    canary = None
+    try:
+        with open(os.path.join(STATE_DIR, "canary.json"), encoding="utf-8") as fh:
+            canary = json.load(fh)
+    except (OSError, ValueError):
+        pass
+
     report = {
         "generated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+        "canary": canary,
         "totals": {"runs": len(runs), "personas": len(by_persona),
                    "tool_calls": sum(r["tool_calls"] for r in runs),
                    "failures": sum(len(r["failures"]) for r in runs), **totals_db},

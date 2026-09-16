@@ -318,3 +318,163 @@ def test_the_scoreboard_has_a_build_ledger(tmp_path, monkeypatch):
 def test_builder_tasks_only_name_hosts_inside_the_fence():
     hosts = set(re.findall(r"https?://([a-z0-9.-]+)", " ".join(builder.BUILDER_TASKS)))
     assert hosts <= ALLOW, hosts - ALLOW
+
+
+# -- the install canary -----------------------------------------------------
+
+
+def test_the_canary_covers_every_pip_path_the_setup_page_advertises():
+    """Whatever `pip install` the setup page tells a reader to run, the canary
+    runs from a clean VM. A new package on the page without a canary step is
+    a path we advertise and never re-check."""
+    from failecho_sandbox import canary
+
+    page = (ROOT / "app" / "web" / "static" / "setup.html").read_text()
+    advertised = set()
+    for line in re.findall(r"pip install ([a-z0-9 -]+)", page):
+        advertised |= set(line.split())
+    src = (ROOT / "failecho_sandbox" / "canary.py").read_text()
+    covered = set(re.findall(r'"install", "--quiet", "([a-z0-9-]+)"', src))
+    for line in re.findall(r'\[("[a-z0-9-]+"(?:, "[a-z0-9-]+")*)\],', src):
+        covered |= set(re.findall(r'"([a-z0-9-]+)"', line))
+    assert advertised and advertised <= covered, advertised - covered
+    # and the snippets the canary runs are the page's, not a rewrite of them
+    assert 'BasicMCPClient(os.environ["LAB"] + "/mcp")' in canary.LLAMAINDEX_SNIPPET
+    assert 'MCPAdapter(os.environ["LAB"] + "/mcp")' in canary.LANGCHAIN_SNIPPET
+    assert "from llama_index.tools.mcp import BasicMCPClient" in page and "from langchain.mcp import MCPAdapter" in page
+    assert canary.EXPECTED_TOOLS == sorted(canary.EXPECTED_TOOLS)
+
+
+def test_the_canary_expects_the_same_four_tools_the_server_serves():
+    from failecho_sandbox import canary
+    from app.mcp_server import mcp_server
+
+    import asyncio
+
+    served = sorted(t.name for t in asyncio.run(mcp_server.list_tools()))
+    assert served == canary.EXPECTED_TOOLS
+
+
+def test_the_canary_refuses_to_run_without_a_lab_url(monkeypatch, capsys):
+    from failecho_sandbox import canary
+
+    monkeypatch.setattr(canary, "LAB_URL", "")
+    assert canary.main() == 2
+    assert "refusing to guess" in capsys.readouterr().out
+
+
+def test_the_canary_reports_an_unavailable_sandbox_as_a_failure(monkeypatch, tmp_path):
+    from failecho_sandbox import canary
+
+    monkeypatch.setattr(canary, "LAB_URL", "https://lab.example")
+    monkeypatch.setattr(canary, "REPORT_PATH", str(tmp_path / "canary.json"))
+    monkeypatch.setattr(canary, "available", lambda: "no kvm here")
+    assert canary.main() == 1
+    report = json.loads((tmp_path / "canary.json").read_text())
+    assert report["ok"] is False and "no kvm here" in report["error"] and report["steps"] == []
+
+
+def test_the_canary_steps_run_against_a_fake_vm(monkeypatch, tmp_path):
+    """The whole sequence with a VM that answers what a healthy one would,
+    so the pass/fail logic is exercised without KVM."""
+    from failecho_sandbox import Result, canary
+
+    class FakeVM:
+        boot_seconds = 0.5
+
+        def __init__(self, **kw):
+            self.scratch_mib = kw.get("scratch_mib")
+
+        def run(self, argv, files=None, timeout=60, env=None):
+            joined = " ".join(argv)
+            if "import failecho_autoreport" in joined:
+                return Result(exit=0, stdout="0.1.2\n", stderr="", seconds=0.1)
+            if "import failecho_mcp" in joined:
+                return Result(exit=0, stdout="0.1.1\n", stderr="", seconds=0.1)
+            if "check" in argv:
+                return Result(exit=0, stdout="api.github.com GET /repos\n  known: True   status: HEALTHY\n", stderr="", seconds=0.2)
+            if argv[-2:] == ["run", "hello.py"]:
+                return Result(exit=0, stdout="called\n", stderr="[failecho] observing...\n[failecho] reported 1 call\n", seconds=0.3)
+            if argv[-1] == "handshake.py":
+                assert env["PATH"].startswith("/work/venv/bin"), "the relay must be found in the venv"
+                return Result(exit=0, stdout=json.dumps({"server": {"name": "failecho"}, "tools": canary.EXPECTED_TOOLS}) + "\n",
+                              stderr="", seconds=1.0)
+            if argv[-1] in ("li.py", "lc.py"):
+                return Result(exit=0, stdout=json.dumps(canary.EXPECTED_TOOLS) + "\n", stderr="", seconds=2.0)
+            return Result(exit=0, stdout="", stderr="", seconds=0.1)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    monkeypatch.setattr(canary, "LAB_URL", "https://lab.example")
+    monkeypatch.setattr(canary, "REPORT_PATH", str(tmp_path / "canary.json"))
+    monkeypatch.setattr(canary, "available", lambda: None)
+    monkeypatch.setattr(canary, "Sandbox", FakeVM)
+    assert canary.main() == 0
+    report = json.loads((tmp_path / "canary.json").read_text())
+    assert report["ok"] is True
+    names = [s["name"] for s in report["steps"]]
+    assert "failecho-mcp stdio handshake: 4 tools" in names and "failecho_autoreport run (one call observed)" in names
+    assert "LlamaIndex snippet: list_tools -> 4 tools" in names and "LangChain snippet: list_tools -> 4 tools" in names
+    # and the guest was told the lab, under a reporter id that names what it is
+    assert all(s["ok"] for s in report["steps"])
+
+
+def test_a_wrong_tool_list_fails_the_handshake_step(monkeypatch, tmp_path):
+    from failecho_sandbox import Result, canary
+
+    class FakeVM:
+        boot_seconds = 0.5
+
+        def __init__(self, **kw):
+            self.scratch_mib = kw.get("scratch_mib")
+
+        def run(self, argv, files=None, timeout=60, env=None):
+            if argv[-1] == "handshake.py":
+                return Result(exit=0, stdout=json.dumps({"server": {"name": "x"}, "tools": ["check_tool_failure"]}), stderr="", seconds=1)
+            if argv[-2:] == ["run", "hello.py"]:
+                return Result(exit=0, stdout="called\n", stderr="[failecho] reported 1 call\n", seconds=0.3)
+            if "check" in argv:
+                return Result(exit=0, stdout="x\n  known: False\n", stderr="", seconds=0.2)
+            if argv[-1] in ("li.py", "lc.py"):
+                return Result(exit=0, stdout=json.dumps(canary.EXPECTED_TOOLS) + "\n", stderr="", seconds=2.0)
+            return Result(exit=0, stdout="0.1.2\n", stderr="", seconds=0.1)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    monkeypatch.setattr(canary, "LAB_URL", "https://lab.example")
+    monkeypatch.setattr(canary, "REPORT_PATH", str(tmp_path / "canary.json"))
+    monkeypatch.setattr(canary, "available", lambda: None)
+    monkeypatch.setattr(canary, "Sandbox", FakeVM)
+    assert canary.main() == 1
+    report = json.loads((tmp_path / "canary.json").read_text())
+    bad = [s for s in report["steps"] if not s["ok"]]
+    assert [s["name"] for s in bad] == ["failecho-mcp stdio handshake: 4 tools"]
+
+
+def test_the_scoreboard_carries_the_canary(tmp_path, monkeypatch):
+    import failecho_fleet as F
+
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    (tmp_path / "canary.json").write_text(json.dumps({"at": "t", "ok": True, "steps": []}))
+    F.write_report({"runs": []})
+    assert json.loads((tmp_path / "fleet.json").read_text())["canary"] == {"at": "t", "ok": True, "steps": []}
+
+
+def test_the_canary_unit_is_boxed_like_the_fleet():
+    unit = (ROOT / "deploy" / "failecho-canary.service").read_text()
+    for line in ("User=failecho", "ProtectSystem=strict", "NoNewPrivileges=yes", "MemoryMax=600M",
+                 "RuntimeDirectory=failecho-sandbox", 'Environment="CANARY_LAB_URL=https://lab.failecho.com"'):
+        assert line in unit, line
+    assert "failecho.env" not in unit, "the canary must never hold the operator token"
+    timer = (ROOT / "deploy" / "failecho-canary.timer").read_text()
+    assert "OnCalendar=*-*-* 04:10:00 UTC" in timer

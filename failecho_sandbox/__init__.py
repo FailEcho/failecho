@@ -10,9 +10,10 @@ no route to anywhere except the allowlisting proxy in ``proxy.py``.
         r = vm.python("print(2 + 2)")
         r = vm.run(["uv", "pip", "compile", "requirements.in"], files={"requirements.in": "requests\\n"})
 
-What the host provides per boot, all under ``/run/failecho-sandbox/<id>/``:
-the API socket, the vsock socket, a fresh ``scratch.ext4``, the VM config,
-and the console log. ``close()`` kills the VM and removes the directory.
+What the host provides per boot: under ``/run/failecho-sandbox/<id>/`` the
+API socket, the vsock socket, the VM config and the console log; under
+``/var/lib/failecho-sandbox-scratch/`` a fresh ``<id>.ext4`` scratch disk
+(on disk, not tmpfs). ``close()`` kills the VM and removes both.
 
 Boundaries, in order of how much they matter:
 
@@ -52,6 +53,10 @@ __all__ = ["Sandbox", "SandboxError", "Result", "available"]
 FIRECRACKER = os.environ.get("FAILECHO_FIRECRACKER") or "/usr/local/bin/firecracker"
 IMAGES = os.environ.get("FAILECHO_SANDBOX_IMAGES") or "/var/lib/failecho-sandbox"
 RUN_DIR = os.environ.get("FAILECHO_SANDBOX_RUN") or "/run/failecho-sandbox"
+#: Where the per-boot scratch disk lives. Not /run: that is a tmpfs, so a
+#: 512 MiB scratch there is 512 MiB of RAM once written, and a framework
+#: install filled it and surfaced as I/O errors in the guest. On disk.
+SCRATCH_DIR = os.environ.get("FAILECHO_SANDBOX_SCRATCH") or "/var/lib/failecho-sandbox-scratch"
 TAP = os.environ.get("FAILECHO_SANDBOX_TAP") or "fctap0"
 GUEST_MAC = "AA:FC:00:00:00:02"
 VSOCK_PORT = 5000
@@ -108,6 +113,7 @@ class Sandbox:
         self.dir = os.path.join(RUN_DIR, self.id)
         self.mem_mib, self.scratch_mib = mem_mib, scratch_mib
         self.proc: subprocess.Popen | None = None
+        self._scratch = ""
         self._lock = None
         self.boot_seconds: float | None = None
 
@@ -128,8 +134,10 @@ class Sandbox:
         self._lock = open(os.path.join(RUN_DIR, "lock"), "w")
         fcntl.flock(self._lock, fcntl.LOCK_EX)   # one VM at a time, one tap
         os.makedirs(self.dir, mode=0o700)
+        os.makedirs(SCRATCH_DIR, exist_ok=True)
         started = time.monotonic()
-        scratch = os.path.join(self.dir, "scratch.ext4")
+        scratch = os.path.join(SCRATCH_DIR, f"{self.id}.ext4")
+        self._scratch = scratch
         with open(scratch, "wb") as fh:
             fh.truncate(self.scratch_mib * 1024 * 1024)
         subprocess.run(["mkfs.ext4", "-q", "-F", "-O", "^has_journal", scratch],
@@ -184,6 +192,10 @@ class Sandbox:
                 pass
         self.proc = None
         shutil.rmtree(self.dir, ignore_errors=True)
+        try:
+            os.unlink(getattr(self, "_scratch", ""))
+        except OSError:
+            pass
         if self._lock is not None:
             try:
                 fcntl.flock(self._lock, fcntl.LOCK_UN)

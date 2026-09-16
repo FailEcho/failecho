@@ -201,7 +201,7 @@ VS Code       .vscode/mcp.json        "servers"      type + url</code></pre>
 from llama_index.tools.mcp import BasicMCPClient
 
 client = BasicMCPClient("{{PUBLIC_URL}}/mcp")
-tools = await client.list_tools()</code></pre>
+result = await client.list_tools()   # result.tools holds the four tools</code></pre>
     </figure>
     <figure class="snip">
       <pre><code># LangChain &mdash; pip install langchain fastmcp

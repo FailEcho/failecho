@@ -109,6 +109,15 @@
     <th>service</th><th>operations seen</th><th class="num">fingerprints</th><th>reported via</th>
   </tr></thead><tbody></tbody></table>
 
+  <h2>Install canary</h2>
+  <p class="sub">Once a day a fresh VM with nothing of ours on it installs each package from PyPI and does what
+  the setup page says to do: import it, ask the network, run a script under it, start the stdio relay and
+  complete an MCP handshake. The day a path stops working is the day this table says so.
+  <span id="fleet-canary-when"></span></p>
+  <table id="fleet-canary"><thead><tr>
+    <th>step</th><th>result</th><th class="num">seconds</th><th>detail</th>
+  </tr></thead><tbody></tbody></table>
+
   <h2>Per persona</h2>
   <table id="fleet-personas"><thead><tr>
     <th>reporter</th><th>path</th><th>model</th><th>asks</th><th class="num">runs</th><th class="num">tool calls</th><th class="num">failures</th><th>last</th>

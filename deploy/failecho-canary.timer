@@ -1,0 +1,11 @@
+# Once a day, after the nightly backup and before anyone in Europe is up.
+[Unit]
+Description=FailEcho install canary, daily
+
+[Timer]
+OnCalendar=*-*-* 04:10:00 UTC
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,8 +1,9 @@
-"""python -m failecho_sandbox {selftest|exec|status}
+"""python -m failecho_sandbox {selftest|exec|status|canary}
 
     selftest   boot a VM and prove the fence holds, before any persona uses it
     exec       run one Python snippet or file inside a fresh VM, print the result
     status     what is installed and whether a VM could boot right now
+    canary     install every advertised package in a fresh VM and use it (canary.py)
 """
 
 from __future__ import annotations
@@ -90,6 +91,9 @@ def main(argv: list[str]) -> int:
         except SandboxError as e:
             print(f"sandbox error: {e}")
             return 2
+    if cmd == "canary":
+        from .canary import main as canary_main
+        return canary_main()
     if cmd == "exec":
         src = argv[1] if len(argv) > 1 else "-"
         code = sys.stdin.read() if src == "-" else (open(src).read() if src.endswith(".py") else src)

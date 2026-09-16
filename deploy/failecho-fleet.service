@@ -21,11 +21,12 @@ Environment="FLEET_MAX_RUNS_PER_DAY=800"
 # because the guest cannot see this host's loopback
 Environment="FLEET_LAB_PUBLIC_URL=https://lab.failecho.com"
 Environment="FAILECHO_SANDBOX_RUN=/run/failecho-sandbox"
+Environment="FAILECHO_SANDBOX_SCRATCH=/var/lib/failecho-sandbox-scratch"
 ExecStart=/srv/failecho/.venv/bin/python -m failecho_fleet
 TimeoutStartSec=420
 # a builder run holds one 384 MiB microVM; every other persona is ~40 MB
 MemoryMax=600M
-StateDirectory=failecho-fleet
+StateDirectory=failecho-fleet failecho-sandbox-scratch
 RuntimeDirectory=failecho-sandbox
 RuntimeDirectoryPreserve=yes
 ReadOnlyPaths=/srv/failecho-lab/data

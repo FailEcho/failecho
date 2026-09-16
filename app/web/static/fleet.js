@@ -44,6 +44,12 @@
     fill("fleet-naming", (d.naming || []).map(function (n) {
       return [td(n.service), td(n.operations.join(", ")), td(n.fingerprints, "num " + (n.fingerprints > n.expected ? "warn" : "ok")), td(n.paths.join(", "))];
     }));
+    var c = d.canary;
+    el("fleet-canary-when").textContent = c ? ("Last run " + (c.at || "").replace("T", " ").slice(0, 16) + " UTC: " +
+      (c.ok ? "every path worked." : "A PATH IS BROKEN.") + (c.error ? " " + c.error : "")) : "Not run yet.";
+    fill("fleet-canary", ((c && c.steps) || []).filter(function (s) { return s.name !== "wrapper_version"; }).map(function (s) {
+      return [td(s.name), td(s.ok ? "ok" : "FAILED", s.ok ? "ok" : "warn"), td(s.seconds, "num"), td(s.detail || "")];
+    }));
     fill("fleet-personas", (d.personas || []).map(function (p) {
       return [td(p.reporter), td(p.path), td(p.provider), td(p.asks ? "yes" : "no"),
               td(p.runs, "num"), td(p.tool_calls, "num"), td(p.failures, "num"), td((p.last || "").replace("T", " ").slice(0, 16))];
