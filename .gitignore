@@ -16,3 +16,4 @@ build/
 # Editor swap files
 .*.sw[a-p]
 *~
+.scratch/
