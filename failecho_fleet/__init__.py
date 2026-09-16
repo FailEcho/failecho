@@ -62,6 +62,14 @@ PROVIDERS = {
                               "inclusionai/ling-3.0-flash-vl:free"],
                    "headers": {"HTTP-Referer": "https://failecho.com", "X-Title": "FailEcho fleet lab"},
                    "daily_cap": 120},
+    # Ollama's cloud, free tier: three models verified for tool calls, two
+    # others answered 402 "requires a subscription", which is where the tier
+    # ends and where the fleet stops. gpt-oss:20b here is the same model as
+    # Groq's gpt-oss-20b -- the one returning "parsing failed" 400s -- so the
+    # fleet will show whether that failure belongs to the model or the host.
+    "ollama": {"host": "ollama.com", "url": "https://ollama.com/v1/chat/completions",
+               "key": os.environ.get("LLAMA_API_KEY"),
+               "models": ["gpt-oss:20b", "nemotron-3-nano:30b", "gemma4:31b"], "daily_cap": 150},
 }
 
 # ---------------------------------------------------------------------------
@@ -114,9 +122,9 @@ GH_HEAVY = [("github", r) for r in GH_REPOS] + [("github_release", r) for r in G
 PERSONAS = [
     # reporter,           path,        provider, asks,  workload
     ("fleet-decor-ask-a",  "decorator", "groq",   True,  PYPI_NPM),
-    ("fleet-decor-ask-b",  "decorator", "gemini", True,  GITHUB),
+    ("fleet-decor-ask-b",  "decorator", "ollama", True,  GITHUB),
     ("fleet-decor-blind-a","decorator", "groq",   False, PYPI_NPM),
-    ("fleet-decor-blind-b","decorator", "gemini", False, GITHUB),
+    ("fleet-decor-blind-b","decorator", "ollama", False, GITHUB),
     ("fleet-auto-ask-a",   "auto",      "openrouter", True,  MIXED),
     ("fleet-auto-ask-b",   "auto",      "gemini",     True,  MIXED),
     ("fleet-auto-blind-a", "auto",      "openrouter", False, MIXED),
