@@ -1560,6 +1560,10 @@ def test_setup_offers_reporting_without_a_model_deciding(client):
     assert "not on PyPI yet" not in body
     assert "FAILECHO_DISABLED=1" in body
     assert "mutates=True" in body
+    assert "python -m failecho_autoreport run" in body
+    assert "python -m failecho_autoreport check" in body
+    # the honest limit of route inference, stated where the command is
+    assert "npm registry" in body and "use the decorator there" in body
 
 
 def test_llms_txt_says_what_identifying_yourself_buys_you(client):

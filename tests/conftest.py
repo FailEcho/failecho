@@ -24,6 +24,40 @@ os.environ["FIN_REPORTER_SALT"] = "test-salt"
 # Its behaviour is covered directly in tests/test_cache.py.
 os.environ["FIN_DASHBOARD_CACHE_SECONDS"] = "0"
 
+# ---------------------------------------------------------------------------
+# The test suite must never be able to reach the production network.
+#
+# On 2026-09-16 a module that patched httpx on import turned Starlette's
+# TestClient into a reporter, and 91 rows of test traffic reached
+# failecho.com as independent adoption -- the one number on the front page
+# that has to stay honest. Two guards, belt and braces:
+#
+#   1. Any reporter that reads FAILECHO_ENDPOINT from the environment gets a
+#      dead local port, so an accidental report fails fast and harmlessly.
+#   2. At the socket layer, resolving failecho.com raises. urllib, requests
+#      and httpx all go through getaddrinfo; nothing in this process can open
+#      a connection to production, whatever it was patched into.
+# ---------------------------------------------------------------------------
+os.environ.setdefault("FAILECHO_ENDPOINT", "http://127.0.0.1:9")
+
+import socket as _socket  # noqa: E402
+
+_FORBIDDEN_HOSTS = ("failecho.com", "www.failecho.com", "failecho.dev")
+_real_getaddrinfo = _socket.getaddrinfo
+
+
+def _guarded_getaddrinfo(host, *args, **kwargs):
+    if isinstance(host, (bytes, bytearray)):
+        host = host.decode(errors="ignore")
+    if isinstance(host, str) and host.lower().rstrip(".") in _FORBIDDEN_HOSTS:
+        raise RuntimeError(
+            f"test process tried to reach {host}: the suite must never touch production"
+        )
+    return _real_getaddrinfo(host, *args, **kwargs)
+
+
+_socket.getaddrinfo = _guarded_getaddrinfo
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.core.cache import dashboard_cache  # noqa: E402

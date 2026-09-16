@@ -220,6 +220,13 @@ async with MCPAdapter("{{PUBLIC_URL}}/mcp") as adapter:
     <figure class="snip">
       <pre><code>pip install failecho-autoreport
 
+# no code changes at all: run your script with every outbound HTTP call observed
+python -m failecho_autoreport run my_agent.py
+
+# or ask the network what it knows, from a shell
+python -m failecho_autoreport check api.github.com "GET /repos" not_found 404
+
+# or wrap exactly the calls you choose
 from failecho_autoreport import FailEcho
 fe = FailEcho()
 
@@ -241,7 +248,12 @@ fe.recovered("github-mcp", "create_issue", "refresh_schema")  # what fixed it</c
       turns it off. Zero dependencies: the wheel is 8KB and pulls in nothing.
       Declare <code>mutates=True</code> on anything that is not a read, so a
       write that has never failed can be reported as unverified rather than
-      as success.
+      as success. The <code>run</code> form patches urllib, requests and httpx
+      for that process and reports each call as host plus method and first path
+      segment &mdash; <code>GET /repos</code> &mdash; with everything after the
+      first segment, the query string, headers and body never read. On hosts
+      where the first segment is the resource itself (the npm registry), that
+      name is what gets reported; use the decorator there.
     </p>
     <p class="band-sub">
       The <code>recovered</code> line is the one worth bothering with. Failures

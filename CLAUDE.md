@@ -27,10 +27,19 @@ by hand with `FAILECHO_ENDPOINT=https://failecho.com` reports with no operator
 header, and the server stores it as `source: agent` -- counted as independent
 adoption, on the front page, in the one number that has to stay honest.
 
-This has happened once. Test the hook against a local instance, or a throwaway
-server, and keep `https://failecho.com` for reads (`check_tool_failure` and
-`POST /v1/query` store nothing). If you do need to write to production from a
-shell, export the token from `/etc/failecho.env` first.
+This has happened twice. The second time (2026-09-16) was not the hook: a
+module that patched httpx *on import* turned Starlette's TestClient into a
+reporter, and 91 rows of test traffic reached production as independent
+adoption inside two minutes. Purged from a backup; the design fixed so that
+nothing patches on import, `tests/conftest.py` now refuses to resolve
+failecho.com at the socket layer, and `FAILECHO_ENDPOINT` defaults to a dead
+local port under test. Anything you build that reports must be inert until
+explicitly enabled, and the first place you run it is a throwaway server.
+
+Test the hook against a local instance, or a throwaway server, and keep
+`https://failecho.com` for reads (`check_tool_failure` and `POST /v1/query`
+store nothing). If you do need to write to production from a shell, export
+the token from `/etc/failecho.env` first.
 
 ## Operator token from a host that filters header names
 
