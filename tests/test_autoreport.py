@@ -328,3 +328,23 @@ def test_an_orphan_outcome_is_dropped_not_misattached():
     drained(client)
     assert client.unmatched == 1
     assert client.bodies == []
+
+
+# -- our own agents must never count as adoption ----------------------------
+
+
+def test_operator_token_is_sent_as_bearer_and_only_when_set():
+    """An agent we run that reports without this is stored as source: agent
+    and counted as a stranger adopting us. With it, the server files the
+    report as first_party. Bearer rather than the custom header because it
+    survives hosts that filter unknown header names."""
+    plain = FailEcho(endpoint="http://127.0.0.1:9", reporter_id="x")
+    assert "Authorization" not in plain._headers()
+
+    ours = FailEcho(endpoint="http://127.0.0.1:9", reporter_id="x", operator_token="tok-1")
+    assert ours._headers()["Authorization"] == "Bearer tok-1"
+
+
+def test_operator_token_comes_from_the_environment_too(monkeypatch):
+    monkeypatch.setenv("FAILECHO_OPERATOR_TOKEN", "env-tok")
+    assert FailEcho(endpoint="http://127.0.0.1:9")._headers()["Authorization"] == "Bearer env-tok"

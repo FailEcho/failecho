@@ -102,3 +102,21 @@ def test_the_autoreport_package_builds_from_the_repo():
     src = Path("failecho_autoreport/__init__.py").read_text()
     assert re.search(r'^__version__ = "\d+\.\d+\.\d+"', src, re.M)
     assert "__version__" in script
+
+
+def test_deploy_script_refuses_a_dirty_checkout_and_checks_the_site():
+    """Nineteen hand deploys in a day, each the same four commands. The script
+    must refuse to reset a tree with local edits -- that is how a fix is lost
+    -- and must check the live pages afterwards rather than trusting the
+    restart."""
+    from pathlib import Path
+
+    script = Path("deploy/deploy.sh").read_text()
+    assert "set -euo pipefail" in script
+    assert "local modifications" in script and "status --porcelain" in script
+    assert "reset --hard" in script and "fetch -q origin main" in script
+    assert "systemctl restart" in script
+    assert "real_observations_total" in script, "the honesty counter is part of the check"
+    assert "/llms.txt" in script and "/setup" in script
+    # writes go through the failecho user, never root
+    assert "sudo -u failecho git" in script

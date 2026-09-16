@@ -41,6 +41,8 @@ Environment:
     FAILECHO_REPORTER_ID     stable id, so this process counts as one reporter
     FAILECHO_SEND_ERRORS=1   also send the error text (normalized server-side)
     FAILECHO_REPORT_SUCCESS=0  do not report successful calls
+    FAILECHO_OPERATOR_TOKEN  FailEcho's own agents only. Marks reports as
+                             first-party so they are never counted as adoption.
 """
 
 from __future__ import annotations
@@ -138,6 +140,7 @@ class FailEcho:
         report_success: bool | None = None,
         send_errors: bool | None = None,
         timeout: float = TIMEOUT_SECONDS,
+        operator_token: str | None = None,
     ) -> None:
         self.endpoint = (endpoint or os.environ.get("FAILECHO_ENDPOINT")
                          or DEFAULT_ENDPOINT).rstrip("/")
@@ -154,6 +157,11 @@ class FailEcho:
             if send_errors is None else send_errors
         )
         self.timeout = timeout
+        # Only FailEcho's own agents set this. With it, the server stores the
+        # report as first_party and keeps it out of the adoption counters. An
+        # agent we run that forgets it is counted as a stranger adopting us,
+        # which is the one number on the front page that has to stay honest.
+        self.operator_token = operator_token or os.environ.get("FAILECHO_OPERATOR_TOKEN") or None
 
         self.queued = 0
         self.dropped = 0
@@ -345,15 +353,23 @@ class FailEcho:
             finally:
                 self._queue.task_done()
 
+    def _headers(self) -> dict:
+        headers = {
+            "Content-Type": "application/json",
+            "X-Reporter-ID": self.reporter_id,
+            "User-Agent": f"failecho-autoreport/{__version__}",
+        }
+        if self.operator_token:
+            # Bearer rather than X-FailEcho-Operator: the server accepts both,
+            # and Bearer survives hosts that filter unknown header names.
+            headers["Authorization"] = f"Bearer {self.operator_token}"
+        return headers
+
     def _post(self, body: dict) -> None:
         request = urllib.request.Request(
             f"{self.endpoint}/v1/observe",
             data=json.dumps(body).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "X-Reporter-ID": self.reporter_id,
-                "User-Agent": f"failecho-autoreport/{__version__}",
-            },
+            headers=self._headers(),
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=self.timeout) as response:
@@ -380,11 +396,7 @@ class FailEcho:
             data=json.dumps({"fingerprint": fingerprint,
                              "action": body["action"],
                              "successful": body["successful"]}).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "X-Reporter-ID": self.reporter_id,
-                "User-Agent": f"failecho-autoreport/{__version__}",
-            },
+            headers=self._headers(),
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=self.timeout) as response:
