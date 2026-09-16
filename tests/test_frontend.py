@@ -1399,10 +1399,14 @@ def test_llms_txt_states_a_default_setup(client):
     # the seventh test hand-edited ~/.claude.json after the CLI was missing
     assert "Never hand-edit `~/.claude.json`" in default
     assert "the default mechanism, not a fallback" in default
-    # the ninth test's cwd was a folder holding many repos, not a project
-    assert "check first that the working directory is the project you mean" in default
+    # the ninth test's cwd was a folder holding many repos, not a project;
+    # the night-one onboarding runs (nemotron, gpt-oss-20b) then wrote into a
+    # home directory anyway, so the look comes before the write and the
+    # "do not write" is explicit
+    assert "Before writing anything, look at the working directory" in default
+    assert default.index("Before writing anything") < default.index("Only once the directory is a project, write")
     assert "is not a project" in default
-    assert "ask which project is meant rather than guessing" in default
+    assert "do not write anything: say so and ask which project is meant" in default
     assert "A missing CLI is not this case: write the file." in default
     assert "Never do that to a file you did not create." in default
     assert "Do not install the hook or the plugin" in default

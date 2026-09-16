@@ -317,15 +317,17 @@ options, and it is option 2 below:
 - **Query-only access, current project, remote MCP endpoint.** Register
   {base_url}/mcp for this project only, not user-wide.
 
-  Write `.mcp.json` in the working directory -- but check first that the
-  working directory is the project you mean. A home directory, a Desktop or
+  Before writing anything, look at the working directory (`ls -la`) and
+  decide whether it is the project you mean. A home directory, a Desktop or
   Documents folder, or a folder that merely *contains* several repositories
   is not a project: a `.mcp.json` there applies to far more than was asked
   for, which is the user-wide outcome this default exists to avoid. If the
-  directory looks like one of those -- no repository, no project manifest,
-  many child projects -- say so and ask which project is meant rather than
-  guessing. Asking here is cheap; a config written in the wrong place is
+  directory has no repository and no project manifest, or holds several
+  projects side by side, do not write anything: say so and ask which project
+  is meant. Asking here is cheap; a config written in the wrong place is
   found much later.
+
+  Only once the directory is a project, write `.mcp.json` there.
 
   Given the right directory, `.mcp.json` is the default mechanism, not a
   fallback: it needs no CLI, works on every platform and in every client
