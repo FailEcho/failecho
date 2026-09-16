@@ -38,6 +38,7 @@ No account, no API key. Zero dependencies, Node 18+.
 |---|---|---|
 | `FAILECHO_URL` | `https://failecho.com/mcp` | Network to relay to. Point it at your own server if you self-host. |
 | `FAILECHO_REPORTER_ID` | unset | Optional. Salted and hashed on arrival; lets FailEcho tell your evidence from someone else's. |
+| `NODE_USE_ENV_PROXY` | unset | Behind an HTTP proxy, set to `1` (Node 24+). Node's `fetch` ignores `HTTPS_PROXY` unless told to, and the relay answers `FailEcho unreachable: fetch failed`. Found by running the relay in a machine whose only way out is a proxy. |
 
 ## Privacy
 

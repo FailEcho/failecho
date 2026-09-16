@@ -1,0 +1,31 @@
+# The onboarding test: a free model, a clean VM, and the sentence "Read
+# <lab>/llms.txt and set yourself up to use FailEcho." Graded on the host.
+# See failecho_fleet/onboard.py.
+[Unit]
+Description=FailEcho onboarding test (a cheap model follows llms.txt in a clean VM)
+After=network-online.target failecho-lab.service failecho-sandbox-proxy.service
+Wants=network-online.target failecho-sandbox-proxy.service
+Requires=failecho-lab.service
+
+[Service]
+Type=oneshot
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho-lab/app
+# provider keys only; never /etc/failecho.env (the module refuses an operator token)
+EnvironmentFile=/etc/failecho-agent.env
+Environment="FAILECHO_ENDPOINT=http://127.0.0.1:8089"
+Environment="FLEET_LAB_PUBLIC_URL=https://lab.failecho.com"
+Environment="FAILECHO_SANDBOX_RUN=/run/failecho-sandbox"
+Environment="FAILECHO_SANDBOX_SCRATCH=/var/lib/failecho-sandbox-scratch"
+ExecStart=/srv/failecho/.venv/bin/python -m failecho_fleet.onboard
+TimeoutStartSec=900
+MemoryMax=600M
+StateDirectory=failecho-fleet failecho-sandbox-scratch
+RuntimeDirectory=failecho-sandbox
+RuntimeDirectoryPreserve=yes
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes

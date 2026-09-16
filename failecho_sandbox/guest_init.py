@@ -100,6 +100,8 @@ def base_env() -> dict[str, str]:
         "UV_HTTP_TIMEOUT": "30",
         "UV_NO_PROGRESS": "1",
         "UV_CACHE_DIR": f"{WORK}/.uv-cache",
+        # Node's fetch ignores the proxy variables unless told to (Node >= 24)
+        "NODE_USE_ENV_PROXY": "1",
         "HTTP_PROXY": PROXY, "HTTPS_PROXY": PROXY,
         "http_proxy": PROXY, "https_proxy": PROXY,
         "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost",

@@ -5,6 +5,8 @@
 # What it produces, under /var/lib/failecho-sandbox:
 #   vmlinux       the Firecracker CI kernel (6.1, x86_64), with its .config
 #   rootfs.ext4   Ubuntu noble minbase + python3, pip, uv, requests, httpx,
+#                 curl, git, and Node LTS from nodejs.org with npm and npx
+#                 (Debian's npm does not configure inside debootstrap),
 #                 failecho-autoreport, an unprivileged `runner` user, and
 #                 our guest init at /usr/local/bin/sandbox-init
 #
@@ -18,7 +20,8 @@ DEST=${FAILECHO_SANDBOX_IMAGES:-/var/lib/failecho-sandbox}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 CI=firecracker-ci/v1.15/x86_64
 KERNEL=vmlinux-6.1.155
-SIZE_MB=450
+NODE_VERSION=v24.21.0
+SIZE_MB=700
 
 mkdir -p "$DEST"
 cd "$DEST"
@@ -34,7 +37,7 @@ done
 command -v debootstrap >/dev/null || apt-get install -y -qq debootstrap
 rm -rf rootfs-build
 debootstrap --variant=minbase --components=main,universe \
-    --include=python3,python3-venv,python3-pip,ca-certificates,iproute2 \
+    --include=python3,python3-venv,python3-pip,ca-certificates,iproute2,curl,git,xz-utils \
     noble rootfs-build http://archive.ubuntu.com/ubuntu
 
 # the wrapper version the guest gets is the one in this checkout, from PyPI
@@ -48,6 +51,17 @@ chroot rootfs-build /bin/sh -c "
     printf '127.0.0.1 localhost sandbox\n' > /etc/hosts
     printf 'nameserver 127.0.0.1\n' > /etc/resolv.conf
 "
+# Node LTS, the official build, checksum checked against the release's list.
+# Into /usr/local so node, npm and npx are on the guest's PATH.
+NODE_TAR="node-$NODE_VERSION-linux-x64.tar.xz"
+if [ ! -s "$NODE_TAR" ]; then
+    curl -sSL -o "$NODE_TAR" "https://nodejs.org/dist/$NODE_VERSION/$NODE_TAR"
+    curl -sSL -o SHASUMS256.txt "https://nodejs.org/dist/$NODE_VERSION/SHASUMS256.txt"
+fi
+grep " $NODE_TAR\$" SHASUMS256.txt | sha256sum -c - >/dev/null
+tar -xJf "$NODE_TAR" -C rootfs-build/usr/local --strip-components=1 --exclude='*/share/doc' --exclude='*/include'
+chroot rootfs-build /usr/local/bin/node --version
+
 install -m 755 "$REPO/failecho_sandbox/guest_init.py" rootfs-build/usr/local/bin/sandbox-init
 mkdir -p rootfs-build/work
 

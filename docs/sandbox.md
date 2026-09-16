@@ -100,11 +100,37 @@ the lab, runs a two-line script under `run` and looks for the summary line,
 installs `failecho-mcp` and completes a stdio MCP handshake (initialize,
 tools/list, the same four tools the HTTP endpoint serves), then runs the
 LlamaIndex and LangChain snippets from the page verbatim in their own venvs.
-About 75 seconds. The result is `canary.json` beside the fleet state, shown
-on `/fleet`; a failing step fails the unit. On its first run it found that
-the LlamaIndex snippet's result is a `ListToolsResult`, not a list, and the
-page now says so. The npm relay is not covered because the image has no
-Node; that is the next thing to add to it.
+Then the two one-line relay forms llms.txt offers, `npx -y failecho-mcp`
+and `uvx failecho-mcp`, through the same handshake (the image carries Node
+LTS from nodejs.org and uv). About 80 seconds. The result is `canary.json`
+beside the fleet state, shown on `/fleet`; a failing step fails the unit.
+
+Its first runs found three things. The LlamaIndex snippet's result is a
+`ListToolsResult`, not a list, and the page now says so. Node's `fetch`
+ignores `HTTPS_PROXY`, so behind a proxy the npm relay answers "FailEcho
+unreachable: fetch failed" until `NODE_USE_ENV_PROXY=1` is set (Node 24+);
+the relay's README says so now. And Debian's `npm` package does not
+configure inside debootstrap, which is why Node comes from the official
+tarball, checksum checked.
+
+## The onboarding test
+
+`failecho-onboard.timer` runs `python -m failecho_fleet.onboard` every two
+hours. A free model (eight in rotation, across groq, Ollama cloud,
+OpenRouter and Gemini) gets a clean VM, a shell, a file writer, a file
+reader and a URL fetcher, inside a git repository with a manifest, and one
+sentence: *Read <lab>/llms.txt and set yourself up to use FailEcho.* Every
+other run the project already holds a `.mcp.json` with another server in
+it. The host grades from disk and from the command log -- config written
+and pointing at `/mcp`, the other server preserved, one `/v1/query` made,
+nothing reported, no client-owned file touched, no hook -- and a model that
+asks a question instead of acting is recorded as "asked", which the
+document allows. The `/fleet` table shows pass rate per model and the grade
+each fails most, which is the line of llms.txt to rewrite next. First two
+runs: groq's gpt-oss-20b hit its 8,000 tokens-per-minute limit with the
+23 KB document in context (the run now waits the minute out, three times);
+Ollama's gpt-oss:20b passed a seeded run in 12.5 s, preserving the other
+server and verifying over REST, without saying a restart is needed.
 
 ## What it is not
 

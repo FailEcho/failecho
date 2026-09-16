@@ -323,6 +323,16 @@ def test_builder_tasks_only_name_hosts_inside_the_fence():
 # -- the install canary -----------------------------------------------------
 
 
+def test_the_canary_covers_both_relay_one_liners_llms_txt_offers():
+    from app.main import LLMS_TXT_TEMPLATE
+    from failecho_sandbox import canary
+
+    src = (ROOT / "failecho_sandbox" / "canary.py").read_text()
+    for line in ("uvx failecho-mcp", "npx -y failecho-mcp"):
+        assert line in LLMS_TXT_TEMPLATE and f'"{line}"' in src, line
+    assert "RELAY_CMD" in canary.HANDSHAKE
+
+
 def test_the_canary_covers_every_pip_path_the_setup_page_advertises():
     """Whatever `pip install` the setup page tells a reader to run, the canary
     runs from a clean VM. A new package on the page without a canary step is
@@ -396,7 +406,8 @@ def test_the_canary_steps_run_against_a_fake_vm(monkeypatch, tmp_path):
             if argv[-2:] == ["run", "hello.py"]:
                 return Result(exit=0, stdout="called\n", stderr="[failecho] observing...\n[failecho] reported 1 call\n", seconds=0.3)
             if argv[-1] == "handshake.py":
-                assert env["PATH"].startswith("/work/venv/bin"), "the relay must be found in the venv"
+                if "RELAY_CMD" not in env:
+                    assert env["PATH"].startswith("/work/venv/bin"), "the relay must be found in the venv"
                 return Result(exit=0, stdout=json.dumps({"server": {"name": "failecho"}, "tools": canary.EXPECTED_TOOLS}) + "\n",
                               stderr="", seconds=1.0)
             if argv[-1] in ("li.py", "lc.py"):
@@ -419,6 +430,7 @@ def test_the_canary_steps_run_against_a_fake_vm(monkeypatch, tmp_path):
     names = [s["name"] for s in report["steps"]]
     assert "failecho-mcp stdio handshake: 4 tools" in names and "failecho_autoreport run (one call observed)" in names
     assert "LlamaIndex snippet: list_tools -> 4 tools" in names and "LangChain snippet: list_tools -> 4 tools" in names
+    assert "npx -y failecho-mcp stdio handshake: 4 tools" in names and "uvx failecho-mcp stdio handshake: 4 tools" in names
     # and the guest was told the lab, under a reporter id that names what it is
     assert all(s["ok"] for s in report["steps"])
 
@@ -456,7 +468,9 @@ def test_a_wrong_tool_list_fails_the_handshake_step(monkeypatch, tmp_path):
     assert canary.main() == 1
     report = json.loads((tmp_path / "canary.json").read_text())
     bad = [s for s in report["steps"] if not s["ok"]]
-    assert [s["name"] for s in bad] == ["failecho-mcp stdio handshake: 4 tools"]
+    assert [s["name"] for s in bad] == ["failecho-mcp stdio handshake: 4 tools",
+                                        "npx -y failecho-mcp stdio handshake: 4 tools",
+                                        "uvx failecho-mcp stdio handshake: 4 tools"]
 
 
 def test_the_scoreboard_carries_the_canary(tmp_path, monkeypatch):

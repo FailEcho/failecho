@@ -51,7 +51,8 @@ not run by us.
 |---|---|
 | First-party agent, production, every 30 min | running since 05:30 UTC; all `first_party`; label self-check on every run; 4 real provider failures seen (Gemini timeouts, a 503); **zero recovery outcomes yet** — nothing retryable has failed |
 | Fleet, lab, 18 personas, 4 providers, every 2 min | running since ~09:00 UTC; frozen at `9f91a5d` 11:30–15:45, re-pinned to `76a4559` at 15:45 to add two builders (first sixteen rows pinned by a test); 139 runs, 102 failures, **11 fingerprints across 2+ reporters**, 68 recovery outcomes, **cross_agent_help 3** |
-| Install canary: every pip path from a clean VM, daily 04:10 UTC | built 2026-09-16; 6 paths incl. stdio relay handshake and both framework snippets; first run all green in 73 s; found the LlamaIndex snippet returned a result object, page fixed; npm relay not covered (no Node in image) |
+| Onboarding test: 8 free models follow llms.txt in a clean VM, every 2 h | built 2026-09-16; host-graded (config, preserved, verified, no reporting, no home edit, no hook); first pass: Ollama gpt-oss:20b, seeded, 12.5 s; groq hits 8k TPM with the 23 KB doc |
+| Install canary: every pip path from a clean VM, daily 04:10 UTC | built 2026-09-16; 8 paths incl. pip/npx/uvx relay handshakes and both framework snippets; all green in 83 s; found: LlamaIndex result object (page fixed), Node fetch ignores HTTPS_PROXY (relay README), scratch on tmpfs (moved) |
 | Zero-code mode infers retry/backoff outcomes | `failecho-autoreport` 0.1.2 on PyPI; 12 unit tests; clean-room 503,503,200 produced "backoff failed" then "backoff worked" on the lab; builders now feed outcomes from inside the VM |
 | Sandbox: Firecracker microVM for model-written code | installed 2026-09-16; selftest 9/9 as root and as `failecho`; first scheduled builder run 15:50 UTC, 7.1 s, task done, 5 GitHub calls reported from inside the VM; `docs/sandbox.md` |
 

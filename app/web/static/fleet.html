@@ -109,6 +109,17 @@
     <th>service</th><th>operations seen</th><th class="num">fingerprints</th><th>reported via</th>
   </tr></thead><tbody></tbody></table>
 
+  <h2>Onboarding from llms.txt</h2>
+  <p class="sub">Every two hours a free model gets a clean VM, a shell, and one sentence: <em>Read llms.txt and set
+  yourself up to use FailEcho.</em> No hints. Graded from the disk, not by a model: config written in the project,
+  a pre-existing server left intact, one read-only query to verify, nothing reported, no client-owned file
+  touched, no hook installed. The failing column is the line of llms.txt to rewrite next.
+  <span id="fleet-onboard-when"></span></p>
+  <table id="fleet-onboard"><thead><tr>
+    <th>model</th><th class="num">runs</th><th class="num">passed</th><th class="num">asked instead</th>
+    <th class="num">provider failed</th><th>fails most on</th><th>last</th>
+  </tr></thead><tbody></tbody></table>
+
   <h2>Install canary</h2>
   <p class="sub">Once a day a fresh VM with nothing of ours on it installs each package from PyPI and does what
   the setup page says to do: import it, ask the network, run a script under it, start the stdio relay and

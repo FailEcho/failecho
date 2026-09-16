@@ -44,6 +44,15 @@
     fill("fleet-naming", (d.naming || []).map(function (n) {
       return [td(n.service), td(n.operations.join(", ")), td(n.fingerprints, "num " + (n.fingerprints > n.expected ? "warn" : "ok")), td(n.paths.join(", "))];
     }));
+    var o = d.onboard, ot = (o && o.totals) || {};
+    el("fleet-onboard-when").textContent = o ? (ot.graded + " graded runs, " + ot.passed + " passed; " +
+      ot.seeded_preserved + " kept the existing server, " + ot.seeded_clobbered + " clobbered it; " +
+      ot.said_restart + " said a restart is needed.") : "Not run yet.";
+    fill("fleet-onboard", ((o && o.models) || []).map(function (m) {
+      return [td(m.model + " (" + m.provider + ")"), td(m.runs, "num"),
+              td(m.graded ? m.passed + " / " + m.graded : "-", "num " + (m.graded && m.passed === m.graded ? "ok" : m.graded ? "warn" : "")),
+              td(m.asked, "num"), td(m.provider_failed, "num"), td(m.worst || "-"), td((m.last || "").replace("T", " ").slice(0, 16))];
+    }));
     var c = d.canary;
     el("fleet-canary-when").textContent = c ? ("Last run " + (c.at || "").replace("T", " ").slice(0, 16) + " UTC: " +
       (c.ok ? "every path worked." : "A PATH IS BROKEN.") + (c.error ? " " + c.error : "")) : "Not run yet.";

@@ -14,6 +14,9 @@ from PyPI through the fence and does what the page tells a reader to do:
 4. ``pip install failecho-mcp``, then start ``failecho-mcp`` on stdio and
    complete an MCP handshake: initialize, tools/list, four tools back, the
    same four the HTTP endpoint serves
+4b. ``npx -y failecho-mcp`` and ``uvx failecho-mcp``, the two one-line relay
+   forms llms.txt offers, each through the same handshake -- Node LTS and uv
+   are in the image; both fetch the relay from its registry through the fence
 5. the LlamaIndex snippet from the setup page, verbatim: ``pip install
    llama-index-tools-mcp``, ``BasicMCPClient(url).list_tools()``
 6. the LangChain snippet, verbatim: ``pip install langchain fastmcp``,
@@ -22,7 +25,6 @@ from PyPI through the fence and does what the page tells a reader to do:
 
 The result is a small JSON file the scoreboard shows, and a non-zero exit
 that systemd records, so the day a path stops working is the day we know.
-The npm relay is not covered: the image has no Node. Noted, not hidden.
 
 Everything talks to the lab, not production. The fence does not let the guest
 reach production, and the canary's calls would be first-party traffic that
@@ -56,7 +58,8 @@ print("called")
 HANDSHAKE = r'''
 import json, os, subprocess, sys, time, select
 env = dict(os.environ, FAILECHO_URL=os.environ["LAB"] + "/mcp")
-p = subprocess.Popen(["failecho-mcp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+cmd = json.loads(os.environ.get("RELAY_CMD") or '["failecho-mcp"]')
+p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                      stderr=subprocess.PIPE, env=env, text=True, bufsize=1)
 def send(o):
     p.stdin.write(json.dumps(o) + "\n"); p.stdin.flush()
@@ -70,7 +73,7 @@ def recv(deadline):
     raise SystemExit("relay: no answer in time; stderr: " + p.stderr.read()[-800:])
 send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18",
       "capabilities": {}, "clientInfo": {"name": "failecho-canary", "version": "0"}}})
-init = recv(time.time() + 60)
+init = recv(time.time() + 150)   # npx and uvx download the relay first
 send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
 tools = recv(time.time() + 60)
@@ -173,6 +176,17 @@ def run_canary(vm: Sandbox, lab_url: str) -> list[dict]:
             got = {}
         step("failecho-mcp stdio handshake: 4 tools", r, r.ok and got.get("tools") == EXPECTED_TOOLS,
              f"{got.get('server', {}).get('name', '?')} -> {', '.join(got.get('tools') or [])}" if got else "")
+    for label, cmd, timeout in (("npx -y failecho-mcp", ["npx", "-y", "failecho-mcp"], 200),
+                                ("uvx failecho-mcp", ["uvx", "failecho-mcp"], 280)):
+        r = vm.run([py, "handshake.py"], files={"handshake.py": HANDSHAKE}, timeout=timeout,
+                   env={**env, "RELAY_CMD": json.dumps(cmd), "NODE_USE_ENV_PROXY": "1"})
+        try:
+            got = json.loads(r.stdout.strip().splitlines()[-1]) if r.ok else {}
+        except ValueError:
+            got = {}
+        step(f"{label} stdio handshake: 4 tools", r, r.ok and got.get("tools") == EXPECTED_TOOLS,
+             f"{got.get('server', {}).get('name', '?')} -> {', '.join(got.get('tools') or [])}" if got else "")
+
     _framework_step(vm, steps, env, "LlamaIndex", "/work/venv-li", ["llama-index-tools-mcp"],
                     LLAMAINDEX_SNIPPET, "li.py")
     _framework_step(vm, steps, env, "LangChain", "/work/venv-lc", ["langchain", "fastmcp"],
