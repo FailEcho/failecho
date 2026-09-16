@@ -1,4 +1,4 @@
-"""The fleet: twelve of FailEcho's own agents, one at a time, against the lab.
+"""The fleet: eighteen of FailEcho's own agents, one at a time, against the lab.
 
 See docs/fleet-test-plan.md for what this is for. In one line: half the fleet
 asks the network before retrying and half retries blind, on identical
@@ -17,8 +17,8 @@ Three things this refuses to do, each checked before any request is made:
 * hold more than one persona in memory -- there is no loop here, one run and
   exit, and the unit caps memory.
 
-Nothing is manufactured. The failures are whatever PyPI, npm, GitHub and two
-free-tier model providers actually do when twelve agents share one IP for two
+Nothing is manufactured. The failures are whatever PyPI, npm, GitHub and four
+free-tier model providers actually do when eighteen agents share one IP for two
 days.
 """
 
@@ -36,6 +36,8 @@ import urllib.request
 
 from failecho_autoreport import FailEcho, classify
 
+from .builder import BUILDER_SCHEMAS, BUILDER_TASKS, SYSTEM_PROMPT as BUILDER_PROMPT, Builder, fetch_doc
+
 __version__ = "0.1.0"
 UA = "failecho-fleet/0.1 (+https://failecho.com; lab)"
 
@@ -45,10 +47,13 @@ REPORT_PATH = os.environ.get("FLEET_REPORT_PATH") or os.path.join(STATE_DIR, "fl
 LAB_DB = os.environ.get("FLEET_LAB_DB") or ""
 PRODUCTION_HOSTS = ("failecho.com", "www.failecho.com")
 MAX_RUNS_PER_DAY = int(os.environ.get("FLEET_MAX_RUNS_PER_DAY") or 600)
+#: What the sandbox guest is told to report to. Unset means the in-guest
+#: wrapper stays off; there is deliberately no default.
+LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None
 
 PROVIDERS = {
     "groq": {"host": "api.groq.com", "url": "https://api.groq.com/openai/v1/chat/completions",
-             "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 400},
+             "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 700},
     "gemini": {"host": "generativelanguage.googleapis.com",
                "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                "key": os.environ.get("GEMINI_API_KEY"), "models": ["gemini-flash-latest"], "daily_cap": 400},
@@ -139,7 +144,13 @@ PERSONAS = [
     # real target, real limit: twenty GitHub calls a run from a shared IP
     ("fleet-gh-ask",       "decorator", None,     True,  GH_HEAVY),
     ("fleet-gh-blind",     "decorator", None,     False, GH_HEAVY),
+    # builders: write code, run it in a throwaway VM, fix it, run it again.
+    # Added 2026-09-16 15:40 UTC, after the first sixteen had run for six
+    # hours; the twins share a provider so the only difference is asking.
+    ("fleet-build-ask",    "builder",   "groq",   True,  BUILDER_TASKS),
+    ("fleet-build-blind",  "builder",   "groq",   False, BUILDER_TASKS),
 ]
+BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind"}
 TEST_PERSONAS = {"fleet-test-ask", "fleet-test-blind"}
 
 
@@ -274,6 +285,7 @@ class Run:
             from failecho_autoreport import auto
             auto._fe = self.fe
             auto.enable()
+        self.build: dict | None = None   # the builder's ledger, when this is one
 
     # -- asking and reporting through the three paths ------------------------
 
@@ -330,9 +342,9 @@ class Run:
 
     # -- the ask-then-recover discipline --------------------------------------
 
-    def call(self, name: str, args: dict) -> tuple[str, bool]:
-        fn = self.tools[name]
-        service = TOOL_SERVICE[name]
+    def call(self, name: str, args: dict, fn=None, service: str | None = None) -> tuple[str, bool]:
+        fn = fn or self.tools[name]
+        service = service or TOOL_SERVICE[name]
         self.tool_calls += 1
         try:
             out = fn(**args)
@@ -445,6 +457,82 @@ class Run:
                 messages.append({"role": "tool", "tool_call_id": c["id"], "content": result})
         return "(model budget exhausted)"
 
+    def run_build(self, task: str, run_index: int = 0, used_today: int = 0) -> str:
+        """A builder run: the model writes code and the sandbox runs it.
+
+        Same provider loop as run_model, different tools. run_python and
+        resolve_python_deps go to the VM through the Builder; fetch_doc is a
+        host read through call(), so it asks or does not exactly as the other
+        personas' tools do. The Builder's ledger (VM runs, local failures,
+        shared failures) lands on self.build for the scoreboard."""
+        p = PROVIDERS[self.provider]
+        if not p["key"]:
+            return "(no provider key)"
+        if used_today >= p.get("daily_cap", 10**9):
+            return f"(provider {self.provider} daily cap reached; run skipped)"
+        model = p["models"][run_index % len(p["models"])]
+        self.model = model
+        messages = [{"role": "system", "content": BUILDER_PROMPT}, {"role": "user", "content": task}]
+
+        def chat():
+            body = {"model": model, "messages": messages, "tools": BUILDER_SCHEMAS, "tool_choice": "auto",
+                    "max_tokens": 2500}
+            req = urllib.request.Request(p["url"], data=json.dumps(body).encode(), method="POST",
+                                         headers={"Content-Type": "application/json", "User-Agent": UA,
+                                                  "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
+            try:
+                with urllib.request.urlopen(req, timeout=90) as r:
+                    return json.load(r)
+            except urllib.error.HTTPError as e:
+                log(f"  provider {p['host']} HTTP {e.code}: {e.read()[:200].decode(errors='ignore')!r}")
+                raise
+
+        chat = self.fe.watch(service=p["host"], operation="chat.completions", mutates=False)(chat)
+
+        with Builder(self.reporter, LAB_PUBLIC_URL, self.fe) as b:
+            answer = "(model budget exhausted)"
+            for _ in range(10):
+                self.model_calls += 1
+                try:
+                    resp = chat()
+                except Exception as exc:  # noqa: BLE001
+                    et, code = classify(exc)
+                    self.failures.append({"service": p["host"], "operation": "chat.completions", "error_type": et,
+                                          "error_code": code, "asked": False, "recommended": None, "attempts": 1,
+                                          "recovered": False})
+                    answer = f"(provider failed: {et})"
+                    break
+                msg = resp["choices"][0]["message"]
+                calls = msg.get("tool_calls") or []
+                if not calls:
+                    answer = (msg.get("content") or "").strip()[:300]
+                    break
+                messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
+                for c in calls:
+                    try:
+                        args = json.loads(c["function"].get("arguments") or "{}")
+                    except ValueError:
+                        args = {}
+                    name = c["function"]["name"]
+                    self.tool_calls += 1
+                    if name == "run_python":
+                        result = json.dumps(b.run_python(str(args.get("code") or ""), str(args.get("filename") or "task.py"),
+                                                         args.get("requirements") if isinstance(args.get("requirements"), list) else None))
+                    elif name == "resolve_python_deps":
+                        result = json.dumps(b.resolve_python_deps(args.get("requirements") if isinstance(args.get("requirements"), list) else []))
+                    elif name == "fetch_doc":
+                        self.tool_calls -= 1   # call() counts it
+                        url = str(args.get("url") or "")
+                        host = (urllib.parse.urlsplit(url).hostname or "").lower() or "invalid"
+                        wrapped = self.fe.watch(service=host, operation="fetch_doc", mutates=False)(fetch_doc)
+                        result, _ = self.call("fetch_doc", {"url": url}, fn=wrapped, service=host)
+                    else:
+                        result = json.dumps({"error": "unknown tool"})
+                    messages.append({"role": "tool", "tool_call_id": c["id"], "content": result[:12000]})
+            self.build = b.summary()
+            self.build["task_done"] = b.last_ok and not answer.startswith("(")
+            return answer
+
 
 # ---------------------------------------------------------------------------
 # scheduling and the scoreboard
@@ -469,13 +557,24 @@ def write_report(state: dict) -> None:
     runs = state["runs"]
     by_persona: dict[str, dict] = {}
     blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0}
-    cohorts = {"real / ask": blank(), "real / blind": blank(), "test / ask": blank(), "test / blind": blank()}
+    cohorts = {"real / ask": blank(), "real / blind": blank(), "test / ask": blank(), "test / blind": blank(),
+               "build / ask": blank(), "build / blind": blank()}
+    # the builders' second ledger: what happened inside the VM
+    build = {"build / ask": {"vm_runs": 0, "local": 0, "shared": 0, "tasks_done": 0, "sandbox_down": 0},
+             "build / blind": {"vm_runs": 0, "local": 0, "shared": 0, "tasks_done": 0, "sandbox_down": 0}}
     for r in runs:
         p = by_persona.setdefault(r["reporter"], {"reporter": r["reporter"], "path": r["path"], "provider": r["provider"] or "none",
                                                    "asks": r["asks"], "runs": 0, "tool_calls": 0, "failures": 0, "last": ""})
         p["runs"] += 1; p["tool_calls"] += r["tool_calls"]; p["failures"] += len(r["failures"]); p["last"] = r["at"]
-        c = cohorts[("test" if r["reporter"] in TEST_PERSONAS else "real") + (" / ask" if r["asks"] else " / blind")]
+        kind = "test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS else "real"
+        key = kind + (" / ask" if r["asks"] else " / blind")
+        c = cohorts[key]
         c["runs"] += 1
+        if kind == "build" and r.get("build"):
+            bl, b = build[key], r["build"]
+            bl["vm_runs"] += b.get("vm_runs", 0); bl["local"] += b.get("local_failures", 0)
+            bl["shared"] += len(b.get("shared_failures") or []); bl["tasks_done"] += int(bool(b.get("task_done")))
+            bl["sandbox_down"] += int(b.get("sandbox", "ok") != "ok")
         for f in r["failures"]:
             c["failures"] += 1; c["attempts"] += f["attempts"]; c["recovered"] += int(f["recovered"])
             c["asked"] += int(f["asked"]); c["recommended"] += int(bool(f["recommended"]))
@@ -512,6 +611,8 @@ def write_report(state: dict) -> None:
                    "failures": sum(len(r["failures"]) for r in runs), **totals_db},
         "cohorts": [{"cohort": k, **v, "attempts_per_failure": (v["attempts"] / v["failures"]) if v["failures"] else None}
                     for k, v in cohorts.items()],
+        "build": [{"cohort": k, **v, "shared_share": (v["shared"] / (v["shared"] + v["local"])) if (v["shared"] + v["local"]) else None}
+                  for k, v in build.items()],
         "repeats": repeats, "naming": naming,
         "personas": sorted(by_persona.values(), key=lambda p: p["reporter"]),
     }
@@ -541,6 +642,11 @@ def main(argv: list[str] | None = None) -> int:
         state["provider_day"], state["provider_calls_today"] = today, {}
     if provider is None:
         answer = run.run_cron(workload)
+    elif path == "builder":
+        task = workload[(state["runs_today"] // len(PERSONAS)) % len(workload)]
+        answer = run.run_build(task, run_index=state["runs_today"],
+                               used_today=state["provider_calls_today"].get(provider, 0))
+        state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
     else:
         task = workload[(state["runs_today"] // len(PERSONAS)) % len(workload)]
         answer = run.run_model(task, run_index=state["runs_today"],
@@ -551,6 +657,8 @@ def main(argv: list[str] | None = None) -> int:
     record = {"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "reporter": reporter, "path": path,
               "provider": provider, "model": getattr(run, "model", None), "asks": asks, "tool_calls": run.tool_calls, "model_calls": run.model_calls,
               "failures": run.failures, "seconds": round(time.monotonic() - started, 1)}
+    if run.build is not None:
+        record["build"] = run.build
     state["runs"].append(record)
     state["runs"] = state["runs"][-5000:]
     state["next"] = idx + 1
@@ -564,6 +672,10 @@ def main(argv: list[str] | None = None) -> int:
     for f in run.failures:
         log(f"  {f['service']} {f['operation']} {f['error_type']}{'/' + f['error_code'] if f['error_code'] else ''}"
             f" asked={f['asked']} rec={f['recommended']} attempts={f['attempts']} recovered={f['recovered']}")
+    if run.build is not None:
+        b = run.build
+        log(f"  build: vm_runs={b['vm_runs']} local={b['local_failures']} shared={len(b['shared_failures'])} "
+            f"done={b['task_done']} sandbox={b['sandbox']}")
     log(f"  answer: {answer[:120]!r}")
     return 0
 

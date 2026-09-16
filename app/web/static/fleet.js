@@ -31,6 +31,12 @@
               td(c.attempts_per_failure == null ? "-" : c.attempts_per_failure.toFixed(2), "num"),
               td(c.recovered, "num"), td(c.asked, "num"), td(c.recommended, "num")];
     }));
+    var runsBy = {}; (d.cohorts || []).forEach(function (c) { runsBy[c.cohort] = c.runs; });
+    fill("fleet-build", (d.build || []).map(function (b) {
+      return [td(b.cohort), td(runsBy[b.cohort] || 0, "num"), td(b.vm_runs, "num"), td(b.tasks_done, "num"),
+              td(b.local, "num"), td(b.shared, "num"),
+              td(b.shared_share == null ? "-" : Math.round(b.shared_share * 100) + "%", "num")];
+    }));
     fill("fleet-repeats", (d.repeats || []).map(function (r) {
       return [td(r.service), td(r.operation), td(r.error_type + (r.error_code ? "/" + r.error_code : "")),
               td(r.reporters, "num"), td(r.observations, "num"), td(r.fixes || "-")];

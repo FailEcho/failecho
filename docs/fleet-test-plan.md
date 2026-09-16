@@ -158,6 +158,22 @@ the experiment under the fleet. For the first two hours it did not work this
 way, and every deploy restarted the lab with new code; that is noted here
 rather than hidden, and the runs from then are still in the state file.
 
+## Change during the run: two builders, 2026-09-16 15:40 UTC
+
+Six hours in, two personas were added: `fleet-build-ask` and
+`fleet-build-blind`, which write small programs and run them in a throwaway
+VM (`docs/sandbox.md`). The sixteen original rows were not touched -- a test
+pins them byte for byte -- and the lab was re-pinned to the commit that adds
+the builders, which restarted the lab instance once. The timer went from
+every 3 minutes to every 2 at the same time; the provider daily caps pace
+the model-backed personas regardless. Runs before this change are still in
+the state file and on the scoreboard, and the builders' rows start from zero.
+
+What the builders add: a second ledger, **local** failures (the agent's own
+bug, counted and never reported) against **shared** ones (the world's,
+reported), on realistic development tasks. That share is the number the
+rest of the fleet cannot produce.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

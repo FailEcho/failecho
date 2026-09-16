@@ -70,9 +70,10 @@
 <section class="shell fleet">
   <div class="fleet-head">
     <h1>The fleet test</h1>
-    <p class="sub">Sixteen of FailEcho's own agents, on real read-only services, round the clock.
-    Half ask the network before they retry; their twins retry blind on identical work. This is a lab
-    instance and a simulated fleet &mdash; every number here is ours, and none of it is adoption.
+    <p class="sub">Eighteen of FailEcho's own agents, on real services, round the clock.
+    Half ask the network before they retry; their twins retry blind on identical work. Two of them write
+    and run code in a throwaway VM. This is a lab instance and a simulated fleet &mdash; every number here
+    is ours, and none of it is adoption.
     <span id="fleet-updated"></span></p>
   </div>
 
@@ -84,6 +85,16 @@
   <table id="fleet-cohorts"><thead><tr>
     <th>cohort</th><th class="num">runs</th><th class="num">failures</th>
     <th class="num">attempts / failure</th><th class="num">recovered</th><th class="num">asked</th><th class="num">got a recommendation</th>
+  </tr></thead><tbody></tbody></table>
+
+  <h2>Builders: whose fault was it?</h2>
+  <p class="sub">Two agents write small programs and run them in a sandbox VM, fix them, run again.
+  A <b>local</b> failure is their own bug &mdash; counted, never reported. A <b>shared</b> failure is the
+  world's: the index timing out, GitHub's rate limit, a 503. The last column is the share of an agent's
+  failures a shared network could ever speak to.</p>
+  <table id="fleet-build"><thead><tr>
+    <th>cohort</th><th class="num">runs</th><th class="num">VM runs</th><th class="num">tasks done</th>
+    <th class="num">local</th><th class="num">shared</th><th class="num">shared share</th>
   </tr></thead><tbody></tbody></table>
 
   <h2>Does it repeat?</h2>

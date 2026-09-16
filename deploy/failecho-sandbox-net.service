@@ -1,0 +1,15 @@
+# The sandbox VM's tap device and firewall fence. Runs at boot and stays
+# "active (exited)" so the units that need the link can depend on it.
+[Unit]
+Description=FailEcho sandbox: tap device and fence
+After=network-online.target ufw.service
+Wants=network-online.target
+Requires=ufw.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/failecho-sandbox-net.sh
+
+[Install]
+WantedBy=multi-user.target

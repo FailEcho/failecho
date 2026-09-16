@@ -2,8 +2,8 @@
 # state file. The timer is the loop.
 [Unit]
 Description=FailEcho fleet test (one persona run)
-After=network-online.target failecho-lab.service
-Wants=network-online.target
+After=network-online.target failecho-lab.service failecho-sandbox-proxy.service
+Wants=network-online.target failecho-sandbox-proxy.service
 Requires=failecho-lab.service
 
 [Service]
@@ -16,11 +16,18 @@ WorkingDirectory=/srv/failecho-lab/app
 EnvironmentFile=/etc/failecho-agent.env
 Environment="FAILECHO_ENDPOINT=http://127.0.0.1:8089"
 Environment="FLEET_LAB_DB=/srv/failecho-lab/data/lab.db"
-Environment="FLEET_MAX_RUNS_PER_DAY=600"
+Environment="FLEET_MAX_RUNS_PER_DAY=800"
+# what the sandbox guest reports to, through the fence; the public lab URL
+# because the guest cannot see this host's loopback
+Environment="FLEET_LAB_PUBLIC_URL=https://lab.failecho.com"
+Environment="FAILECHO_SANDBOX_RUN=/run/failecho-sandbox"
 ExecStart=/srv/failecho/.venv/bin/python -m failecho_fleet
-TimeoutStartSec=180
-MemoryMax=120M
+TimeoutStartSec=420
+# a builder run holds one 384 MiB microVM; every other persona is ~40 MB
+MemoryMax=600M
 StateDirectory=failecho-fleet
+RuntimeDirectory=failecho-sandbox
+RuntimeDirectoryPreserve=yes
 ReadOnlyPaths=/srv/failecho-lab/data
 UMask=0022
 NoNewPrivileges=yes

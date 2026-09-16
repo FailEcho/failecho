@@ -1,10 +1,10 @@
-# One persona every three minutes, round the clock, for the length of the
+# One persona every two minutes (three until 2026-09-16 15:40 UTC), round the clock, for the length of the
 # test. Stop with: systemctl stop failecho-fleet.timer
 [Unit]
-Description=FailEcho fleet test, one persona every 3 minutes
+Description=FailEcho fleet test, one persona every 2 minutes
 
 [Timer]
-OnCalendar=*:0/3
+OnCalendar=*:0/2
 RandomizedDelaySec=30
 Persistent=false
 

@@ -1,0 +1,29 @@
+# The allowlisting CONNECT proxy: the sandbox guest's only way out.
+# Listens on the host end of the tap link only. See failecho_sandbox/proxy.py
+# for the list of hosts it will connect to.
+[Unit]
+Description=FailEcho sandbox: allowlisting egress proxy
+After=failecho-sandbox-net.service
+Requires=failecho-sandbox-net.service
+
+[Service]
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho-lab/app
+ExecStart=/srv/failecho/.venv/bin/python -m failecho_sandbox.proxy
+Restart=always
+RestartSec=2
+MemoryMax=60M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
