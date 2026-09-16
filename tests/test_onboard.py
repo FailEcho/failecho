@@ -145,15 +145,17 @@ def test_the_report_aggregates_per_model(tmp_path, monkeypatch):
         {"at": "t1", "provider": "ollama", "model": "m", "seeded": True, "model_calls": 5, "tool_calls": 4, "seconds": 12.0, "answer": "a", "grades": g_pass},
         {"at": "t2", "provider": "ollama", "model": "m", "seeded": False, "model_calls": 5, "tool_calls": 4, "seconds": 12.0, "answer": "a", "grades": g_fail},
         {"at": "t3", "provider": "groq", "model": "g", "seeded": False, "model_calls": 4, "tool_calls": 3, "seconds": 2.0, "answer": "", "grades": None, "error": "provider rate_limit"},
+        # the provider died after the model had already written the config: still the provider's failure
+        {"at": "t4", "provider": "groq", "model": "g", "seeded": False, "model_calls": 5, "tool_calls": 2, "seconds": 50.0, "answer": "", "grades": g_fail, "error": "provider validation_error"},
     ]}
     onboard.write_report(state)
     r = json.loads((tmp_path / "onboard.json").read_text())
     by = {m["model"]: m for m in r["models"]}
     assert by["m"]["passed"] == 1 and by["m"]["graded"] == 2 and by["m"]["worst"] == "verified"
-    assert by["g"]["provider_failed"] == 1 and by["g"]["graded"] == 0 and by["g"]["pass_rate"] is None
-    assert r["totals"] == {"runs": 3, "graded": 2, "passed": 1, "said_restart": 1, "verified": 1,
+    assert by["g"]["provider_failed"] == 2 and by["g"]["graded"] == 0 and by["g"]["pass_rate"] is None
+    assert r["totals"] == {"runs": 4, "graded": 2, "passed": 1, "said_restart": 1, "verified": 1,
                            "seeded_preserved": 1, "seeded_clobbered": 0}
-    assert r["recent"][0]["at"] == "t3"
+    assert r["recent"][0]["at"] == "t4"
 
 
 def test_the_unit_holds_no_operator_token_and_uses_the_lab():

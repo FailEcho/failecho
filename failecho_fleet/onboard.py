@@ -286,7 +286,9 @@ def write_report(state: dict) -> None:
         m["runs"] += 1
         m["last"] = r["at"]
         g = r.get("grades")
-        if not g:
+        if not g or str(r.get("error", "")).startswith("provider"):
+            # the model never got to finish; that is the provider's failure,
+            # not the document's, and it is reported to the lab as such
             m["provider_failed"] += 1
             continue
         m["graded"] += 1
@@ -303,7 +305,7 @@ def write_report(state: dict) -> None:
     for m in by_model.values():
         m["worst"] = max(m["fails"], key=m["fails"].get) if m["fails"] else None
         m["pass_rate"] = (m["passed"] / m["graded"]) if m["graded"] else None
-    graded = [r for r in runs if r.get("grades")]
+    graded = [r for r in runs if r.get("grades") and not str(r.get("error", "")).startswith("provider")]
     report = {
         "generated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "totals": {"runs": len(runs), "graded": len(graded), "passed": sum(1 for r in graded if r["grades"]["pass"]),
