@@ -859,14 +859,17 @@ def render_page(filename: str, base_url: str) -> str:
         # and a tag next to the wordmark that stays in view when the strip has
         # scrolled away
         html = re.sub(r'(<a class="brand"[^>]*>.*?</a>)', r'\1<span class="lab-tag">lab</span>', html, count=1, flags=re.S)
-    if settings.github_url:
-        html = html.replace("{{GITHUB_URL}}", settings.github_url)
-        html = html.replace("<!--github-->", "").replace("<!--/github-->", "")
-    else:
-        while "<!--github-->" in html and "<!--/github-->" in html:
-            start = html.index("<!--github-->")
-            end = html.index("<!--/github-->") + len("<!--/github-->")
-            html = html[:start] + html[end:]
+    for marker, value, placeholder in (("github", settings.github_url, "{{GITHUB_URL}}"),
+                                       ("lab", settings.lab_url, "{{LAB_URL}}")):
+        open_, close = f"<!--{marker}-->", f"<!--/{marker}-->"
+        if value:
+            html = html.replace(placeholder, value)
+            html = html.replace(open_, "").replace(close, "")
+        else:
+            while open_ in html and close in html:
+                start = html.index(open_)
+                end = html.index(close) + len(close)
+                html = html[:start] + html[end:]
     return html
 
 

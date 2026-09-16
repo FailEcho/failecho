@@ -700,7 +700,9 @@ def test_the_arrow_means_one_thing_only():
             # HTML is the unrendered source, so the GitHub href is still a
             # placeholder; it is substituted with an absolute URL or the whole
             # block is stripped.
-            assert target.startswith("http") or target == "{{GITHUB_URL}}", (
+            # A placeholder is substituted with an absolute URL or the whole
+            # block is stripped, so it is external by construction.
+            assert target.startswith("http") or target.startswith(("{{GITHUB_URL}}", "{{LAB_URL}}")), (
                 f"marked external but stays on the site: {tag}"
             )
 
@@ -1596,21 +1598,34 @@ def test_llms_txt_explains_decay_and_unverified_success(client):
     assert "the evidence for the join, not the join" in body
 
 
-def test_the_lab_is_linked_from_the_main_site_and_named_honestly(client):
-    """The lab is reachable from the nav, the footer and the own-agents card,
-    and every mention says what it is: our own agents, a separate instance,
-    not adoption. Opens in a new tab like every other off-site link."""
+def test_the_lab_is_linked_only_when_configured(client):
+    """Unconfigured -- a self-hosted copy -- links to no lab at all, and no
+    production hostname leaks into the page. Configured, the lab is reachable
+    from the nav, the footer and the own-agents card, every mention says what
+    it is, and the link opens in a new tab like every other off-site link."""
     import re
 
-    for path in ("/", "/demo"):
-        body = re.sub(r"\s+", " ", client.get(path).text)
-        links = re.findall(r'<a\b[^>]*href="https://lab\.failecho\.com[^"]*"[^>]*>', body)
-        assert links, f"{path}: no link to the lab"
-        assert all('target="_blank"' in l and "noopener" in l for l in links)
-    home = re.sub(r"\s+", " ", client.get("/").text)
-    assert "a separate lab instance" in home and "without any of it touching this number" in home
-    demo = re.sub(r"\s+", " ", client.get("/demo").text)
-    assert "Nothing in it is counted as adoption" in demo
+    from app.main import render_page
+
+    off = render_page("index.html", "http://testserver")
+    assert "{{LAB_URL}}" not in off and "lab.failecho.com" not in off
+    assert "<!--lab-->" not in off
+
+    import app.main as m
+    from app.core.config import settings
+    on = off
+    try:
+        object.__setattr__(settings, "lab_url", "https://lab.example")
+        on = render_page("index.html", "http://testserver")
+        demo = render_page("demo.html", "http://testserver")
+    finally:
+        object.__setattr__(settings, "lab_url", "")
+    links = re.findall(r'<a\b[^>]*href="https://lab\.example/[^"]*"[^>]*>', on)
+    assert len(links) >= 3, "nav, footer and the own-agents card"
+    assert all('target="_blank"' in l and "noopener" in l for l in links)
+    flat_on, flat_demo = re.sub(r"\s+", " ", on), re.sub(r"\s+", " ", demo)
+    assert "a separate lab instance" in flat_on and "without any of it touching this number" in flat_on
+    assert "Nothing in it is counted as adoption" in flat_demo and "https://lab.example/fleet" in flat_demo
 
 
 def test_demo_page_reflects_the_current_product(client):

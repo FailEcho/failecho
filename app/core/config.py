@@ -144,6 +144,9 @@ class Settings:
     # written by the fleet scheduler. Empty on production, and everything here
     # is inert.
     lab_label: str = field(default_factory=lambda: _env_str("FIN_LAB_LABEL", ""))
+    #: Where the public site links to its lab. Empty means no lab is linked --
+    #: a self-hosted copy should not advertise ours.
+    lab_url: str = field(default_factory=lambda: _env_str("FIN_LAB_URL", ""))
     fleet_report_path: str = field(default_factory=lambda: _env_str("FIN_FLEET_REPORT", ""))
 
     # ---- incident detection (MVP heuristic, deliberately simple) ---------

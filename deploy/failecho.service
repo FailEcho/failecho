@@ -28,6 +28,8 @@ Environment="FIN_RETENTION_HOURS=48"
 Environment="FIN_RATE_LIMIT_WRITES_PER_MINUTE=120"
 Environment="FIN_DEMO_MODE=0"
 Environment="FIN_GITHUB_URL=https://github.com/FailEcho/failecho"
+# The public site links to its lab; a self-hosted copy leaves this unset.
+Environment="FIN_LAB_URL=https://lab.failecho.com"
 
 # FIN_REPORTER_SALT lives here, generated ONCE. Regenerating it would reset
 # every reporter hash and every unique-reporter count.
