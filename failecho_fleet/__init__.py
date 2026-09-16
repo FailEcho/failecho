@@ -30,6 +30,7 @@ import os
 import sqlite3
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -310,14 +311,25 @@ class Run:
                                                    "try once more, then answer with what you have. Under 60 words."},
                     {"role": "user", "content": task}]
 
-        @self.fe.watch(service=p["host"], operation="chat.completions", mutates=False)
         def chat():
             body = {"model": p["model"], "messages": messages, "tools": TOOL_SCHEMAS, "tool_choice": "auto", "max_tokens": 500}
             req = urllib.request.Request(p["url"], data=json.dumps(body).encode(), method="POST",
                                          headers={"Content-Type": "application/json", "User-Agent": UA,
                                                   "Authorization": f"Bearer {p['key']}"})
-            with urllib.request.urlopen(req, timeout=60) as r:
-                return json.load(r)
+            try:
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    return json.load(r)
+            except urllib.error.HTTPError as e:
+                # a provider rejecting our request is data, and if it is OUR
+                # request shape that is wrong, the journal is where we find out
+                log(f"  provider {p['host']} HTTP {e.code}: {e.read()[:200].decode(errors='ignore')!r}")
+                raise
+
+        # The auto path's urllib patch already observes this call by route.
+        # Wrapping it again would report every provider call twice, and the
+        # network cannot tell a double count from two agents agreeing.
+        if self.path != "auto":
+            chat = self.fe.watch(service=p["host"], operation="chat.completions", mutates=False)(chat)
 
         for _ in range(6):
             self.model_calls += 1
