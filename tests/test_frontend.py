@@ -288,7 +288,8 @@ def test_static_assets_stay_small():
     # 145k -> 195k on 2026-09-16: the home page has a section for the lab,
     # wrapped in the lab's picture -- 47KB of WebP at 1200px, from a 2.1MB
     # PNG that was never committed. Still under a fifth of the old hero ground.
-    assert per_visit < 197_000, f"page weight crept to {per_visit} bytes"
+    # 197k -> 208k: the four install cards' own render (10.8KB), on request.
+    assert per_visit < 208_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
