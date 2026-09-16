@@ -73,13 +73,16 @@ def test_the_front_page_is_not_a_claude_code_accessory(client):
 
 def test_the_front_page_stays_brief():
     """It is a front page, not the manual. Nine sections was the old mistake."""
-    assert HTML.count("<h2") <= 5, "more than five sections means it is growing back"
+    # Five, then six on 2026-09-16: the lab got its own section, on request.
+    # The sixth is the last; anything else goes on its own page.
+    assert HTML.count("<h2") <= 6, "more than six sections means it is growing back"
     # Four ways in, four tabs. The budget follows the install card, not the
     # other way round -- but sections are still capped at four above.
     # 13k -> 14k when the definition moved back into the hero's left column,
     # 14k -> 15k for the three cards that close the page, 15k -> 16k for the
     # four install cards carrying two faces each.
-    assert len(HTML) < 18_000
+    # 16k -> 19k for the lab's section. See the six-section note above.
+    assert len(HTML) < 19_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -231,9 +234,9 @@ def test_static_assets_stay_small():
     # raise, as the note below predicted: the trims available were comments
     # carrying the reasoning for the motion, which is worth more than the
     # bytes.
-    # 63k -> 64k on 2026-09-16 for the picture behind "What the network holds
-    # today": the band, its gradient and the glassy cards. Requested; the
-    # trims left were reasoning comments.
+    # 63k -> 64k on 2026-09-16 for the lab's section on the home page (its
+    # picture band) and the lab's quieter strip and tag. Requested; the trims
+    # left were reasoning comments.
     assert len(CSS) < 64_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
@@ -252,8 +255,8 @@ def test_static_assets_stay_small():
     # that were already there, not new markup.
     # 110k -> 111k: the lab linked from the nav, the footer and the own-agents
     # card, and the lab banner's non-sticky form plus its bar tag.
-    # 111k -> 112k: the picture band's CSS. Same day, same request.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 112_000
+    # 111k -> 113k: the lab's section on the home page and its picture band.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 113_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -267,16 +270,17 @@ def test_static_assets_stay_small():
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-dark.png").stat().st_size
         + (STATIC / "card-abstract1.webp").stat().st_size
+        + (STATIC / "purple_lab.webp").stat().st_size
     )
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
     # 144k -> 145k on 2026-09-16: the lab linked from three places on the
     # home page, and its banner and bar tag in the shared stylesheet.
-    # (purple_lab.webp was briefly behind the live band here; it belongs to
-    # the lab's scoreboard and is loaded by fleet.css only, so the public
-    # page is back under its old budget.)
-    assert per_visit < 145_000, f"page weight crept to {per_visit} bytes"
+    # 145k -> 195k on 2026-09-16: the home page has a section for the lab,
+    # wrapped in the lab's picture -- 47KB of WebP at 1200px, from a 2.1MB
+    # PNG that was never committed. Still under a fifth of the old hero ground.
+    assert per_visit < 197_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -1655,15 +1659,29 @@ def test_lab_banner_is_not_pinned(client):
 
 
 
-def test_the_lab_picture_is_small_webp_and_loaded_by_the_lab_only(client):
-    """The source was a 2.1MB PNG. What ships is WebP under 60KB, referenced
-    from fleet.css -- which only the lab's scoreboard loads -- and never from
-    the shared stylesheet, so the public site never downloads it."""
+def test_the_lab_picture_is_small_webp_not_the_png(client):
+    """The source was a 2.1MB PNG. What ships is WebP under 60KB, behind the
+    lab's section on the home page and the scoreboard's head on the lab."""
     assert (STATIC / "purple_lab.webp").stat().st_size < 60_000
     assert not (STATIC / "purple_lab.png").exists()
     assert 'url("purple_lab.webp")' in (STATIC / "fleet.css").read_text()
-    shared = (STATIC / "style.css").read_text()
-    assert "purple_lab" not in shared and "purple_lab" not in HTML
+    assert 'url("purple_lab.webp")' in (STATIC / "style.css").read_text()
+    assert "purple_lab.png" not in HTML
+
+
+def test_home_page_lab_section_exists_only_when_a_lab_is_configured():
+    from app.core.config import settings
+    from app.main import render_page
+
+    off = render_page("index.html", "http://testserver")
+    assert 'id="lab"' not in off and "Watch the scoreboard" not in off
+    object.__setattr__(settings, "lab_url", "https://lab.example")
+    try:
+        on = render_page("index.html", "http://testserver")
+    finally:
+        object.__setattr__(settings, "lab_url", "")
+    assert 'id="lab"' in on and 'href="https://lab.example/fleet"' in on
+    assert "none of it is adoption" in on.replace("\n", " ")
 
 
 def test_lab_banner_links_home_and_the_tag_is_off_the_brand():

@@ -1364,6 +1364,25 @@ footer.shell {
 }
 
 /* ---- stat cards -------------------------------------------------------- */
+/* The lab's section on the home page, on the lab's picture: 47KB of WebP
+   under a gradient that fades it to the black page at both edges. */
+.band--lab {
+  position: relative; isolation: isolate; overflow: hidden;
+  background: #000; padding-block: 76px 80px;
+}
+.band--lab::before {
+  content: ""; position: absolute; inset: 0; z-index: -2;
+  background: url("purple_lab.webp") center / cover no-repeat; opacity: 0.6;
+}
+.band--lab::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.25) 25%, rgba(0,0,0,0.25) 75%, #000 100%),
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 35%, rgba(0,0,0,0.6) 100%);
+}
+.band--lab .label { color: #fff; }
+.band--lab .band-sub { color: rgba(255,255,255,0.82); }
+.band--lab .hero-actions { justify-content: center; margin: 26px 0 0; }
 .statcards {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px; text-align: left;
@@ -1469,16 +1488,16 @@ section[id], h2[id] { scroll-margin-top: 100px; }
 /* Only rendered when FIN_LAB_LABEL is set. Sits above the bar so every
    screenshot of a lab page carries what it is. */
 .lab-banner {
-  padding: 8px 16px; text-align: center;
-  font: 12px var(--sans); letter-spacing: .04em; text-transform: uppercase;
-  color: #fff; background: var(--lab-gradient);
-  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  padding: 7px 16px; text-align: center;
+  font: 11.5px var(--sans); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-2); background: #07070b;
+  border-bottom: 2px solid transparent; border-image: var(--lab-gradient) 1;
 }
-.lab-banner a { color: #fff; text-decoration: underline; }
-/* Lives in the nav, not beside the brand: the brand moves when the bar opens
-   and anything next to it collides. */
+.lab-banner a { color: var(--ink); text-decoration: underline; }
+/* In the nav, not beside the brand: the brand moves when the bar opens. */
 .lab-tag {
-  display: inline-block; margin-right: 8px; padding: 3px 8px;
+  display: inline-block; margin-right: 8px; padding: 2px 8px;
   font: 10.5px var(--sans); letter-spacing: .08em; text-transform: uppercase;
-  color: #fff; background: var(--lab-gradient);
+  color: var(--ink); background: transparent;
+  border: 1px solid transparent; border-image: var(--lab-gradient) 1;
 }
