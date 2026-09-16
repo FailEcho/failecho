@@ -231,7 +231,10 @@ def test_static_assets_stay_small():
     # raise, as the note below predicted: the trims available were comments
     # carrying the reasoning for the motion, which is worth more than the
     # bytes.
-    assert len(CSS) < 63_000
+    # 63k -> 64k on 2026-09-16 for the picture behind "What the network holds
+    # today": the band, its gradient and the glassy cards. Requested; the
+    # trims left were reasoning comments.
+    assert len(CSS) < 64_000
     assert len(JS) < 31_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
@@ -249,7 +252,8 @@ def test_static_assets_stay_small():
     # that were already there, not new markup.
     # 110k -> 111k: the lab linked from the nav, the footer and the own-agents
     # card, and the lab banner's non-sticky form plus its bar tag.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 111_000
+    # 111k -> 112k: the picture band's CSS. Same day, same request.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 112_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -263,13 +267,18 @@ def test_static_assets_stay_small():
         + (STATIC / "logo.png").stat().st_size
         + (STATIC / "wordmark-dark.png").stat().st_size
         + (STATIC / "card-abstract1.webp").stat().st_size
+        + (STATIC / "purple_lab.webp").stat().st_size
     )
     # 150k -> 120k: no full-page decorative download at all now, and the light-ink
     # wordmark is not on this page -- the bar and the footer both use the
     # white-ink one.
     # 144k -> 145k on 2026-09-16: the lab linked from three places on the
     # home page, and its banner and bar tag in the shared stylesheet.
-    assert per_visit < 145_000, f"page weight crept to {per_visit} bytes"
+    # 145k -> 195k the same day: the site carries one picture again, on
+    # request -- purple_lab.webp behind the live band. Delivered as 47KB of
+    # WebP at 1200px from a 2.1MB PNG that was never committed. Below this
+    # is still under a fifth of what the hero ground used to cost.
+    assert per_visit < 195_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
@@ -1645,3 +1654,30 @@ def test_lab_banner_is_not_pinned(client):
     banner = banner[: banner.index("}")]
     assert "sticky" not in banner and "fixed" not in banner
     assert ".lab-tag" in css
+
+
+
+def test_the_live_band_picture_is_small_webp_not_the_png(client):
+    """The source was a 2.1MB PNG. What ships is WebP under 60KB, and the PNG
+    is neither in static nor referenced anywhere."""
+    assert (STATIC / "purple_lab.webp").stat().st_size < 60_000
+    assert not (STATIC / "purple_lab.png").exists()
+    css = (STATIC / "style.css").read_text()
+    assert 'url("purple_lab.webp")' in css
+    assert "purple_lab.png" not in css and "purple_lab.png" not in HTML
+
+
+def test_lab_front_door_is_the_scoreboard(monkeypatch):
+    """A lab instance redirects / to /fleet; the public site does not."""
+    from fastapi.testclient import TestClient
+
+    from app.core.config import settings
+    from app.main import app
+
+    assert TestClient(app).get("/", follow_redirects=False).status_code == 200
+    object.__setattr__(settings, "lab_label", "Lab")
+    try:
+        r = TestClient(app).get("/", follow_redirects=False)
+    finally:
+        object.__setattr__(settings, "lab_label", "")
+    assert r.status_code == 302 and r.headers["location"] == "/fleet"

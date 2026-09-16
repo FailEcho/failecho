@@ -34,6 +34,7 @@ from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
     PlainTextResponse,
+    RedirectResponse,
     Response,
 )
 from fastapi.staticfiles import StaticFiles
@@ -907,6 +908,17 @@ async def about(request: Request) -> HTMLResponse:
 async def network(request: Request) -> HTMLResponse:
     """The live dashboard, off the front page so it cannot dominate it."""
     return HTMLResponse(render_page("network.html", public_base_url(request)))
+
+
+@app.middleware("http")
+async def lab_lands_on_the_scoreboard(request: Request, call_next):
+    """A lab instance is the same software as the public site, so it would
+    serve the whole marketing site over the fleet's data. Nobody needs that.
+    Its front door is the scoreboard; the other pages still exist, labelled,
+    for anyone who navigates to them."""
+    if settings.lab_label and request.url.path == "/":
+        return RedirectResponse("/fleet", status_code=302)
+    return await call_next(request)
 
 
 @app.get("/fleet", include_in_schema=False)

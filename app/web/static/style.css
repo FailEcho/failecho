@@ -1363,6 +1363,26 @@ footer.shell {
 }
 
 /* ---- stat cards -------------------------------------------------------- */
+/* The one picture the site carries: 47KB of WebP behind a dark gradient, so
+   the numbers stay legible and the band fades into the black page. */
+.band--lab {
+  position: relative; isolation: isolate; overflow: hidden;
+  background: #000; padding-block: 72px 76px;
+}
+.band--lab::before {
+  content: ""; position: absolute; inset: 0; z-index: -2;
+  background: url("purple_lab.webp") center / cover no-repeat;
+  opacity: 0.62;
+}
+.band--lab::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.30) 22%, rgba(0,0,0,0.30) 78%, #000 100%),
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%);
+}
+.band--lab .label, .band--lab .band-sub { color: var(--ink); }
+.band--lab .band-sub { color: var(--ink-2); }
+.band--lab .fineprint a { color: var(--ink); }
 .statcards {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px; text-align: left;
@@ -1370,6 +1390,13 @@ footer.shell {
 .statcard {
   background: var(--surface); border-radius: var(--r);
   padding: 30px 32px 34px;
+}
+/* On the picture the cards go glassy; the numbers keep a solid ground. */
+.band--lab .statcard {
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
 }
 .statcard-label { margin: 0; font-size: 13.5px; color: var(--ink-2); }
 .statcard-value {
