@@ -341,3 +341,21 @@ def test_a_name_may_not_carry_control_characters(client):
             "service": good, "operation": "op", "outcome": "failure",
             "error_type": "x"})
         assert answer.status_code == 200, f"{good!r} was rejected"
+
+
+def test_a_service_is_a_name_not_a_url_a_path_or_a_format_string(client):
+    """The first fuzzer to find /v1/observe (2026-09-16 19:41 UTC) got
+    `http://example.invalid/x` and `%n` stored as services, each under a fresh
+    reporter id, and the front page counted them as independent agents. A
+    host name, an MCP server name or a registry-style name is a service; a
+    URL, an absolute path or a printf directive is not one."""
+    for bad in ("http://example.invalid/x", "https://api.github.com", "/tmp/pp-fuzz", "%n", "%s%s%s",
+                "a%x", "%%n", "ftp://x"):
+        answer = client.post("/v1/observe", json={
+            "service": bad, "operation": "op", "outcome": "success"})
+        assert answer.status_code == 422, f"{bad!r} was accepted"
+    for good in ("api.github.com", "localhost:8000", "github-mcp", "io.github.owner/server", "@scope/name",
+                 "registry.npmjs.org", "服务-mcp", "100%"):
+        answer = client.post("/v1/observe", json={
+            "service": good, "operation": "op", "outcome": "success"})
+        assert answer.status_code == 200, f"{good!r} was rejected"

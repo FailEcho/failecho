@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
 from app.core.config import STATUS_DEGRADED, STATUS_HEALTHY  # noqa: F401  (docs)
 
@@ -26,9 +26,28 @@ Status = Literal["HEALTHY", "DEGRADED", "MAJOR", "INSUFFICIENT_DATA"]
 #: name we stored.
 _NO_CONTROL = r"^[^\x00-\x1f\x7f-\x9f]+$"
 
+#: A service is a host name or an MCP server's own name. Names in any
+#: script are names, and the test suite holds that line -- but a URL is not
+#: a name, a path is not a name, and a printf format string is not a name.
+#: The first fuzzer to find /v1/observe (2026-09-16 19:41 UTC) got
+#: `http://example.invalid/x` and `%n` stored as services and counted on the
+#: front page as independent agents. Rejected at the door: a scheme
+#: separator, a leading slash, or a `%` followed by a letter, digit or `%`.
+_FORMAT_DIRECTIVE = re.compile(r"%[0-9A-Za-z%]")
+
+
+def _service_shape(value: str) -> str:
+    if value.startswith("/") or "://" in value or _FORMAT_DIRECTIVE.search(value):
+        raise ValueError(
+            "service is a host name or an MCP server name, e.g. 'api.github.com' "
+            "or 'github-mcp' -- not a URL, a path or a format string"
+        )
+    return value
+
+
 ServiceName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128,
-                           pattern=_NO_CONTROL)
+                           pattern=_NO_CONTROL), AfterValidator(_service_shape)
 ]
 OperationName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128,
