@@ -56,10 +56,12 @@ LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or N
 
 PROVIDERS = {
     "groq": {"host": "api.groq.com", "url": "https://api.groq.com/openai/v1/chat/completions",
-             "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 700},
+             "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 700,
+             "alt_models": ["llama-3.3-70b-versatile"]},
     "gemini": {"host": "generativelanguage.googleapis.com",
                "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-               "key": os.environ.get("GEMINI_API_KEY"), "models": ["gemini-flash-latest"], "daily_cap": 400},
+               "key": os.environ.get("GEMINI_API_KEY"), "models": ["gemini-flash-latest"], "daily_cap": 400,
+               "alt_models": ["gemini-flash-lite-latest"]},
     # Free-tier key, zero spend, no limit set -- checked before this was added.
     # Three free models verified to make real tool calls; rotated per run so
     # no single one carries the persona. Free models are rate-limited hard,
@@ -69,7 +71,7 @@ PROVIDERS = {
                    "models": ["nex-agi/nex-n2.5-mini:free", "liquid/lfm-2.5-2.6b:free",
                               "inclusionai/ling-3.0-flash-vl:free"],
                    "headers": {"HTTP-Referer": "https://failecho.com", "X-Title": "FailEcho fleet lab"},
-                   "daily_cap": 120},
+                   "daily_cap": 120, "alt_models": ["liquid/lfm-2.5-2.6b:free", "nex-agi/nex-n2.5-mini:free"]},
     # Ollama's cloud, free tier: three models verified for tool calls, two
     # others answered 402 "requires a subscription", which is where the tier
     # ends and where the fleet stops. gpt-oss:20b here is the same model as
@@ -77,8 +79,24 @@ PROVIDERS = {
     # fleet will show whether that failure belongs to the model or the host.
     "ollama": {"host": "ollama.com", "url": "https://ollama.com/v1/chat/completions",
                "key": os.environ.get("LLAMA_API_KEY"),
-               "models": ["gpt-oss:20b", "nemotron-3-nano:30b", "gemma4:31b"], "daily_cap": 150},
+               "models": ["gpt-oss:20b", "nemotron-3-nano:30b", "gemma4:31b"], "daily_cap": 150,
+               "alt_models": ["nemotron-3-nano:30b", "gpt-oss:20b"]},
 }
+
+#: What an agent can do about a model provider failing, beyond retrying. The
+#: explorers try these in order, one per failure, skipping any the network
+#: already has evidence for, and report what happened; askers then inherit
+#: whichever the network recommends. Blind personas give up on a provider
+#: failure, which is what the fleet did on its first day.
+PROVIDER_ACTIONS = {
+    "rate_limit": ["wait_until_reset", "backoff", "switch_model"],
+    "validation_error": ["retry_without_tool_choice", "switch_model", "retry"],
+    "server_error": ["retry", "switch_model", "backoff"],
+    "timeout": ["retry", "switch_model"],
+    "connection_error": ["retry", "backoff"],
+}
+KNOWN_ACTIONS = ("backoff", "retry", "refresh_schema", "skip", "wait_until_reset", "switch_model",
+                 "retry_without_tool_choice")
 
 # ---------------------------------------------------------------------------
 # personas
@@ -152,13 +170,36 @@ PERSONAS = [
     # hours; the twins share a provider so the only difference is asking.
     ("fleet-build-ask",    "builder",   "groq",   True,  BUILDER_TASKS),
     ("fleet-build-blind",  "builder",   "groq",   False, BUILDER_TASKS),
+    # explorers: on a provider failure they try an action nobody has evidence
+    # for yet and report the outcome. They pay; askers inherit. Added
+    # 2026-09-17 05:00 UTC.
+    ("fleet-explore-a",    "decorator", "groq",   True,  PYPI_NPM),
+    ("fleet-explore-b",    "decorator", "gemini", True,  GITHUB),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind"}
+EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b"}
 TEST_PERSONAS = {"fleet-test-ask", "fleet-test-blind"}
 
 
 def log(msg: str) -> None:
     print(f"[fleet] {msg}", flush=True)
+
+
+def _seconds(value: str) -> float:
+    """A Retry-After or ratelimit-reset header as seconds: '7', '2.5s', '1m3s'."""
+    value = str(value).strip().lower()
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    total, num = 0.0, ""
+    for ch in value:
+        if ch.isdigit() or ch == ".":
+            num += ch
+        elif ch in "hms" and num:
+            total += float(num) * {"h": 3600, "m": 60, "s": 1}[ch]
+            num = ""
+    return total
 
 
 # ---------------------------------------------------------------------------
@@ -395,6 +436,76 @@ class Run:
             self.report_recovery(service, name, action, True, fingerprint)
             return json.dumps({"result": out, "recovered": True}), True
 
+    # -- a provider failing: ask, explore, or give up ---------------------------
+
+    def recover_provider(self, p: dict, exc: BaseException, chat, state: dict):
+        """One recovery attempt after a model provider failed, or None.
+
+        Blind: give up (the first day's behaviour, kept as the control).
+        Ask: follow the network's recommendation if it is one of the actions
+        this loop knows; `skip` and no advice both mean give up.
+        Explore: if the network recommends, follow it; otherwise try the
+        first action in PROVIDER_ACTIONS that nobody has evidence for yet,
+        and report the outcome either way. Explorers are how the evidence
+        askers inherit gets made.
+        """
+        host = p["host"]
+        et, code = classify(exc)
+        rec = {"service": host, "operation": "chat.completions", "error_type": et, "error_code": code,
+               "asked": False, "recommended": None, "attempts": 1, "recovered": False}
+        self.failures.append(rec)
+        if not self.asks:
+            return None
+        rec["asked"] = True
+        advice = self.ask(host, "chat.completions", et, code) or {}
+        fingerprint = advice.get("fingerprint")
+        recommended = (advice.get("recommendation") or {}).get("action")
+        action = None
+        if recommended:
+            rec["recommended"] = recommended
+            if recommended == "skip":
+                rec["skipped"] = True
+                return None
+            if recommended in KNOWN_ACTIONS:
+                action = recommended
+        if action is None and self.reporter in EXPLORER_PERSONAS:
+            tried = {a.get("action") for a in advice.get("recovery_actions") or []}
+            untried = [a for a in PROVIDER_ACTIONS.get(et, []) if a not in tried]
+            action = untried[0] if untried else None
+            rec["explored"] = action
+        if action is None:
+            return None
+        # -- apply the action ---------------------------------------------
+        if action == "backoff":
+            time.sleep(3)
+        elif action == "wait_until_reset":
+            headers = getattr(exc, "headers", None)
+            wait = 0.0
+            for name in ("retry-after", "x-ratelimit-reset-tokens", "x-ratelimit-reset-requests"):
+                value = headers.get(name) if headers else None
+                if value:
+                    wait = _seconds(value)
+                    break
+            time.sleep(min(max(wait, 1.0), 30.0))
+        elif action == "switch_model":
+            alts = [m for m in p.get("alt_models", []) if m != state["model"]]
+            if not alts:
+                return None
+            state["model"] = alts[0]
+            self.model = f"{self.model}->{alts[0]}"
+        elif action == "retry_without_tool_choice":
+            state["tools"] = False
+        rec["attempts"] += 1
+        self.model_calls += 1
+        try:
+            resp = chat()
+        except Exception:  # noqa: BLE001
+            self.report_recovery(host, "chat.completions", action, False, fingerprint)
+            return None
+        rec["recovered"] = True
+        self.report_recovery(host, "chat.completions", action, True, fingerprint)
+        return resp
+
     # -- the two kinds of workload ---------------------------------------------
 
     def run_cron(self, calls: list) -> str:
@@ -422,9 +533,12 @@ class Run:
         messages = [{"role": "system", "content": "Use the tools to answer with real data. If a tool errors you may "
                                                    "try once more, then answer with what you have. Under 60 words."},
                     {"role": "user", "content": task}]
+        state = {"model": model, "tools": True}
 
         def chat():
-            body = {"model": model, "messages": messages, "tools": TOOL_SCHEMAS, "tool_choice": "auto", "max_tokens": 500}
+            body = {"model": state["model"], "messages": messages, "max_tokens": 500}
+            if state["tools"]:
+                body.update(tools=TOOL_SCHEMAS, tool_choice="auto")
             req = urllib.request.Request(p["url"], data=json.dumps(body).encode(), method="POST",
                                          headers={"Content-Type": "application/json", "User-Agent": UA,
                                                   "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
@@ -448,10 +562,10 @@ class Run:
             try:
                 resp = chat()
             except Exception as exc:  # noqa: BLE001
-                et, code = classify(exc)
-                self.failures.append({"service": p["host"], "operation": "chat.completions", "error_type": et,
-                                      "error_code": code, "asked": False, "recommended": None, "attempts": 1, "recovered": False})
-                return f"(provider failed: {et})"
+                resp = self.recover_provider(p, exc, chat, state)
+                if resp is None:
+                    et, _ = classify(exc)
+                    return f"(provider failed: {et})"
             msg = resp["choices"][0]["message"]
             calls = msg.get("tool_calls") or []
             if not calls:
@@ -566,9 +680,10 @@ def _save(state: dict) -> None:
 def write_report(state: dict) -> None:
     runs = state["runs"]
     by_persona: dict[str, dict] = {}
-    blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0, "skipped": 0}
+    blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0, "skipped": 0,
+                     "provider_failures": 0, "provider_recovered": 0, "explored": 0}
     cohorts = {"real / ask": blank(), "real / blind": blank(), "test / ask": blank(), "test / blind": blank(),
-               "build / ask": blank(), "build / blind": blank()}
+               "build / ask": blank(), "build / blind": blank(), "explore": blank()}
     # the builders' second ledger: what happened inside the VM
     build = {"build / ask": {"vm_runs": 0, "local": 0, "shared": 0, "tasks_done": 0, "sandbox_down": 0},
              "build / blind": {"vm_runs": 0, "local": 0, "shared": 0, "tasks_done": 0, "sandbox_down": 0}}
@@ -577,7 +692,7 @@ def write_report(state: dict) -> None:
                                                    "asks": r["asks"], "runs": 0, "tool_calls": 0, "failures": 0, "last": ""})
         p["runs"] += 1; p["tool_calls"] += r["tool_calls"]; p["failures"] += len(r["failures"]); p["last"] = r["at"]
         kind = "test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS else "real"
-        key = kind + (" / ask" if r["asks"] else " / blind")
+        key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = cohorts[key]
         c["runs"] += 1
         if kind == "build" and r.get("build"):
@@ -588,6 +703,8 @@ def write_report(state: dict) -> None:
         for f in r["failures"]:
             c["failures"] += 1; c["attempts"] += f["attempts"]; c["recovered"] += int(f["recovered"])
             c["asked"] += int(f["asked"]); c["recommended"] += int(bool(f["recommended"])); c["skipped"] += int(bool(f.get("skipped")))
+            if f["operation"] == "chat.completions":
+                c["provider_failures"] += 1; c["provider_recovered"] += int(f["recovered"]); c["explored"] += int(bool(f.get("explored")))
 
     repeats, naming, totals_db = [], [], {}
     if LAB_DB and os.path.exists(LAB_DB):

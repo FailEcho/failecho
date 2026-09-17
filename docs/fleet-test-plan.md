@@ -184,6 +184,17 @@ and the ask personas honour it: no second attempt, `skipped` counted on the
 scoreboard. Blind personas are unchanged. From this point the ask/blind
 comparison measures the product as it is; the tie before it is in the log.
 
+## Change during the run: two explorers, 2026-09-17 05:00 UTC
+
+On a model-provider failure the fleet used to give up, every persona alike,
+so the network never got evidence about the one class of failure that
+happens daily and has non-obvious fixes (wait for the reset header rather
+than three seconds; switch model; drop `tool_choice` after a tool-JSON parse
+error). Two explorers now try the first action nobody has evidence for and
+report the outcome; askers follow what the network then recommends; blind
+personas still give up, as the control. The scoreboard's "when the model
+provider fails" table is the comparison: recovery rate per cohort.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

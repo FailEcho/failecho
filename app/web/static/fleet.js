@@ -31,6 +31,10 @@
               td(c.attempts_per_failure == null ? "-" : c.attempts_per_failure.toFixed(2), "num"),
               td(c.recovered, "num"), td(c.asked, "num"), td(c.recommended, "num"), td(c.skipped || 0, "num")];
     }));
+    fill("fleet-provider", (d.cohorts || []).filter(function (c) { return c.cohort.indexOf("test") !== 0 && c.cohort.indexOf("build") !== 0; }).map(function (c) {
+      var pf = c.provider_failures || 0, pr = c.provider_recovered || 0;
+      return [td(c.cohort), td(pf, "num"), td(pr, "num"), td(pf ? Math.round(100 * pr / pf) + "%" : "-", "num"), td(c.explored || 0, "num")];
+    }));
     var runsBy = {}; (d.cohorts || []).forEach(function (c) { runsBy[c.cohort] = c.runs; });
     fill("fleet-build", (d.build || []).map(function (b) {
       return [td(b.cohort), td(runsBy[b.cohort] || 0, "num"), td(b.vm_runs, "num"), td(b.tasks_done, "num"),
