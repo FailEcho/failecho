@@ -287,3 +287,20 @@ def test_check_unknown_stays_honest_in_the_compact_shape(client):
     result = mcp_call(client, "check_tool_failure", {"service": "x.example", "operation": "op", "error_type": "timeout"})
     assert result["known"] is False and result["recommendation"] is None and result["recovery_actions"] == []
     assert result["observations"]["total"] == 0
+
+
+def test_the_tool_list_is_lean():
+    """Most clients paste the whole tool list into the model on every turn.
+    No titles on parameters, and the four definitions together stay under a
+    budget; a description that grows past it costs every user every turn."""
+    import json
+
+    from app.mcp_server import mcp_server
+
+    total = 0
+    for tool in mcp_server._tool_manager._tools.values():
+        assert "title" not in tool.parameters
+        for prop in tool.parameters["properties"].values():
+            assert "title" not in prop
+        total += len(tool.description or "") + len(json.dumps(tool.parameters))
+    assert total < 7000, f"tool list is {total} chars (~{total // 4} tokens)"

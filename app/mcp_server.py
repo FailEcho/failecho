@@ -535,3 +535,24 @@ async def mcp_lifespan(path: str):
             yield
     finally:
         mcp_endpoint.app = None
+
+
+# ---------------------------------------------------------------------------
+# Trim what every client injects into the model on every turn
+# ---------------------------------------------------------------------------
+
+def _strip_schema_titles() -> None:
+    """Pydantic labels every parameter with a `title` ("Schema Hash") that
+    repeats its name; the tool list is pasted into a model's context on every
+    turn by most MCP clients, so those labels are paid for constantly and
+    inform nothing. Removed from the input schemas after registration."""
+    for tool in mcp_server._tool_manager._tools.values():  # noqa: SLF001 - no public hook for this
+        schema = tool.parameters
+        if isinstance(schema, dict):
+            schema.pop("title", None)
+            for prop in (schema.get("properties") or {}).values():
+                if isinstance(prop, dict):
+                    prop.pop("title", None)
+
+
+_strip_schema_titles()
