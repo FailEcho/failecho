@@ -195,6 +195,21 @@ report the outcome; askers follow what the network then recommends; blind
 personas still give up, as the control. The scoreboard's "when the model
 provider fails" table is the comparison: recovery rate per cohort.
 
+## Change during the run: real limits, real fixes, 2026-09-17 06:00 UTC
+
+PyPI and npm do not fail under honest use; GitHub does (403 at 60 an hour
+per address, 103 times on the first day). Three additions so the real-API
+comparison has something to measure: `fleet-limits-ask` / `-blind`, twins
+on services that push back under honest use (crates.io at one request a
+second, Stack Exchange at 300 a day, GitHub search at 10 a minute) plus two
+GitHub repos; a third explorer with no model that meets GitHub's 403 every
+run; and two recovery actions an agent would not try on its own --
+`wait_until_reset` from the `X-RateLimit-Reset` header, and
+`conditional_request` (If-None-Match, a 304 that does not count against the
+limit, from a per-persona ETag cache). Explorers discover, askers inherit,
+blind keeps its default. The scoreboard's "real services, real limits"
+table is the proof table: real services, controlled twins only.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

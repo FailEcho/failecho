@@ -70,7 +70,7 @@
 <section class="shell fleet">
   <div class="fleet-head">
     <h1>The fleet test</h1>
-    <p class="sub">Twenty of FailEcho's own agents, on real services, round the clock.
+    <p class="sub">Twenty-three of FailEcho's own agents, on real services, round the clock.
     Half ask the network before they retry; their twins retry blind on identical work. Two of them write
     and run code in a throwaway VM; two explore recoveries nobody has tried. This is a lab instance and a simulated fleet &mdash; every number here
     is ours, and none of it is adoption.
@@ -86,6 +86,17 @@
   <table id="fleet-cohorts"><thead><tr>
     <th>cohort</th><th class="num">runs</th><th class="num">failures</th>
     <th class="num">attempts / failure</th><th class="num">recovered</th><th class="num">asked</th><th class="num">got a recommendation</th><th class="num">skipped on advice</th>
+  </tr></thead><tbody></tbody></table>
+
+  <h2>Real services, real limits: ask vs blind</h2>
+  <p class="sub">The proof table. Only real services (GitHub API, PyPI, npm, crates.io, Stack Exchange) and only the
+  controlled twins &mdash; no test endpoints, no model providers, no explorers. Each failure is a documented policy
+  being enforced on agents behind one address: GitHub's 403 at 60 an hour, crates.io's 429 above one a second,
+  Stack Exchange's 300 a day. The asking side spends what the network says is worth spending &mdash; a reset wait,
+  a conditional request that a 304 does not count against the limit &mdash; and skips the rest.</p>
+  <table id="fleet-real"><thead><tr>
+    <th>service</th><th>cohort</th><th class="num">failures</th><th class="num">attempts / failure</th>
+    <th class="num">recovered</th><th class="num">skipped</th><th class="num">seconds lost</th>
   </tr></thead><tbody></tbody></table>
 
   <h2>When the model provider fails</h2>

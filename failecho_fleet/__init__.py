@@ -24,6 +24,7 @@ days.
 
 from __future__ import annotations
 
+import contextvars
 import datetime as dt
 import json
 import os
@@ -96,7 +97,7 @@ PROVIDER_ACTIONS = {
     "connection_error": ["retry", "backoff"],
 }
 KNOWN_ACTIONS = ("backoff", "retry", "refresh_schema", "skip", "wait_until_reset", "switch_model",
-                 "retry_without_tool_choice")
+                 "retry_without_tool_choice", "conditional_request")
 
 # ---------------------------------------------------------------------------
 # personas
@@ -145,6 +146,17 @@ GH_REPOS = ["FailEcho/failecho", "modelcontextprotocol/python-sdk", "modelcontex
             "psf/requests", "encode/httpx", "fastapi/fastapi"]
 GH_HEAVY = [("github", r) for r in GH_REPOS] + [("github_release", r) for r in GH_REPOS]
 
+#: Real limits, honestly crossed: six crates.io calls back to back (policy is
+#: one a second), four Stack Exchange calls (300 a day per IP, shared by the
+#: fleet), three GitHub searches (10 a minute unauthenticated), then two
+#: repos. Every run, in this order.
+LIMIT_CALLS = [
+    ("crate", "serde"), ("crate", "tokio"), ("crate", "reqwest"), ("crate", "clap"), ("crate", "anyhow"), ("crate", "rand"),
+    ("so", "python"), ("so", "rust"), ("so", "javascript"), ("so", "go"),
+    ("gh_search", "mcp server"), ("gh_search", "failure intelligence agents"), ("gh_search", "retry backoff library"),
+    ("github", "FailEcho/failecho"), ("github", "astral-sh/uv"),
+]
+
 PERSONAS = [
     # reporter,           path,        provider, asks,  workload
     ("fleet-decor-ask-a",  "decorator", "groq",   True,  PYPI_NPM),
@@ -175,9 +187,28 @@ PERSONAS = [
     # 2026-09-17 05:00 UTC.
     ("fleet-explore-a",    "decorator", "groq",   True,  PYPI_NPM),
     ("fleet-explore-b",    "decorator", "gemini", True,  GITHUB),
+    # real limits, real fixes (2026-09-17 06:00 UTC): twins on services that
+    # push back under honest use, and a third explorer with no model that
+    # meets GitHub's 403 and the limits every run and tries what nobody has
+    ("fleet-limits-ask",   "decorator", None,     True,  LIMIT_CALLS),
+    ("fleet-limits-blind", "decorator", None,     False, LIMIT_CALLS),
+    ("fleet-explore-c",    "decorator", None,     True,  GH_HEAVY + LIMIT_CALLS),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind"}
-EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b"}
+EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c"}
+
+#: What an agent can do about a tool call failing, beyond the default.
+#: Explorers try these in order, skipping what the network has evidence for.
+TOOL_ACTIONS = {
+    "rate_limit": ["backoff", "wait_until_reset", "conditional_request"],
+    # GitHub's secondary limit answers a plain 403 Forbidden, which the
+    # classifier files as auth_error; from an unauthenticated agent it is a
+    # limit all the same
+    "auth_error": ["wait_until_reset", "conditional_request"],
+    "server_error": ["retry", "backoff"],
+    "timeout": ["retry"],
+    "connection_error": ["retry"],
+}
 TEST_PERSONAS = {"fleet-test-ask", "fleet-test-blind"}
 
 
@@ -223,10 +254,33 @@ def assert_lab_only() -> None:
 # ---------------------------------------------------------------------------
 
 
+#: Set by Run.call for one retry when the recovery action is
+#: conditional_request: send If-None-Match with the ETag from the last good
+#: answer. GitHub serves 304 to a matching ETag and a 304 does not count
+#: against the rate limit -- the fix almost no agent knows. The ETag cache
+#: is per persona, on disk, so a later run has something to condition on.
+CONDITIONAL: contextvars.ContextVar[bool] = contextvars.ContextVar("conditional", default=False)
+ETAGS: contextvars.ContextVar[dict] = contextvars.ContextVar("etags", default={})
+
+
 def _get_json(url: str):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.load(r)
+    headers = {"User-Agent": UA, "Accept": "application/json"}
+    cache = ETAGS.get()
+    cached = cache.get(url)
+    if CONDITIONAL.get() and cached:
+        headers["If-None-Match"] = cached["etag"]
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            body = json.load(r)
+            etag = r.headers.get("ETag")
+            if etag and isinstance(cache, dict):
+                cache[url] = {"etag": etag, "body": body}
+            return body
+    except urllib.error.HTTPError as e:
+        if e.code == 304 and cached:
+            return cached["body"]
+        raise
 
 
 def pypi_latest_version(package: str) -> dict:
@@ -247,6 +301,27 @@ def github_repo(owner: str, repo: str) -> dict:
 def github_latest_release(owner: str, repo: str) -> dict:
     d = _get_json(f"https://api.github.com/repos/{owner}/{repo}/releases/latest")
     return {"tag": d["tag_name"]}
+
+
+# Real services with real, documented limits that honest use at fleet scale
+# crosses: GitHub search (10/min unauthenticated), crates.io (one request a
+# second, 429 above), Stack Exchange (300/day per IP, then a 400
+# "throttle_violation"). Nothing synthetic: every failure is a policy being
+# enforced on us, the way it would be on any agent behind one address.
+def github_search(query: str) -> dict:
+    d = _get_json(f"https://api.github.com/search/repositories?q={urllib.parse.quote(query)}&per_page=3")
+    return {"total": d["total_count"], "top": [i["full_name"] for i in d["items"][:3]]}
+
+
+def crates_io_latest(crate: str) -> dict:
+    d = _get_json(f"https://crates.io/api/v1/crates/{urllib.parse.quote(crate)}")
+    return {"crate": crate, "version": d["crate"]["max_stable_version"] or d["crate"]["max_version"]}
+
+
+def stackexchange_questions(tag: str) -> dict:
+    d = _get_json("https://api.stackexchange.com/2.3/questions?order=desc&sort=activity&pagesize=3"
+                  f"&site=stackoverflow&tagged={urllib.parse.quote(tag)}")
+    return {"tag": tag, "titles": [q["title"] for q in d["items"][:3]], "quota_remaining": d.get("quota_remaining")}
 
 
 # httpbingo.org exists to return whatever status you ask for. Calling it is its
@@ -283,10 +358,14 @@ def echo_write() -> dict:            # 200 forever, persists nothing: a write th
 
 TOOLS = {"pypi_latest_version": pypi_latest_version, "npm_latest_version": npm_latest_version,
          "github_repo": github_repo, "github_latest_release": github_latest_release,
+         "github_search": github_search, "crates_io_latest": crates_io_latest,
+         "stackexchange_questions": stackexchange_questions,
          "flaky_read": flaky_read, "throttled_read": throttled_read, "always_broken": always_broken,
          "slow_read": slow_read, "echo_write": echo_write}
 TOOL_SERVICE = {"pypi_latest_version": "pypi.org", "npm_latest_version": "registry.npmjs.org",
                 "github_repo": "api.github.com", "github_latest_release": "api.github.com",
+                "github_search": "api.github.com", "crates_io_latest": "crates.io",
+                "stackexchange_questions": "api.stackexchange.com",
                 "flaky_read": "httpbingo.org", "throttled_read": "httpbingo.org", "always_broken": "httpbingo.org",
                 "slow_read": "httpbingo.org", "echo_write": "httpbingo.org"}
 TOOL_MUTATES = {"echo_write": True}   # everything else is a read
@@ -330,6 +409,23 @@ class Run:
             auto._fe = self.fe
             auto.enable()
         self.build: dict | None = None   # the builder's ledger, when this is one
+        # this persona's ETag cache (URL -> etag, body), for conditional requests
+        self._etag_path = os.path.join(STATE_DIR, f"etags-{reporter}.json")
+        try:
+            with open(self._etag_path, encoding="utf-8") as fh:
+                self.etags = json.load(fh)
+        except (OSError, ValueError):
+            self.etags = {}
+        ETAGS.set(self.etags)
+
+    def save_etags(self) -> None:
+        try:
+            os.makedirs(STATE_DIR, exist_ok=True)
+            items = list(self.etags.items())[-200:]
+            with open(self._etag_path, "w", encoding="utf-8") as fh:
+                json.dump(dict(items), fh)
+        except OSError:
+            pass
 
     # -- asking and reporting through the three paths ------------------------
 
@@ -390,6 +486,7 @@ class Run:
         fn = fn or self.tools[name]
         service = service or TOOL_SERVICE[name]
         self.tool_calls += 1
+        started = time.monotonic()
         try:
             out = fn(**args)
             self.report_success(service, name)
@@ -398,41 +495,68 @@ class Run:
             et, code = classify(exc)
             self.report_failure(service, name, exc)
             rec = {"service": service, "operation": name, "error_type": et, "error_code": code,
-                   "asked": False, "recommended": None, "attempts": 1, "recovered": False}
+                   "asked": False, "recommended": None, "attempts": 1, "recovered": False, "seconds": 0.0}
             self.failures.append(rec)
             fingerprint = None
             action = {"rate_limit": "backoff", "server_error": "retry", "timeout": "retry",
                       "connection_error": "retry"}.get(et)
+            advice = {}
             if self.asks:
                 rec["asked"] = True
-                advice = self.ask(service, name, et, code)
-                if advice:
-                    fingerprint = advice.get("fingerprint")
-                    r = advice.get("recommendation") or {}
-                    if r.get("action"):
-                        rec["recommended"] = r["action"]
-                        action = r["action"] if r["action"] in ("backoff", "retry", "refresh_schema", "skip") else action
-                        if r.get("decaying"):
-                            rec["recommended"] += " (decaying)"
+                advice = self.ask(service, name, et, code) or {}
+                fingerprint = advice.get("fingerprint")
+                r = advice.get("recommendation") or {}
+                if r.get("action"):
+                    rec["recommended"] = r["action"]
+                    action = r["action"] if r["action"] in KNOWN_ACTIONS else action
+                    if r.get("decaying"):
+                        rec["recommended"] += " (decaying)"
+                elif self.reporter in EXPLORER_PERSONAS:
+                    tried = {a.get("action") for a in advice.get("recovery_actions") or []}
+                    untried = [a for a in TOOL_ACTIONS.get(et, []) if a not in tried]
+                    if untried:
+                        action = untried[0]
+                        rec["explored"] = action
             if action == "skip":
                 # the network says nothing tried recently has worked: an asker
                 # spends no second attempt (since 2026-09-17 04:40 UTC; before
                 # that askers retried anyway and tied with blind)
                 rec["skipped"] = True
+                rec["seconds"] = round(time.monotonic() - started, 2)
                 return json.dumps({"error": et, "code": code, "skipped": True,
                                    "why": "the network reports every recent recovery attempt failed"}), False
             if action is None:
+                rec["seconds"] = round(time.monotonic() - started, 2)
                 return json.dumps({"error": et, "code": code}), False
+            token = None
             if action == "backoff":
                 time.sleep(3)
+            elif action == "wait_until_reset":
+                headers = getattr(exc, "headers", None)
+                wait = 0.0
+                reset = headers.get("x-ratelimit-reset") if headers else None
+                if reset and str(reset).isdigit():
+                    wait = float(reset) - time.time()
+                else:
+                    for h in ("retry-after", "x-ratelimit-reset-tokens"):
+                        if headers and headers.get(h):
+                            wait = _seconds(headers.get(h)); break
+                time.sleep(min(max(wait, 1.0), 30.0))
+            elif action == "conditional_request":
+                token = CONDITIONAL.set(True)
             rec["attempts"] += 1
             self.tool_calls += 1
             try:
                 out = fn(**args)
             except Exception:  # noqa: BLE001
                 self.report_recovery(service, name, action, False, fingerprint)
+                rec["seconds"] = round(time.monotonic() - started, 2)
                 return json.dumps({"error": et, "retried": True, "recovered": False}), False
+            finally:
+                if token is not None:
+                    CONDITIONAL.reset(token)
             rec["recovered"] = True
+            rec["seconds"] = round(time.monotonic() - started, 2)
             self.report_recovery(service, name, action, True, fingerprint)
             return json.dumps({"result": out, "recovered": True}), True
 
@@ -520,6 +644,12 @@ class Run:
                 o, r = arg.split("/"); self.call("github_repo", {"owner": o, "repo": r})
             elif kind == "github_release":
                 o, r = arg.split("/"); self.call("github_latest_release", {"owner": o, "repo": r})
+            elif kind == "crate":
+                self.call("crates_io_latest", {"crate": arg})
+            elif kind == "so":
+                self.call("stackexchange_questions", {"tag": arg})
+            elif kind == "gh_search":
+                self.call("github_search", {"query": arg})
         return f"cron: {len(calls)} calls"
 
     def run_model(self, task: str, run_index: int = 0, used_today: int = 0) -> str:
@@ -706,6 +836,26 @@ def write_report(state: dict) -> None:
             if f["operation"] == "chat.completions":
                 c["provider_failures"] += 1; c["provider_recovered"] += int(f["recovered"]); c["explored"] += int(bool(f.get("explored")))
 
+    # real targets, per service and cohort: the proof table. Test endpoints
+    # and model providers are left out on purpose; this is PyPI, GitHub,
+    # crates.io, Stack Exchange answering real agents behind one address.
+    real: dict[tuple[str, str], dict] = {}
+    for r in runs:
+        if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS:
+            continue
+        side = "ask" if r["asks"] else "blind"
+        for f in r["failures"]:
+            if f["operation"] == "chat.completions" or f["service"] == "httpbingo.org":
+                continue
+            row = real.setdefault((f["service"], side), {"service": f["service"], "cohort": side, "failures": 0,
+                                                          "attempts": 0, "recovered": 0, "skipped": 0, "seconds": 0.0})
+            row["failures"] += 1; row["attempts"] += f["attempts"]; row["recovered"] += int(f["recovered"])
+            row["skipped"] += int(bool(f.get("skipped"))); row["seconds"] += float(f.get("seconds") or 0)
+    real_targets = sorted(real.values(), key=lambda x: (x["service"], x["cohort"]))
+    for row in real_targets:
+        row["attempts_per_failure"] = round(row["attempts"] / row["failures"], 2) if row["failures"] else None
+        row["seconds"] = round(row["seconds"], 1)
+
     repeats, naming, totals_db = [], [], {}
     if LAB_DB and os.path.exists(LAB_DB):
         try:
@@ -751,7 +901,7 @@ def write_report(state: dict) -> None:
                     for k, v in cohorts.items()],
         "build": [{"cohort": k, **v, "shared_share": (v["shared"] / (v["shared"] + v["local"])) if (v["shared"] + v["local"]) else None}
                   for k, v in build.items()],
-        "repeats": repeats, "naming": naming,
+        "repeats": repeats, "naming": naming, "real_targets": real_targets,
         "personas": sorted(by_persona.values(), key=lambda p: p["reporter"]),
     }
     os.makedirs(os.path.dirname(REPORT_PATH) or ".", exist_ok=True)
@@ -794,6 +944,7 @@ def main(argv: list[str] | None = None) -> int:
                                used_today=state["provider_calls_today"].get(provider, 0))
         state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
     run.fe.flush(timeout=20)
+    run.save_etags()
 
     record = {"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "reporter": reporter, "path": path,
               "provider": provider, "model": getattr(run, "model", None), "asks": asks, "tool_calls": run.tool_calls, "model_calls": run.model_calls,

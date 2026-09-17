@@ -31,6 +31,11 @@
               td(c.attempts_per_failure == null ? "-" : c.attempts_per_failure.toFixed(2), "num"),
               td(c.recovered, "num"), td(c.asked, "num"), td(c.recommended, "num"), td(c.skipped || 0, "num")];
     }));
+    fill("fleet-real", (d.real_targets || []).map(function (r) {
+      return [td(r.service), td(r.cohort), td(r.failures, "num"),
+              td(r.attempts_per_failure == null ? "-" : r.attempts_per_failure.toFixed(2), "num"),
+              td(r.recovered, "num"), td(r.skipped, "num"), td(r.seconds, "num")];
+    }));
     fill("fleet-provider", (d.cohorts || []).filter(function (c) { return c.cohort.indexOf("test") !== 0 && c.cohort.indexOf("build") !== 0; }).map(function (c) {
       var pf = c.provider_failures || 0, pr = c.provider_recovered || 0;
       return [td(c.cohort), td(pf, "num"), td(pr, "num"), td(pf ? Math.round(100 * pr / pf) + "%" : "-", "num"), td(c.explored || 0, "num")];
