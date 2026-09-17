@@ -118,6 +118,19 @@
     <th>cohort</th><th class="num">provider failures</th><th class="num">recovered</th><th class="num">recovery rate</th><th class="num">explored</th>
   </tr></thead><tbody></tbody></table>
 
+  <h2>Cost and outcome per run: ask vs blind</h2>
+  <p class="sub">Everything a run pays and whether it got the job done, by cohort, so a change to the product can be
+  judged on all of it and not only on the number it moved. <em>Completed</em>: a real answer, every call eventually
+  succeeding, or the build done. <em>Tokens</em>: what the provider billed, prompt plus completion. <em>Ask s</em>:
+  time spent asking the network &mdash; the product's own overhead. <em>Wait s</em>: time slept on backoff or a reset.
+  Recorded since 2026-09-17 10:30 UTC. Definitions in <code>docs/fleet-metrics.md</code>.</p>
+  <table id="fleet-costs"><thead><tr>
+    <th>cohort</th><th class="num">runs</th><th class="num">completed</th><th class="num">tokens / run</th>
+    <th class="num">tokens / completed</th><th class="num">model calls / run</th><th class="num">tool calls / run</th>
+    <th class="num">s / run</th><th class="num">asks / run</th><th class="num">ask s / run</th><th class="num">wait s / run</th>
+    <th class="num">first try</th><th class="num">recovered</th><th class="num">failed</th>
+  </tr></thead><tbody></tbody></table>
+
   <h2>Builders: whose fault was it?</h2>
   <p class="sub">Two agents write small programs and run them in a sandbox VM, fix them, run again.
   A <b>local</b> failure is their own bug &mdash; counted, never reported. A <b>shared</b> failure is the

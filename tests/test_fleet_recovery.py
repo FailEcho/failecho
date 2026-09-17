@@ -318,3 +318,49 @@ def test_the_proof_table_starts_when_the_order_became_fair(tmp_path, monkeypatch
     import json
     rows = json.loads((tmp_path / "fleet.json").read_text())["real_targets"]
     assert len(rows) == 1 and rows[0]["failures"] == 1
+
+
+def test_every_cost_a_run_pays_is_recorded_and_aggregated(tmp_path, monkeypatch):
+    """Tokens, asks and their time, waits, completion, call outcomes -- all of
+    it, so a change to the product is judged on everything it moved."""
+    import json
+
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    run = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
+    run._count_tokens({"usage": {"prompt_tokens": 120, "completion_tokens": 30}})
+    run._count_tokens({"usage": {"prompt_tokens": 80, "completion_tokens": 20}})
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    run._sleep(3)
+    run.ask = run.ask  # real ask() wraps _ask; stub the inner call
+    run._ask = lambda *a, **k: {"recommendation": None}
+    run.ask("x", "y", "server_error", "503")
+    assert run.tokens_prompt == 200 and run.tokens_completion == 50 and run.wait_seconds == 3
+    assert run.asks_made == 1 and run.ask_seconds >= 0
+
+    state = {"runs": [
+        {"at": "t", "reporter": "fleet-decor-ask-a", "path": "decorator", "provider": "groq", "asks": True,
+         "tool_calls": 4, "model_calls": 2, "seconds": 5.0,
+         "failures": [{"service": "pypi.org", "operation": "pypi_latest_version", "error_type": "server_error",
+                       "error_code": "503", "asked": True, "recommended": "retry", "attempts": 2, "recovered": True, "seconds": 1.5}],
+         "metrics": {"tokens_prompt": 200, "tokens_completion": 50, "asks": 1, "ask_seconds": 0.2, "wait_seconds": 0,
+                     "completed": True, "calls_first_try": 2, "calls_recovered": 1, "calls_failed": 0}},
+        {"at": "t", "reporter": "fleet-decor-blind-a", "path": "decorator", "provider": "groq", "asks": False,
+         "tool_calls": 4, "model_calls": 3, "seconds": 9.0, "failures": [],
+         "metrics": {"tokens_prompt": 400, "tokens_completion": 100, "asks": 0, "ask_seconds": 0, "wait_seconds": 3,
+                     "completed": False, "calls_first_try": 4, "calls_recovered": 0, "calls_failed": 0}},
+        {"at": "t", "reporter": "fleet-decor-blind-a", "path": "decorator", "provider": "groq", "asks": False,
+         "tool_calls": 1, "model_calls": 1, "seconds": 1.0, "failures": []},   # no metrics: older run, left out of costs
+    ]}
+    F.write_report(state)
+    costs = {c["cohort"]: c for c in json.loads((tmp_path / "fleet.json").read_text())["costs"]}
+    ask, blind = costs["real / ask"], costs["real / blind"]
+    assert ask["runs"] == 1 and ask["completed_rate"] == 1.0 and ask["tokens_per_run"] == 250 and ask["tokens_per_completed"] == 250
+    assert ask["asks_per_run"] == 1 and ask["ask_seconds_per_run"] == 0.2 and ask["failure_seconds_per_run"] == 1.5
+    assert blind["runs"] == 1 and blind["completed_rate"] == 0.0 and blind["tokens_per_completed"] is None
+    assert blind["wait_seconds_per_run"] == 3 and blind["seconds_per_run"] == 9.0
+    assert (ROOT_DOC := (F.__file__.rsplit("/failecho_fleet", 1)[0] + "/docs/fleet-metrics.md"))
+    doc = open(ROOT_DOC).read()
+    for field in ("tokens_prompt", "ask_seconds", "wait_seconds", "completed", "calls_first_try", "tokens_per_completed", "failure_seconds_per_run"):
+        assert field in doc, f"{field} is not defined in docs/fleet-metrics.md"

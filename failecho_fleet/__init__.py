@@ -438,6 +438,15 @@ class Run:
             auto._fe = self.fe
             auto.enable()
         self.build: dict | None = None   # the builder's ledger, when this is one
+        # Every cost a run pays, so ask and blind can be compared on more than
+        # attempts: tokens the provider billed, time spent asking the network,
+        # time spent waiting on advice, and whether the task got done.
+        self.tokens_prompt = 0
+        self.tokens_completion = 0
+        self.asks_made = 0
+        self.ask_seconds = 0.0
+        self.wait_seconds = 0.0
+        self.completed: bool | None = None
         # this persona's ETag cache (URL -> etag, body), for conditional requests
         self._etag_path = os.path.join(STATE_DIR, f"etags-{reporter}.json")
         try:
@@ -459,6 +468,15 @@ class Run:
     # -- asking and reporting through the three paths ------------------------
 
     def ask(self, service: str, operation: str, error_type: str, code: str | None) -> dict | None:
+        """One question to the network, timed: asking is the product's cost."""
+        started = time.monotonic()
+        self.asks_made += 1
+        try:
+            return self._ask(service, operation, error_type, code)
+        finally:
+            self.ask_seconds += time.monotonic() - started
+
+    def _ask(self, service: str, operation: str, error_type: str, code: str | None) -> dict | None:
         if self.path == "mcp":
             return self._mcp("check_tool_failure", {"service": service, "operation": operation,
                                                     "error_type": error_type, "error_code": code,
@@ -474,6 +492,17 @@ class Run:
                 return json.load(r)
         except Exception:
             return None
+
+    def _count_tokens(self, resp: dict) -> dict:
+        usage = resp.get("usage") if isinstance(resp, dict) else None
+        if isinstance(usage, dict):
+            self.tokens_prompt += int(usage.get("prompt_tokens") or 0)
+            self.tokens_completion += int(usage.get("completion_tokens") or 0)
+        return resp
+
+    def _sleep(self, seconds: float) -> None:
+        self.wait_seconds += seconds
+        time.sleep(seconds)
 
     def _mcp(self, tool: str, args: dict) -> dict | None:
         """One tools/call against the lab's MCP endpoint. Stateless HTTP, so
@@ -559,7 +588,7 @@ class Run:
                 return json.dumps({"error": et, "code": code}), False
             token = None
             if action == "backoff":
-                time.sleep(3)
+                self._sleep(3)
             elif action == "wait_until_reset":
                 headers = getattr(exc, "headers", None)
                 wait = 0.0
@@ -570,7 +599,7 @@ class Run:
                     for h in ("retry-after", "x-ratelimit-reset-tokens"):
                         if headers and headers.get(h):
                             wait = _seconds(headers.get(h)); break
-                time.sleep(min(max(wait, 1.0), 30.0))
+                self._sleep(min(max(wait, 1.0), 30.0))
             elif action == "conditional_request":
                 token = CONDITIONAL.set(True)
             rec["attempts"] += 1
@@ -630,7 +659,7 @@ class Run:
             return None
         # -- apply the action ---------------------------------------------
         if action == "backoff":
-            time.sleep(3)
+            self._sleep(3)
         elif action == "wait_until_reset":
             headers = getattr(exc, "headers", None)
             wait = 0.0
@@ -639,7 +668,7 @@ class Run:
                 if value:
                     wait = _seconds(value)
                     break
-            time.sleep(min(max(wait, 1.0), 30.0))
+            self._sleep(min(max(wait, 1.0), 30.0))
         elif action == "switch_model":
             alts = [m for m in p.get("alt_models", []) if m != state["model"]]
             if not alts:
@@ -703,7 +732,7 @@ class Run:
                                                   "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
             try:
                 with urllib.request.urlopen(req, timeout=60) as r:
-                    return json.load(r)
+                    return self._count_tokens(json.load(r))
             except urllib.error.HTTPError as e:
                 # a provider rejecting our request is data, and if it is OUR
                 # request shape that is wrong, the journal is where we find out
@@ -765,7 +794,7 @@ class Run:
                                                   "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
             try:
                 with urllib.request.urlopen(req, timeout=90) as r:
-                    return json.load(r)
+                    return self._count_tokens(json.load(r))
             except urllib.error.HTTPError as e:
                 log(f"  provider {p['host']} HTTP {e.code}: {e.read()[:200].decode(errors='ignore')!r}")
                 raise
@@ -888,6 +917,42 @@ def write_report(state: dict) -> None:
             row["failures"] += 1; row["attempts"] += f["attempts"]; row["recovered"] += int(f["recovered"])
             row["skipped"] += int(bool(f.get("skipped"))); row["seconds"] += float(f.get("seconds") or 0)
     real_targets = sorted(real.values(), key=lambda x: (x["service"], x["cohort"]))
+
+    # Cost and outcome per run, by cohort: every recorded cost, so a change
+    # to the product can be judged on all of them, not on the one it moved.
+    # Only runs that carry metrics (recorded since 2026-09-17 10:30 UTC).
+    costs: dict[str, dict] = {}
+    for r in runs:
+        m = r.get("metrics")
+        if not m:
+            continue
+        kind = "test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS else "real"
+        key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
+        c = costs.setdefault(key, {"cohort": key, "runs": 0, "completed": 0, "tokens": 0, "tokens_prompt": 0,
+                                   "tokens_completion": 0, "model_calls": 0, "tool_calls": 0, "seconds": 0.0,
+                                   "asks": 0, "ask_seconds": 0.0, "wait_seconds": 0.0, "calls_first_try": 0,
+                                   "calls_recovered": 0, "calls_failed": 0, "failure_seconds": 0.0})
+        c["runs"] += 1; c["completed"] += int(bool(m.get("completed")))
+        c["tokens_prompt"] += m.get("tokens_prompt", 0); c["tokens_completion"] += m.get("tokens_completion", 0)
+        c["tokens"] = c["tokens_prompt"] + c["tokens_completion"]
+        c["model_calls"] += r.get("model_calls", 0); c["tool_calls"] += r.get("tool_calls", 0)
+        c["seconds"] += float(r.get("seconds") or 0); c["asks"] += m.get("asks", 0)
+        c["ask_seconds"] += float(m.get("ask_seconds") or 0); c["wait_seconds"] += float(m.get("wait_seconds") or 0)
+        c["calls_first_try"] += m.get("calls_first_try", 0); c["calls_recovered"] += m.get("calls_recovered", 0)
+        c["calls_failed"] += m.get("calls_failed", 0)
+        c["failure_seconds"] += sum(float(f.get("seconds") or 0) for f in r["failures"])
+    for c in costs.values():
+        n = c["runs"] or 1
+        c.update(completed_rate=round(c["completed"] / n, 3), tokens_per_run=round(c["tokens"] / n),
+                 tokens_per_completed=(round(c["tokens"] / c["completed"]) if c["completed"] else None),
+                 seconds_per_run=round(c["seconds"] / n, 1), model_calls_per_run=round(c["model_calls"] / n, 2),
+                 tool_calls_per_run=round(c["tool_calls"] / n, 2), asks_per_run=round(c["asks"] / n, 2),
+                 ask_seconds_per_run=round(c["ask_seconds"] / n, 3), wait_seconds_per_run=round(c["wait_seconds"] / n, 2),
+                 failure_seconds_per_run=round(c["failure_seconds"] / n, 2))
+        for k in ("seconds", "ask_seconds", "wait_seconds", "failure_seconds"):
+            c[k] = round(c[k], 1)
+    cost_rows = [costs[k] for k in ("real / ask", "real / blind", "test / ask", "test / blind",
+                                    "build / ask", "build / blind", "explore") if k in costs]
     for row in real_targets:
         row["attempts_per_failure"] = round(row["attempts"] / row["failures"], 2) if row["failures"] else None
         row["seconds"] = round(row["seconds"], 1)
@@ -947,7 +1012,7 @@ def write_report(state: dict) -> None:
              "answer": r.get("answer")}
             for r in runs if r.get("build") and r["reporter"] in BUILD_PERSONAS
         ][-12:][::-1],
-        "repeats": repeats, "naming": naming, "real_targets": real_targets,
+        "repeats": repeats, "naming": naming, "real_targets": real_targets, "costs": cost_rows,
         "personas": sorted(by_persona.values(), key=lambda p: p["reporter"]),
     }
     os.makedirs(os.path.dirname(REPORT_PATH) or ".", exist_ok=True)
@@ -991,10 +1056,25 @@ def main(argv: list[str] | None = None) -> int:
         state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
     run.fe.flush(timeout=20)
     run.save_etags()
+    # Did the run do its job? A model run: a real answer, not a parenthesised
+    # failure. A cron run: every call eventually succeeded. A builder: the
+    # task came out done. The one number a user of an agent cares about.
+    if run.build is not None:
+        run.completed = bool(run.build.get("task_done"))
+    elif provider is None:
+        run.completed = all(f["recovered"] for f in run.failures)
+    else:
+        run.completed = not answer.startswith("(")
 
     record = {"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "reporter": reporter, "path": path,
               "provider": provider, "model": getattr(run, "model", None), "asks": asks, "tool_calls": run.tool_calls, "model_calls": run.model_calls,
-              "failures": run.failures, "seconds": round(time.monotonic() - started, 1)}
+              "failures": run.failures, "seconds": round(time.monotonic() - started, 1),
+              "metrics": {"tokens_prompt": run.tokens_prompt, "tokens_completion": run.tokens_completion,
+                          "asks": run.asks_made, "ask_seconds": round(run.ask_seconds, 3),
+                          "wait_seconds": round(run.wait_seconds, 2), "completed": run.completed,
+                          "calls_first_try": run.tool_calls - sum(f["attempts"] for f in run.failures),
+                          "calls_recovered": sum(1 for f in run.failures if f["recovered"]),
+                          "calls_failed": sum(1 for f in run.failures if not f["recovered"])}}
     if run.build is not None:
         record["build"] = run.build
         record["task"] = task[:160] if path == "builder" else None

@@ -47,6 +47,13 @@
       return [td(c.cohort), td(pf, "num"), td(pr, "num"), td(pf ? Math.round(100 * pr / pf) + "%" : "-", "num"), td(c.explored || 0, "num")];
     }));
     var runsBy = {}; (d.cohorts || []).forEach(function (c) { runsBy[c.cohort] = c.runs; });
+    fill("fleet-costs", (d.costs || []).map(function (c) {
+      return [td(c.cohort), td(c.runs, "num"), td(Math.round(c.completed_rate * 100) + "%", "num"),
+              td(c.tokens_per_run, "num"), td(c.tokens_per_completed == null ? "-" : c.tokens_per_completed, "num"),
+              td(c.model_calls_per_run, "num"), td(c.tool_calls_per_run, "num"), td(c.seconds_per_run, "num"),
+              td(c.asks_per_run, "num"), td(c.ask_seconds_per_run, "num"), td(c.wait_seconds_per_run, "num"),
+              td(c.calls_first_try, "num"), td(c.calls_recovered, "num"), td(c.calls_failed, "num")];
+    }));
     var cov = (d.build || []).reduce(function (acc, b) {
       acc.t += b.traffic_runs || 0; acc.u += b.unobserved_runs || 0; acc.c += b.connections || 0; acc.o += b.observed_calls || 0; return acc;
     }, { t: 0, u: 0, c: 0, o: 0 });
