@@ -28,8 +28,11 @@ not run by us.
 | "never stores user content or secrets" wording | **not done** | — | — | stronger than the normalizer can guarantee; decision pending |
 | `report_tool_recovery_outcome` alias | **not done** | — | — | agents guess the wrong name; documented instead |
 | A2A agent card at `/.well-known/agent.json` | **not done, on purpose** | — | 38 probes 404ing | we do not speak A2A; a card would advertise a path that does not work |
-| OTLP receiver (gateways as sources) | **planned only** | — | — | `docs/otlp-receiver-plan.md` |
-| Canonicaliser: route names vs tool names | **not done** | — | lab shows the split | the fleet's first finding; fixed after the test ends, from its data |
+| OTLP receiver (`POST /v1/otlp/traces`, protobuf + JSON) | yes | unit (19), SDK end-to-end, canary daily | lab | built 2026-09-17; allowlisted attribute keys only; names match the wrapper; Collector snippet documented, not run (no room for a Collector here) |
+| Naming split: service-level evidence pooling (`recommendation.scope`, `service_evidence`) | yes | unit (6), lab | yes | read-side repair for rate limit / 5xx / timeout / connection / auth classes; 403 now `auth_error` everywhere |
+| `skip` verdict when nothing works | yes | unit (9), lab | yes | askers honour it; network page lists verdicts; homepage keeps fixes |
+| Explorers + real-limit twins + `wait_until_reset`/`conditional_request` | yes | unit (21) | lab, collecting | proof table on `/fleet`: real services, controlled twins only |
+| Ask-vs-blind public benchmark (`scripts/ask_vs_blind.py`) | yes | unit (5), run | lab: blind 2.00 apf / 77 s, ask 1.20 / 41 s | refuses production |
 
 ## Ways in
 
