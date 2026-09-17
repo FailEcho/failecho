@@ -626,7 +626,7 @@ def test_coverage_counts_task_connections_and_excludes_the_labs(tmp_path, monkey
     stats.write_text(json.dumps({"by_host": {"pypi.org": 2, "lab.failecho.com": 1}}))
     b.vm = VM()
     b.run_python("import urllib.request")
-    assert b.coverage == [{"connections": 2, "observed": 2, "missed": False}]
+    assert b.coverage == [{"connections": 2, "observed": 2, "missed": False, "libs": ["urllib"]}]
 
 
 def test_a_run_with_traffic_and_no_observed_calls_is_a_miss(tmp_path, monkeypatch):
@@ -645,5 +645,5 @@ def test_a_run_with_traffic_and_no_observed_calls_is_a_miss(tmp_path, monkeypatc
 
     b.vm = VM()
     b.run_python("import subprocess; subprocess.run(['curl', 'https://api.github.com'])")
-    assert b.coverage == [{"connections": 3, "observed": 0, "missed": True}]
+    assert b.coverage == [{"connections": 3, "observed": 0, "missed": True, "libs": ["subprocess"]}]
     assert b.summary()["coverage"] == b.coverage

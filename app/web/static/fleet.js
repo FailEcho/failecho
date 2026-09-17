@@ -58,8 +58,10 @@
     var cov = (d.build || []).reduce(function (acc, b) {
       acc.t += b.traffic_runs || 0; acc.u += b.unobserved_runs || 0; acc.c += b.connections || 0; acc.o += b.observed_calls || 0; return acc;
     }, { t: 0, u: 0, c: 0, o: 0 });
+    var missed = {}; (d.build || []).forEach(function (b) { Object.keys(b.missed_libs || {}).forEach(function (k) { missed[k] = (missed[k] || 0) + b.missed_libs[k]; }); });
+    var missedText = Object.keys(missed).length ? " Unobserved programs imported: " + Object.keys(missed).map(function (k) { return k + " (" + missed[k] + ")"; }).join(", ") + "." : "";
     el("fleet-coverage").textContent = cov.t ? ("So far: " + cov.t + " runs with traffic, " + cov.u + " where the wrapper saw nothing; " +
-      cov.c + " connections opened, " + cov.o + " calls observed.") : "No runs with traffic measured yet.";
+      cov.c + " connections opened, " + cov.o + " calls observed." + missedText) : "No runs with traffic measured yet.";
     fill("fleet-build", (d.build || []).map(function (b) {
       return [td(b.cohort), td(runsBy[b.cohort] || 0, "num"), td(b.vm_runs, "num"), td(b.tasks_done, "num"),
               td(b.local, "num"), td(b.shared, "num"),

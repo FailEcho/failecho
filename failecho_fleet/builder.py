@@ -333,8 +333,13 @@ class Builder:
         observed = int(mc.group(1)) if mc else 0
         if before is not None and after is not None:
             connections = max(after - before, 0)
+            # which HTTP paths the program imports -- so a miss names the
+            # client the wrapper does not patch (our own generated code, and
+            # only the import names, is what gets recorded)
+            libs = sorted(l for l in ("requests", "httpx", "urllib", "http.client", "aiohttp", "subprocess", "pycurl", "socket")
+                          if re.search(rf"^\s*(import|from)\s+{re.escape(l)}\b", code, re.M))
             self.coverage.append({"connections": connections, "observed": observed,
-                                  "missed": bool(connections > 0 and observed == 0)})
+                                  "missed": bool(connections > 0 and observed == 0), "libs": libs})
         r["stderr"] = "\n".join(l for l in r.stderr.splitlines() if not l.startswith("[failecho]"))
         out = {"step": "run", **self._account(r, None)}
         if absorbed and r.ok:

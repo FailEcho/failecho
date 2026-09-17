@@ -940,6 +940,9 @@ def write_report(state: dict) -> None:
                 bl["connections"] += cov["connections"]; bl["observed_calls"] += cov["observed"]
                 if cov["connections"] > 0:
                     bl["traffic_runs"] += 1; bl["unobserved_runs"] += int(cov["missed"])
+                    if cov["missed"]:
+                        for lib in cov.get("libs") or ["?"]:
+                            bl.setdefault("missed_libs", {})[lib] = bl.get("missed_libs", {}).get(lib, 0) + 1
         for f in r["failures"]:
             c["failures"] += 1; c["attempts"] += f["attempts"]; c["recovered"] += int(f["recovered"])
             c["asked"] += int(f["asked"]); c["recommended"] += int(bool(f["recommended"])); c["skipped"] += int(bool(f.get("skipped")))
