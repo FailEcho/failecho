@@ -39,7 +39,7 @@ def test_synonyms_land_on_one_class(written, code, expected):
         ("http_error", "404", "not_found"),
         ("HTTP Error", "500", "server_error"),
         ("error", "429", "rate_limit"),
-        ("unknown", "403", "forbidden"),
+        ("unknown", "403", "auth_error"),
         (None, "429", "rate_limit"),
         ("", "429", "rate_limit"),
     ],
@@ -64,10 +64,17 @@ def test_unknown_classes_are_left_alone():
     assert canon("Widget Exploded", None) == "widget_exploded"
 
 
-def test_401_and_403_stay_apart():
-    """Different failures with different fixes. Merging credentials into
-    permissions would send agents after the wrong thing."""
-    assert canon("unauthorized", "401") != canon("forbidden", "403")
+def test_401_and_403_share_a_class_and_keep_their_codes():
+    """The hook and the wrapper have always filed both under auth_error; a
+    server table that said `forbidden` for 403 put a wrapper's report and an
+    OTLP span of the same failure on two fingerprints. One class now; the
+    status code stays in the fingerprint, so the two failures stay distinct
+    where it counts."""
+    assert canon("unauthorized", "401") == canon("forbidden", "403") == "auth_error"
+    from app.core.fingerprint import compute_fingerprint
+
+    assert compute_fingerprint(service="s", operation="o", error_type="auth_error", error_code="401") != \
+        compute_fingerprint(service="s", operation="o", error_type="auth_error", error_code="403")
 
 
 def test_it_is_idempotent():

@@ -137,3 +137,13 @@ def test_agent_unit_is_first_party_and_boxed():
     assert "ProtectSystem=strict" in unit and "NoNewPrivileges=yes" in unit
     timer = Path("deploy/failecho-agent.timer").read_text()
     assert "OnCalendar=*:00/30" in timer
+
+
+def test_the_otlp_route_has_its_own_body_limit_at_the_edge():
+    """The application caps OTLP batches at 256KB; a chunked body has no
+    length to check there, so the edge carries a matching per-path limit
+    while everything else keeps the 64KB backstop."""
+    assert "@otlp path /v1/otlp/*" in CADDYFILE
+    block = CADDYFILE[CADDYFILE.index("request_body @otlp"):]
+    assert "max_size 320KB" in block[: block.index("}")]
+    assert "max_size 64KB" in CADDYFILE

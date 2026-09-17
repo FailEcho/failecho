@@ -349,7 +349,7 @@ def test_the_canary_covers_every_pip_path_the_setup_page_advertises():
         advertised |= set(line.split())
     src = (ROOT / "failecho_sandbox" / "canary.py").read_text()
     covered = set(re.findall(r'"install", "--quiet", "([a-z0-9-]+)"', src))
-    for line in re.findall(r'\[("[a-z0-9-]+"(?:, "[a-z0-9-]+")*)\],', src):
+    for line in re.findall(r'\[("[a-z0-9-]+"(?:, "[a-z0-9-]+")*)\],?', src):
         covered |= set(re.findall(r'"([a-z0-9-]+)"', line))
     assert advertised and advertised <= covered, advertised - covered
     # and the snippets the canary runs are the page's, not a rewrite of them
@@ -416,6 +416,10 @@ def test_the_canary_steps_run_against_a_fake_vm(monkeypatch, tmp_path):
                               stderr="", seconds=1.0)
             if argv[-1] in ("li.py", "lc.py"):
                 return Result(exit=0, stdout=json.dumps(canary.EXPECTED_TOOLS) + "\n", stderr="", seconds=2.0)
+            if argv[-1] == "otel.py":
+                return Result(exit=0, stdout="exported\n", stderr="", seconds=1.0)
+            if "OP" in (env or {}):
+                return Result(exit=0, stdout=json.dumps({"known": True, "total": 1}) + "\n", stderr="", seconds=0.2)
             return Result(exit=0, stdout="", stderr="", seconds=0.1)
 
         def __enter__(self):
@@ -435,6 +439,7 @@ def test_the_canary_steps_run_against_a_fake_vm(monkeypatch, tmp_path):
     assert "failecho-mcp stdio handshake: 4 tools" in names and "failecho_autoreport run (one call observed)" in names
     assert "LlamaIndex snippet: list_tools -> 4 tools" in names and "LangChain snippet: list_tools -> 4 tools" in names
     assert "npx -y failecho-mcp stdio handshake: 4 tools" in names and "uvx failecho-mcp stdio handshake: 4 tools" in names
+    assert "OTLP export -> /v1/query knows it" in names
     # and the guest was told the lab, under a reporter id that names what it is
     assert all(s["ok"] for s in report["steps"])
 
@@ -457,6 +462,10 @@ def test_a_wrong_tool_list_fails_the_handshake_step(monkeypatch, tmp_path):
                 return Result(exit=0, stdout="x\n  known: False\n", stderr="", seconds=0.2)
             if argv[-1] in ("li.py", "lc.py"):
                 return Result(exit=0, stdout=json.dumps(canary.EXPECTED_TOOLS) + "\n", stderr="", seconds=2.0)
+            if argv[-1] == "otel.py":
+                return Result(exit=0, stdout="exported\n", stderr="", seconds=1.0)
+            if "OP" in (env or {}):
+                return Result(exit=0, stdout=json.dumps({"known": True, "total": 1}) + "\n", stderr="", seconds=0.2)
             return Result(exit=0, stdout="0.1.2\n", stderr="", seconds=0.1)
 
         def __enter__(self):

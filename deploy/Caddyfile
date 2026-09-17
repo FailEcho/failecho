@@ -38,6 +38,12 @@ failecho.com {
 	# connection can be cut before the bytes reach a worker with a 400MB
 	# ceiling. 64KB rather than 16KB: this one is the backstop, and it should
 	# not be the thing that rejects a legitimate request first.
+	# OTLP batches are the one exception: many spans per request, capped at
+	# 256KB in the application and here.
+	@otlp path /v1/otlp/*
+	request_body @otlp {
+		max_size 320KB
+	}
 	request_body {
 		max_size 64KB
 	}

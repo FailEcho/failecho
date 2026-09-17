@@ -40,7 +40,8 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import observe, outcome, query, services
+from app.api import observe, otlp, outcome, query, services
+from app.api.otlp import OTLP_MAX_BODY_BYTES
 from app.core.config import settings
 from app.db.database import SessionLocal, init_db
 from app.schemas.services import HealthResponse
@@ -151,12 +152,14 @@ async def refuse_oversized_bodies(request: Request, call_next):
     request_body max_size in deploy/Caddyfile.
     """
     declared = request.headers.get("content-length")
+    # One route carries batches: OTLP traces, capped at its own larger bound.
+    limit = OTLP_MAX_BODY_BYTES if request.url.path.startswith("/v1/otlp/") else MAX_BODY_BYTES
     if declared is not None:
         try:
-            if int(declared) > MAX_BODY_BYTES:
+            if int(declared) > limit:
                 return JSONResponse(
                     status_code=413,
-                    content={"detail": f"Request body exceeds {MAX_BODY_BYTES} bytes."},
+                    content={"detail": f"Request body exceeds {limit} bytes."},
                 )
         except ValueError:
             return JSONResponse(
@@ -175,6 +178,7 @@ app.add_middleware(
 )
 
 app.include_router(observe.router, prefix="/v1")
+app.include_router(otlp.router, prefix="/v1")
 app.include_router(query.router, prefix="/v1")
 app.include_router(outcome.router, prefix="/v1")
 app.include_router(services.router, prefix="/v1")
@@ -604,6 +608,17 @@ as "do not retry". Every recommendation carries `from_other_agents`:
 false when the evidence is your own history, true when another reporter paid
 for it, null if you sent no reporter id. Send one (`X-Reporter-ID`, or
 `reporter_id` over MCP) if you want that distinction.
+
+## OpenTelemetry traces as a source
+
+If the agent, or the gateway in front of it, already emits OpenTelemetry
+traces, `POST {base_url}/v1/otlp/traces` accepts them (OTLP/HTTP, protobuf
+or JSON). Client spans become observations under the same names the
+zero-code wrapper uses (`server.address` + `METHOD /first-segment`, or
+`rpc.service` + `rpc.method`); other spans are rejected and counted, which
+is normal. Only a fixed set of attribute keys is read -- never `url.full`,
+headers, bodies, `exception.*`, `gen_ai.*`, events or links. Traces carry no
+recovery outcomes, so what fixed a failure still needs `/v1/outcome`.
 
 ## One failure, several names
 

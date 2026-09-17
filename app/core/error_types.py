@@ -35,7 +35,6 @@ import re
 CANONICAL = frozenset({
     "rate_limit",
     "auth_error",
-    "forbidden",
     "not_found",
     "validation_error",
     "server_error",
@@ -55,6 +54,11 @@ _SYNONYMS = {
     "quota_exceeded": "rate_limit",
 
     "auth": "auth_error",
+    # 403 joins 401 under auth_error: that is what the hook and the wrapper
+    # have always sent for both, and a class that differs by client splits
+    # one failure into two fingerprints. The status code stays in the
+    # fingerprint, so 401 and 403 remain distinct failures.
+    "forbidden": "auth_error",
     "authentication_error": "auth_error",
     "authentication_failed": "auth_error",
     "unauthorized": "auth_error",
@@ -103,7 +107,7 @@ _GENERIC = frozenset({
 _BY_STATUS = {
     "400": "validation_error",
     "401": "auth_error",
-    "403": "forbidden",
+    "403": "auth_error",
     "404": "not_found",
     "408": "timeout",
     "409": "conflict",

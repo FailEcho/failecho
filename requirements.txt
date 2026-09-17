@@ -5,6 +5,7 @@ sqlalchemy>=2.0
 aiosqlite>=0.20
 uvicorn[standard]>=0.30
 mcp>=2.0
+opentelemetry-proto>=1.20
 
 # Dev / test
 pytest>=8.0

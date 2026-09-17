@@ -360,6 +360,79 @@ fe.recovered("github-mcp", "create_issue", "refresh_schema")  # what fixed it</c
     </p>
   </section>
 
+  <section class="shell band" id="otlp" aria-labelledby="otlp-title">
+    <div class="band-head">
+      <h2 id="otlp-title" class="label">Already on OpenTelemetry? Point the traces here</h2>
+      <p class="band-sub">
+        An agent gateway, a Collector, or your own SDK exporter can send traces
+        to <code>{{PUBLIC_URL}}/v1/otlp/traces</code> &mdash; protobuf or JSON,
+        the standard OTLP/HTTP shapes. Client spans become observations:
+        <code>server.address</code> (or <code>rpc.service</code>) is the service,
+        <code>rpc.method</code> or the HTTP method plus the first segment of
+        <code>http.route</code> is the operation &mdash; <code>GET /repos</code>,
+        the same name the zero-code wrapper uses, so the evidence joins. Every
+        other span is rejected and counted in <code>partialSuccess</code>,
+        which is normal: most spans are not outbound calls.
+      </p>
+    </div>
+    <figure class="snip">
+      <pre><code># OpenTelemetry Collector: send only errors, strip anything payload-shaped first
+processors:
+  filter/errors:
+    error_mode: ignore
+    traces:
+      span: ['status.code != STATUS_CODE_ERROR']
+  attributes/strip:
+    actions:
+      - { key: url.full, action: delete }
+      - { key: url.query, action: delete }
+      - { key: db.statement, action: delete }
+      - { pattern: 'http\.(request|response)\.(header|body).*', action: delete }
+      - { pattern: 'gen_ai\..*', action: delete }
+exporters:
+  otlphttp/failecho:
+    traces_endpoint: {{PUBLIC_URL}}/v1/otlp/traces
+    headers: { X-Reporter-ID: my-gateway }
+service:
+  pipelines:
+    traces:
+      processors: [filter/errors, attributes/strip]
+      exporters: [otlphttp/failecho]</code></pre>
+    </figure>
+    <figure class="snip">
+      <pre><code># Python SDK, no gateway: pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
+    endpoint="{{PUBLIC_URL}}/v1/otlp/traces",
+    headers={"X-Reporter-ID": "my-agent"})))
+
+# then, per outbound call, a CLIENT span with server.address, http.request.method,
+# http.route and http.response.status_code -- the semantic conventions you already set</code></pre>
+    </figure>
+    <p class="band-sub">
+      Only a fixed set of attribute keys is read. <code>url.full</code>,
+      headers, bodies, <code>db.statement</code>, <code>exception.*</code>,
+      <code>gen_ai.*</code>, events and links are never read, under any
+      setting; the Collector snippet strips them anyway, so control stays on
+      your side. At most 500 spans and 256KB per request, rate limited per IP
+      like every write. The Python snippet was run before it was written here:
+      one 503 and one 200 from httpbingo.org, exported with the SDK's default
+      protobuf, arrived as <code>httpbingo.org GET /status server_error/503</code>
+      and one success. The Collector snippet was <em>not</em> run &mdash; this
+      box has no room for a Collector &mdash; and is the documented shape of
+      the two processors; tell us if it needs a fix.
+    </p>
+    <p class="band-sub">
+      What traces cannot give: recovery outcomes. A span says a call failed,
+      and later that one succeeded; it does not say what anyone decided in
+      between. Failure rates and the <code>skip</code> verdict come from
+      traces; what fixed it still needs <code>POST /v1/outcome</code>, the
+      wrapper's <code>recovered()</code>, or the MCP tool.
+    </p>
+  </section>
+
   <section class="shell band" id="check" aria-labelledby="check-title">
     <div class="band-head">
       <h2 id="check-title" class="label">How to tell it is working</h2>

@@ -12,6 +12,7 @@ dependencies = [
     "aiosqlite>=0.20",
     "uvicorn[standard]>=0.30",
     "mcp>=2.0",
+    "opentelemetry-proto>=1.20",
 ]
 
 [project.scripts]

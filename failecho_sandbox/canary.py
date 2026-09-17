@@ -22,6 +22,10 @@ from PyPI through the fence and does what the page tells a reader to do:
 6. the LangChain snippet, verbatim: ``pip install langchain fastmcp``,
    ``MCPAdapter(url).list_tools()`` -- ``langchain.mcp`` is beta and says its
    API may change, which is exactly why it is re-run daily
+7. the OpenTelemetry path: ``pip install opentelemetry-sdk
+   opentelemetry-exporter-otlp-proto-http``, one CLIENT span with a 503 from
+   httpbingo exported to the lab's ``/v1/otlp/traces`` under a route unique
+   to this run, then ``/v1/query`` must know it
 
 The result is a small JSON file the scoreboard shows, and a non-zero exit
 that systemd records, so the day a path stops working is the day we know.
@@ -106,6 +110,64 @@ async def main():
     print(json.dumps(sorted(getattr(t, "name", None) or t["name"] for t in tools)))
 asyncio.run(main())
 """
+
+
+OTEL_SNIPPET = """import os, sys, urllib.error, urllib.request
+from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+provider = TracerProvider(resource=Resource.create({"service.name": "install-canary"}))
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
+    endpoint=os.environ["LAB"] + "/v1/otlp/traces", headers={"X-Reporter-ID": "install-canary"})))
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer("install-canary")
+route = os.environ["CANARY_ROUTE"]
+with tracer.start_as_current_span("GET " + route, kind=trace.SpanKind.CLIENT) as span:
+    span.set_attribute("server.address", "httpbingo.org")
+    span.set_attribute("http.request.method", "GET")
+    span.set_attribute("http.route", route)
+    try:
+        urllib.request.urlopen("https://httpbingo.org/status/503", timeout=20)
+    except urllib.error.HTTPError as e:
+        span.set_attribute("http.response.status_code", e.code)
+        span.set_status(trace.Status(trace.StatusCode.ERROR))
+provider.shutdown()
+print("exported")
+"""
+
+
+def _otlp_step(vm: Sandbox, steps: list, env: dict) -> None:
+    r = vm.run(["python3", "-m", "venv", "/work/venv-otel"], timeout=60)
+    if not r.ok:
+        steps.append({"name": "OpenTelemetry: venv", "ok": False, "seconds": r.get("seconds"), "detail": r.stderr[-300:]})
+        return
+    packages = ["opentelemetry-sdk", "opentelemetry-exporter-otlp-proto-http"]
+    r = vm.run(["/work/venv-otel/bin/pip", "install", "--quiet", "--no-cache-dir", *packages], timeout=300)
+    steps.append({"name": f"pip install {' '.join(packages)}", "ok": r.ok, "seconds": r.get("seconds"),
+                  "detail": "" if r.ok else (r.stderr.strip().splitlines() or [""])[-1][:300]})
+    if not r.ok:
+        return
+    route = f"/canary-{int(time.time())}"
+    r = vm.run(["/work/venv-otel/bin/python", "otel.py"], files={"otel.py": OTEL_SNIPPET}, timeout=120,
+               env={**env, "CANARY_ROUTE": route})
+    exported = r.ok and "exported" in r.stdout
+    q = vm.run(["python3", "-c",
+                "import json,os,urllib.request;"
+                "b=json.dumps({'service':'httpbingo.org','operation':os.environ['OP'],'error_type':'server_error','error_code':'503'}).encode();"
+                "r=urllib.request.Request(os.environ['LAB']+'/v1/query',data=b,headers={'Content-Type':'application/json'},method='POST');"
+                "d=json.load(urllib.request.urlopen(r,timeout=20));print(json.dumps({'known':d['known'],'total':d['observations']['total']}))"],
+               timeout=40, env={**env, "OP": f"GET {route}"})
+    try:
+        seen = json.loads(q.stdout.strip().splitlines()[-1]) if q.ok else {}
+    except ValueError:
+        seen = {}
+    steps.append({"name": "OTLP export -> /v1/query knows it", "ok": bool(exported and seen.get("known")),
+                  "seconds": r.get("seconds"),
+                  "detail": (f"GET {route}: known={seen.get('known')} total={seen.get('total')}" if seen
+                             else (r.stderr.strip().splitlines() or [""])[-1][:300])})
 
 
 def _framework_step(vm: Sandbox, steps: list, env: dict, label: str, venv: str, packages: list[str],
@@ -193,6 +255,7 @@ def run_canary(vm: Sandbox, lab_url: str) -> list[dict]:
                     LLAMAINDEX_SNIPPET, "li.py")
     _framework_step(vm, steps, env, "LangChain", "/work/venv-lc", ["langchain", "fastmcp"],
                     LANGCHAIN_SNIPPET, "lc.py")
+    _otlp_step(vm, steps, env)
     steps.append({"name": "wrapper_version", "ok": True, "seconds": 0, "detail": wrapper_version or "?"})
     return steps
 
