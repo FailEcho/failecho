@@ -205,13 +205,13 @@ PROXY_STATS = os.environ.get("FAILECHO_SANDBOX_PROXY_STATS") or "/run/failecho-s
 LAB_HOSTS = ("lab.failecho.com",)
 
 
-def _proxy_connections() -> int | None:
-    """Connections the fence has opened for the guest so far, excluding the
-    ones to the lab (that is the wrapper reporting, not the task's traffic)."""
+def _proxy_connections() -> dict | None:
+    """Connections the fence has opened for the guest so far, per host,
+    excluding the lab (that is the wrapper reporting, not the task's traffic)."""
     try:
         with open(PROXY_STATS, encoding="utf-8") as fh:
             d = json.load(fh)
-        return sum(n for host, n in d.get("by_host", {}).items() if host not in LAB_HOSTS)
+        return {host: n for host, n in d.get("by_host", {}).items() if host not in LAB_HOSTS}
     except (OSError, ValueError):
         return None
 
@@ -332,14 +332,19 @@ class Builder:
         mc = _SUMMARY_CALLS.search(summary)
         observed = int(mc.group(1)) if mc else 0
         if before is not None and after is not None:
-            connections = max(after - before, 0)
+            per_host = {h: after.get(h, 0) - before.get(h, 0) for h in set(after) | set(before)}
+            per_host = {h: n for h, n in per_host.items() if n > 0}
+            connections = sum(per_host.values())
             # which HTTP paths the program imports -- so a miss names the
             # client the wrapper does not patch (our own generated code, and
             # only the import names, is what gets recorded)
             libs = sorted(l for l in ("requests", "httpx", "urllib", "http.client", "aiohttp", "subprocess", "pycurl", "socket")
                           if re.search(rf"^\s*(import|from)\s+{re.escape(l)}\b", code, re.M))
+            # hosts, so a program that opened 145 connections for 5 observed
+            # calls (seen 2026-09-17 21:28) can be explained rather than guessed at
             self.coverage.append({"connections": connections, "observed": observed,
-                                  "missed": bool(connections > 0 and observed == 0), "libs": libs})
+                                  "missed": bool(connections > 0 and observed == 0), "libs": libs,
+                                  "hosts": dict(sorted(per_host.items(), key=lambda kv: -kv[1])[:6])})
         r["stderr"] = "\n".join(l for l in r.stderr.splitlines() if not l.startswith("[failecho]"))
         out = {"step": "run", **self._account(r, None)}
         if absorbed and r.ok:
