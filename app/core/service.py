@@ -32,6 +32,7 @@ from app.core.aliases import canonical_service
 from app.core.fingerprint import compute_fingerprint
 from app.core.intelligence import (
     ACTION_SKIP,
+    same_shape_fingerprints,
     bump_counter,
     classify_status,
     fingerprint_stats,
@@ -62,6 +63,7 @@ from app.schemas.query import (
     FixEvidence,
     RecoveryActionStats,
     RelatedFailure,
+    ServiceEvidence,
     SuccessEvidence,
 )
 
@@ -332,6 +334,22 @@ async def _includes_demo_data(session: AsyncSession, fingerprint: str) -> bool:
     return bool(archived)
 
 
+def _action_stats(a) -> RecoveryActionStats:
+    return RecoveryActionStats(
+        action=a.action,
+        attempts=a.attempts,
+        successes=a.successes,
+        success_rate=round(a.success_rate, 4),
+        effective_attempts=a.capped_attempts,
+        effective_successes=a.capped_successes,
+        unique_reporters=a.unique_reporters,
+        confidence=round(min(a.evidence_score, settings.max_confidence), 4),
+        recent_attempts=a.recent_attempts,
+        recent_success_rate=round_or_none(a.recent_success_rate),
+        decaying=a.decaying,
+    )
+
+
 async def query_intelligence(
     session: AsyncSession,
     payload: QueryRequest,
@@ -377,6 +395,25 @@ async def query_intelligence(
 
     actions = await recovery_actions(session, fingerprint) if known else []
     chosen = recommend(actions)
+    scope = "operation"
+
+    # The naming-split repair: a rate limit, outage, timeout or auth failure
+    # is the service's, whatever the operation was called. If this operation
+    # has no recommendation of its own, the same class and code under other
+    # names on the same service may -- labelled as service-level evidence.
+    service_evidence = None
+    shape = await same_shape_fingerprints(session, service, payload.error_type, payload.error_code,
+                                          exclude=fingerprint)
+    if shape:
+        pooled = await recovery_actions(session, fingerprints=[fingerprint, *shape.fingerprints])
+        service_evidence = ServiceEvidence(
+            operations=list(shape.operations), fingerprints=len(shape.fingerprints),
+            recovery_actions=[_action_stats(a) for a in pooled],
+        )
+        if chosen is None:
+            pooled_choice = recommend(pooled)
+            if pooled_choice is not None:
+                chosen, scope = pooled_choice, "service"
 
     # Can the successes for this service+operation be believed from outside?
     # Computed on the whole history, not a window: "never failed once" is the
@@ -424,22 +461,7 @@ async def query_intelligence(
             last_1h=round_or_none(long.failure_rate),
         ),
         normalized_error=normalized,
-        recovery_actions=[
-            RecoveryActionStats(
-                action=a.action,
-                attempts=a.attempts,
-                successes=a.successes,
-                success_rate=round(a.success_rate, 4),
-                effective_attempts=a.capped_attempts,
-                effective_successes=a.capped_successes,
-                unique_reporters=a.unique_reporters,
-                confidence=round(min(a.evidence_score, settings.max_confidence), 4),
-                recent_attempts=a.recent_attempts,
-                recent_success_rate=round_or_none(a.recent_success_rate),
-                decaying=a.decaying,
-            )
-            for a in actions
-        ],
+        recovery_actions=[_action_stats(a) for a in actions],
         success_evidence=success_evidence,
         related_failures=[
             RelatedFailure(
@@ -452,9 +474,11 @@ async def query_intelligence(
             )
             for n in neighbours
         ],
+        service_evidence=service_evidence,
         recommendation=(
             Recommendation(
                 action=chosen[0].action,
+                scope=scope,
                 confidence=round(chosen[1], 4),
                 based_on_attempts=chosen[0].attempts,
                 based_on_successes=chosen[0].successes,

@@ -467,16 +467,23 @@ def _cap(attempts: int, successes: int, cap: int) -> tuple[int, int]:
 
 
 async def recovery_actions(
-    session: AsyncSession, fingerprint: str
+    session: AsyncSession, fingerprint: str | None = None, *, fingerprints: list[str] | None = None
 ) -> list[RecoveryAction]:
     """Aggregate recovery evidence: live rows plus pruned hourly aggregates.
 
     The per-reporter cap is applied per (action, reporter, hour) bucket, which
     is exactly the grain the aggregates use -- so pruning a bucket cannot
     change the answer.
+
+    ``fingerprints`` pools several fingerprints -- the same failure shape on
+    the same service under different operation names -- into one view. See
+    ``same_shape_fingerprints`` for when that is legitimate.
     """
     cap = settings.max_reporter_weight_per_hour
     bucket = hour_bucket_expr(RecoveryOutcome.created_at)
+    keys = list(fingerprints) if fingerprints else [fingerprint]
+    match = RecoveryOutcome.fingerprint.in_(keys) if len(keys) > 1 else RecoveryOutcome.fingerprint == keys[0]
+    match_archived = HourlyRecoveryStat.fingerprint.in_(keys) if len(keys) > 1 else HourlyRecoveryStat.fingerprint == keys[0]
 
     rows = (
         await session.execute(
@@ -490,7 +497,7 @@ async def recovery_actions(
                     0,
                 ).label("successes"),
             )
-            .where(RecoveryOutcome.fingerprint == fingerprint)
+            .where(match)
             .group_by(RecoveryOutcome.action, bucket, RecoveryOutcome.reporter_hash)
         )
     ).all()
@@ -508,7 +515,7 @@ async def recovery_actions(
                 ).label("successes"),
             )
             .where(
-                RecoveryOutcome.fingerprint == fingerprint,
+                match,
                 RecoveryOutcome.created_at >= ago(settings.decay_window_seconds),
             )
             .group_by(RecoveryOutcome.action)
@@ -550,7 +557,7 @@ async def recovery_actions(
                     "reporters"
                 ),
             )
-            .where(HourlyRecoveryStat.fingerprint == fingerprint)
+            .where(match_archived)
             .group_by(HourlyRecoveryStat.action)
         )
     ).all()
@@ -661,6 +668,58 @@ async def related_failures(
     ]
     related.sort(key=lambda r: (-r.observations, r.fingerprint))
     return related[:limit]
+
+
+#: Failure classes that belong to the service rather than to one operation:
+#: a rate limit, an outage, a timeout, a connection refused, an expired
+#: credential hit every operation on the host the same way, and the fix is
+#: the same whichever operation happened to be called. A 404 or a validation
+#: error is about the one operation and is never pooled.
+SERVICE_LEVEL_CLASSES = frozenset({"rate_limit", "server_error", "timeout", "connection_error", "auth_error"})
+
+
+@dataclass(frozen=True)
+class ServiceShape:
+    """Fingerprints on one service that share a failure shape under other
+    operation names, and the names they were reported under."""
+
+    fingerprints: tuple[str, ...]
+    operations: tuple[str, ...]
+
+
+async def same_shape_fingerprints(
+    session: AsyncSession, service: str, error_type: str | None, error_code: str | None,
+    exclude: str | None = None,
+) -> ServiceShape | None:
+    """The naming-split repair. The fleet's first finding was that one failure
+    lands on several fingerprints because paths name the operation
+    differently -- `GET /repos` from the zero-code wrapper, `github_repo`
+    from a decorator, `repos.get` from a hand-written client. Evidence that
+    should join did not.
+
+    Aliasing names is not possible in general (tool names are whatever the
+    author chose). What is possible is to notice that a rate limit, an outage
+    or a timeout on a service is the service's failure, not the operation's,
+    and to pool the recovery evidence of every operation on that service with
+    the same error class and code. Only for those classes, only when asked
+    about one of them, and always labelled as service-level evidence.
+    """
+    if not error_type or error_type not in SERVICE_LEVEL_CLASSES:
+        return None
+    rows = (
+        await session.execute(
+            select(Fingerprint.fingerprint, Fingerprint.operation)
+            .where(
+                Fingerprint.service == service,
+                Fingerprint.error_type == error_type,
+                Fingerprint.error_code.is_(None) if error_code is None else Fingerprint.error_code == error_code,
+            )
+        )
+    ).all()
+    keep = [(fp, op) for fp, op in rows if fp != exclude]
+    if not keep:
+        return None
+    return ServiceShape(tuple(fp for fp, _ in keep), tuple(sorted({op for _, op in keep})))
 
 
 def recommend(actions: list[RecoveryAction]) -> tuple[RecoveryAction, float] | None:

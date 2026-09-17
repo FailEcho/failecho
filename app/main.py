@@ -605,6 +605,20 @@ false when the evidence is your own history, true when another reporter paid
 for it, null if you sent no reporter id. Send one (`X-Reporter-ID`, or
 `reporter_id` over MCP) if you want that distinction.
 
+## One failure, several names
+
+Agents name the same call differently: `GET /repos` from a wrapper that sees
+routes, `github_repo` from a decorator, `repos.get` from a hand-written
+client. For a rate limit, a server error, a timeout, a connection or an auth
+failure that does not matter -- the failure is the service's, whatever the
+operation was called -- so when the operation you asked about has no
+recommendation of its own, FailEcho pools the recovery evidence of the same
+error class and code under other operation names on the same service, and
+says so: `recommendation.scope` is `"service"` and `service_evidence` lists
+the names and the pooled actions. `not_found` and `validation_error` are
+about one operation and are never pooled. Name things as the server names
+them anyway; pooling is the repair, not the plan.
+
 ## Confidence
 
 Confidence is a Wilson score lower bound over observed recovery attempts,

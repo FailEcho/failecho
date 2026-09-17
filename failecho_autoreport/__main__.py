@@ -57,7 +57,9 @@ def _check(argv: list[str]) -> int:
     rec = d["recommendation"]
     if rec:
         print(f"  recommendation: {rec['action']}  (confidence {rec['confidence']}, "
-              f"from other agents: {rec['from_other_agents']})")
+              f"from other agents: {rec['from_other_agents']}"
+              + (f", pooled across {', '.join(d['service_evidence']['operations'])}" if rec.get("scope") == "service" and d.get("service_evidence") else "")
+              + ")")
         if rec.get("warning"):
             print(f"    warning: {rec['warning']}")
     else:

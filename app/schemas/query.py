@@ -215,6 +215,17 @@ class Recommendation(BaseModel):
             "above has already been discounted."
         ),
     )
+    scope: str = Field(
+        default="operation",
+        description=(
+            "'operation' when the evidence is for exactly this service+operation. "
+            "'service' when this operation had too little of its own and the "
+            "recommendation rests on the same error class and code seen under "
+            "other operation names on the same service -- a rate limit, an "
+            "outage, a timeout or an auth failure is the service's, not the "
+            "operation's. See service_evidence for what was pooled."
+        ),
+    )
     from_other_agents: bool | None = Field(
         default=None,
         description=(
@@ -237,6 +248,17 @@ class Recommendation(BaseModel):
     warning: str | None = Field(
         default=None,
         description="Plain-language note when decaying is true; null otherwise.",
+    )
+
+
+class ServiceEvidence(BaseModel):
+    """The same failure class and code on this service, under other names."""
+
+    operations: list[str] = Field(description="Operation names it was reported under, besides yours.")
+    fingerprints: int = Field(description="How many distinct fingerprints that is.")
+    recovery_actions: list[RecoveryActionStats] = Field(
+        default_factory=list,
+        description="Recovery evidence pooled across them, same shape as recovery_actions.",
     )
 
 
@@ -283,6 +305,17 @@ class QueryResponse(StrictModel):
         description=(
             "Whether this service+operation's successes can be believed from "
             "outside. Null when nothing has been observed for it at all."
+        ),
+    )
+    service_evidence: ServiceEvidence | None = Field(
+        default=None,
+        description=(
+            "For rate limits, server errors, timeouts, connection and auth "
+            "failures only: the same class and code on this service under other "
+            "operation names, with pooled recovery evidence. Two agents naming "
+            "one endpoint two ways stop losing each other's evidence. Null for "
+            "operation-specific classes (not_found, validation_error) and when "
+            "nothing else on the service shares the shape."
         ),
     )
     related_failures: list[RelatedFailure] = Field(
