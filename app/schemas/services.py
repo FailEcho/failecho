@@ -208,7 +208,17 @@ class RecoveryIntelligence(BaseModel):
     error_code: str | None = None
     normalized_error: str | None = None
     fingerprint: str
-    action: str = Field(description="Best observed recovery action.")
+    action: str = Field(description="Best observed recovery action, or 'skip' when nothing has worked (verdict).")
+    verdict: str = Field(
+        default="fix",
+        description=(
+            "'fix' when the action is something that worked; 'skip' when the "
+            "network's answer is that nothing tried recently has, and the next "
+            "attempt is a wasted one. Skip entries appear only when asked for "
+            "(include_skip)."
+        ),
+    )
+    warning: str | None = Field(default=None, description="For a skip: what failed, in numbers.")
     attempts: int
     successes: int
     success_rate: float

@@ -76,13 +76,32 @@ BUILDER_TASKS = [
     "with their length. Run it.",
     "Fetch https://registry.npmjs.org/express and print the latest version and how many dependencies that "
     "version declares. Run it.",
+    # harder: pagination, dates, headers, real parsing, a multi-step job. Added
+    # 2026-09-17 after 30 of the first 41 runs came out clean.
+    "Fetch the 3 most recent closed pull requests of astral-sh/uv (GitHub API, state=closed, per_page=3) and "
+    "print title, merged date as ISO-8601 UTC, and how many days each stayed open. Handle a missing merged_at. Run it.",
+    "Page through https://api.github.com/repos/pallets/flask/releases with per_page=5, following the Link header, "
+    "until you have 12 releases; print each tag and the days since the previous release. Run it.",
+    "Download https://peps.python.org/pep-0020/ and extract the 19 aphorisms of the Zen of Python with the standard "
+    "library only (html.parser). Print them numbered. Run it.",
+    "Build a small ETL: fetch https://httpbingo.org/json, flatten slideshow.slides into rows (title, type, item), "
+    "write out.csv, then POST the CSV text to https://httpbingo.org/post and print the length of the echoed 'data'. Run it.",
+    "Write a cache-aware GitHub client: GET https://api.github.com/repos/psf/requests, keep the ETag, GET it again "
+    "with If-None-Match, and print both status codes and X-RateLimit-Remaining after each. Run it.",
+    "Parse https://peps.python.org/peps.rss/ with xml.etree and print the 5 most recent PEP titles with publication "
+    "dates converted to UTC ISO-8601. Run it.",
+    "Verify the latest requests wheel: read https://pypi.org/pypi/requests/json, pick the newest bdist_wheel, download "
+    "it from files.pythonhosted.org, SHA-256 it, and compare with the digest PyPI reports. Print match or mismatch. Run it.",
+    "Write a polite crates.io client: fetch https://crates.io/api/v1/crates/<name> for serde, tokio, reqwest, clap and "
+    "anyhow at no more than one request per second, retrying once on 429 using Retry-After; print name, max_version "
+    "and total seconds. Run it.",
 ]
 
 BUILDER_SCHEMAS = [
     {"type": "function", "function": {
         "name": "run_python",
         "description": "Run Python 3.12 code in a sandbox with network access to pypi.org, api.github.com, "
-                       "registry.npmjs.org, httpbingo.org and the Python docs. requests and httpx are installed. "
+                       "registry.npmjs.org, crates.io, httpbingo.org and the Python docs. requests and httpx are installed. "
                        "Optionally pip-install packages first. Returns exit code, stdout and stderr.",
         "parameters": {"type": "object", "properties": {
             "code": {"type": "string", "description": "the complete program"},

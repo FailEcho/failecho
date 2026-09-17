@@ -126,3 +126,8 @@ def test_the_homepage_fixes_panel_does_not_list_skip(client):
 
     dashboard_cache.clear()
     assert client.get("/v1/recovery-intelligence").json() == []
+    # the network page asks for verdicts too
+    dashboard_cache.clear()
+    rows = client.get("/v1/recovery-intelligence?include_skip=1").json()
+    assert len(rows) == 1 and rows[0]["verdict"] == "skip" and rows[0]["action"] == "skip"
+    assert "retry 0/10" in rows[0]["warning"] and rows[0]["successes"] == 0

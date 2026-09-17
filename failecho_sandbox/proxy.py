@@ -53,6 +53,7 @@ DEFAULT_ALLOW = (
     "pypi.org",
     "files.pythonhosted.org",
     "registry.npmjs.org",
+    "crates.io",                  # the builders' polite-client task
     "api.github.com",
     "github.com",                 # release pages; a builder reached for it on night one
     "raw.githubusercontent.com",

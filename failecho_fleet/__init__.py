@@ -906,6 +906,16 @@ def write_report(state: dict) -> None:
                     for k, v in cohorts.items()],
         "build": [{"cohort": k, **v, "shared_share": (v["shared"] / (v["shared"] + v["local"])) if (v["shared"] + v["local"]) else None}
                   for k, v in build.items()],
+        # the live feed: the last builder runs, what was asked and what happened
+        "recent_builds": [
+            {"at": r["at"], "reporter": r["reporter"], "task": r.get("task"), "seconds": r.get("seconds"),
+             "vm_runs": r["build"].get("vm_runs", 0), "local": r["build"].get("local_failures", 0),
+             "shared": len(r["build"].get("shared_failures") or []), "done": bool(r["build"].get("task_done")),
+             "traffic": sum(c["connections"] for c in r["build"].get("coverage") or []),
+             "observed": sum(c["observed"] for c in r["build"].get("coverage") or []),
+             "answer": r.get("answer")}
+            for r in runs if r.get("build") and r["reporter"] in BUILD_PERSONAS
+        ][-12:][::-1],
         "repeats": repeats, "naming": naming, "real_targets": real_targets,
         "personas": sorted(by_persona.values(), key=lambda p: p["reporter"]),
     }
@@ -956,6 +966,8 @@ def main(argv: list[str] | None = None) -> int:
               "failures": run.failures, "seconds": round(time.monotonic() - started, 1)}
     if run.build is not None:
         record["build"] = run.build
+        record["task"] = task[:160] if path == "builder" else None
+        record["answer"] = answer[:200]
     state["runs"].append(record)
     state["runs"] = state["runs"][-5000:]
     state["next"] = idx + 1

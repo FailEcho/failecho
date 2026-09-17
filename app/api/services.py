@@ -439,8 +439,15 @@ async def recovery_intelligence(
     include_demo: bool = Query(
         default=True, description="Include entries backed by synthetic demo data."
     ),
+    include_skip: bool = Query(
+        default=False,
+        description=(
+            "Also list failures where nothing tried recently has worked (the "
+            "network's `skip` verdict). Off by default: the homepage lists fixes."
+        ),
+    ),
 ) -> list[RecoveryIntelligence]:
-    cache_key = f"recovery:{limit}:{include_demo}"
+    cache_key = f"recovery:{limit}:{include_demo}:{include_skip}"
     cached = dashboard_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -475,9 +482,9 @@ async def recovery_intelligence(
             continue
         actions = await recovery_actions(session, fingerprint)
         chosen = recommend(actions)
-        # this panel lists fixes; "nothing works, skip" is a query answer,
-        # not a fix to advertise on the homepage
-        if chosen is None or chosen[0].action == ACTION_SKIP:
+        # the homepage lists fixes; "nothing works, skip" is shown only where
+        # asked for (the network page), never as a fix
+        if chosen is None or (chosen[0].action == ACTION_SKIP and not include_skip):
             continue
         action, confidence = chosen
 
@@ -525,6 +532,13 @@ async def recovery_intelligence(
                 last_seen=isoformat_z(catalogue.last_seen),
                 demo_data=is_demo,
                 first_party_data=first_party,
+                verdict="skip" if action.action == ACTION_SKIP else "fix",
+                warning=(
+                    "Nothing tried in the last "
+                    f"{settings.decay_window_seconds // 3600}h has worked: "
+                    + ", ".join(f"{a.action} 0/{a.recent_attempts}" for a in actions if a.recent_attempts)
+                    if action.action == ACTION_SKIP else None
+                ),
             )
         )
 

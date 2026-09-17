@@ -1505,3 +1505,7 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   color: var(--ink); background: transparent;
   border: 1px solid transparent; border-image: var(--lab-gradient) 1;
 }
+
+/* a verdict, not a fix: the network saying nothing works right now */
+.echo--skip { border-left: 3px solid var(--red); }
+.echo--skip .action { color: var(--red); }

@@ -30,3 +30,5 @@
 .fleet .warn { color: var(--red); }
 .fleet .ok { color: var(--healthy); }
 .fleet h2 { font-family: var(--serif); font-weight: 400; font-size: 22px; margin: 0 0 12px; }
+
+.fleet h3 { font-size: 1.05rem; margin: 1.6rem 0 0.5rem; font-weight: 500; }

@@ -216,6 +216,29 @@
     list.innerHTML = entries
       .map(function (entry) {
         var tags = sourceTags(entry);
+        if (entry.verdict === "skip") {
+          return (
+            '<article class="echo echo--skip">' +
+            '<div class="echo-head">' +
+            '<span class="echo-target">' +
+            escapeHtml(entry.service) + " / " + escapeHtml(entry.operation) + tags +
+            "</span>" +
+            '<span class="echo-kind">' + escapeHtml(entry.error_type || "") + "</span>" +
+            "</div>" +
+            '<dl class="echo-grid">' +
+            "<div><dt>Verdict</dt>" +
+            '<dd class="action">skip</dd></div>' +
+            "<div><dt>Tried, failed</dt><dd>" + number(entry.attempts) +
+            '<span class="sub">' + escapeHtml(entry.warning || "") + "</span></dd></div>" +
+            "<div><dt>Confidence</dt><dd>" + entry.confidence.toFixed(2) +
+            '<span class="sub">that the next attempt fails too</span></dd></div>' +
+            "<div><dt>Independent reporters</dt><dd>" +
+            number(entry.unique_reporters) +
+            "</dd></div>" +
+            "</dl>" +
+            "</article>"
+          );
+        }
         return (
           '<article class="echo">' +
           '<div class="echo-head">' +
@@ -362,7 +385,10 @@
       wants.push(getJSON("/v1/services?limit=" + SERVICE_ROWS).then(renderServices));
     }
     if (el("recovery-list")) {
-      wants.push(getJSON("/v1/recovery-intelligence?limit=3").then(renderRecovery));
+      // the network page shows verdicts too: what nothing fixes is as much
+      // knowledge as what something does; the homepage keeps to fixes
+      var params = el("services-body") ? "?limit=6&include_skip=1" : "?limit=3";
+      wants.push(getJSON("/v1/recovery-intelligence" + params).then(renderRecovery));
     }
     return Promise.all(wants)
       .then(function () {

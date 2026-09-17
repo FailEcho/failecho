@@ -31,6 +31,12 @@
               td(c.attempts_per_failure == null ? "-" : c.attempts_per_failure.toFixed(2), "num"),
               td(c.recovered, "num"), td(c.asked, "num"), td(c.recommended, "num"), td(c.skipped || 0, "num")];
     }));
+    fill("fleet-builds", (d.recent_builds || []).map(function (b) {
+      var task = (b.task || "").replace(/ Run it\.$/, "");
+      return [td((b.at || "").replace("T", " ").slice(5, 16)), td(task.length > 90 ? task.slice(0, 88) + "…" : task),
+              td(b.vm_runs, "num"), td(b.local, "num " + (b.local ? "warn" : "")), td(b.shared, "num " + (b.shared ? "warn" : "")),
+              td(b.done ? "yes" : "no", b.done ? "ok" : "warn"), td(b.traffic + " / " + b.observed, "num"), td(b.seconds, "num")];
+    }));
     fill("fleet-real", (d.real_targets || []).map(function (r) {
       return [td(r.service), td(r.cohort), td(r.failures, "num"),
               td(r.attempts_per_failure == null ? "-" : r.attempts_per_failure.toFixed(2), "num"),
