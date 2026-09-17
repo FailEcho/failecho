@@ -264,7 +264,7 @@ class Builder:
 
     def _account(self, r, service_hint: str | None) -> dict:
         """Turn a task result into the tool's answer, and file the failure."""
-        out = {"exit": r.exit, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:],
+        out = {"exit": r.exit, "stdout": r.stdout[-1500:], "stderr": r.stderr[-1500:],
                "seconds": r.get("seconds"), "timed_out": bool(r.get("timed_out"))}
         if r.ok:
             self.last_ok = True

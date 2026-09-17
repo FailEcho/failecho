@@ -804,15 +804,29 @@ class Run:
         with Builder(self.reporter, LAB_PUBLIC_URL, self.fe) as b:
             answer = "(model budget exhausted)"
             for _ in range(10):
-                self.model_calls += 1
-                try:
-                    resp = chat()
-                except Exception as exc:  # noqa: BLE001
-                    et, code = classify(exc)
-                    self.failures.append({"service": p["host"], "operation": "chat.completions", "error_type": et,
-                                          "error_code": code, "asked": False, "recommended": None, "attempts": 1,
-                                          "recovered": False})
-                    answer = f"(provider failed: {et})"
+                # A builder's context grows with every program and traceback,
+                # and groq's free tier is 8,000 tokens a minute: the second or
+                # third call of a longer task meets a 429 as a matter of
+                # course. Both twins wait the minute out, up to three times --
+                # that is what any agent on that tier does -- and the wait is
+                # counted. The tool results are trimmed for the same reason.
+                resp = None
+                for attempt in range(4):
+                    self.model_calls += 1
+                    try:
+                        resp = chat()
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        et, code = classify(exc)
+                        if et == "rate_limit" and attempt < 3:
+                            self._sleep(25)
+                            continue
+                        self.failures.append({"service": p["host"], "operation": "chat.completions", "error_type": et,
+                                              "error_code": code, "asked": False, "recommended": None,
+                                              "attempts": attempt + 1, "recovered": False})
+                        answer = f"(provider failed: {et})"
+                        break
+                if resp is None:
                     break
                 msg = resp["choices"][0]["message"]
                 calls = msg.get("tool_calls") or []
@@ -840,7 +854,7 @@ class Run:
                         result, _ = self.call("fetch_doc", {"url": url}, fn=wrapped, service=host)
                     else:
                         result = json.dumps({"error": "unknown tool"})
-                    messages.append({"role": "tool", "tool_call_id": c["id"], "content": result[:12000]})
+                    messages.append({"role": "tool", "tool_call_id": c["id"], "content": result[:6000]})
             self.build = b.summary()
             self.build["task_done"] = b.last_ok and not answer.startswith("(")
             return answer
