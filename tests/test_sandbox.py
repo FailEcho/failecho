@@ -302,9 +302,14 @@ def test_the_scoreboard_has_a_build_ledger(tmp_path, monkeypatch):
     monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
     monkeypatch.setattr(F, "LAB_DB", "")
     state = {"runs": [
+        # a builder run with coverage entries AND a host-side failure: the
+        # coverage loop once reused the cohort's variable name and the next
+        # failure raised KeyError, stalling the scoreboard for an hour
         {"at": "t", "reporter": "fleet-build-ask", "path": "builder", "provider": "groq", "asks": True, "tool_calls": 3,
-         "failures": [], "build": {"vm_runs": 3, "local_failures": 2, "shared_failures": [{"service": "pypi.org", "error_type": "timeout"}],
-                                   "task_done": True, "sandbox": "ok"}},
+         "failures": [{"service": "docs.python.org", "operation": "fetch_doc", "error_type": "timeout", "error_code": None,
+                       "asked": True, "recommended": None, "attempts": 2, "recovered": True}],
+         "build": {"vm_runs": 3, "local_failures": 2, "shared_failures": [{"service": "pypi.org", "error_type": "timeout"}],
+                   "task_done": True, "sandbox": "ok", "coverage": [{"connections": 4, "observed": 4, "missed": False}]}},
         {"at": "t", "reporter": "fleet-build-blind", "path": "builder", "provider": "groq", "asks": False, "tool_calls": 1,
          "failures": [], "build": {"vm_runs": 0, "local_failures": 0, "shared_failures": [], "task_done": False,
                                    "sandbox": "unavailable: x"}},
@@ -314,7 +319,9 @@ def test_the_scoreboard_has_a_build_ledger(tmp_path, monkeypatch):
     build = {b["cohort"]: b for b in report["build"]}
     assert build["build / ask"] == {"cohort": "build / ask", "vm_runs": 3, "local": 2, "shared": 1, "tasks_done": 1,
                                     "sandbox_down": 0, "shared_share": pytest.approx(1 / 3),
-                                    "traffic_runs": 0, "unobserved_runs": 0, "connections": 0, "observed_calls": 0}
+                                    "traffic_runs": 1, "unobserved_runs": 0, "connections": 4, "observed_calls": 4}
+    ask = next(c for c in report["cohorts"] if c["cohort"] == "build / ask")
+    assert ask["failures"] == 1 and ask["recovered"] == 1
     assert build["build / blind"]["sandbox_down"] == 1 and build["build / blind"]["shared_share"] is None
     assert {c["cohort"] for c in report["cohorts"]} >= {"build / ask", "build / blind"}
 

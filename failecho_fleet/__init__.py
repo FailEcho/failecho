@@ -860,10 +860,10 @@ def write_report(state: dict) -> None:
             bl["vm_runs"] += b.get("vm_runs", 0); bl["local"] += b.get("local_failures", 0)
             bl["shared"] += len(b.get("shared_failures") or []); bl["tasks_done"] += int(bool(b.get("task_done")))
             bl["sandbox_down"] += int(b.get("sandbox", "ok") != "ok")
-            for c in b.get("coverage") or []:
-                bl["connections"] += c["connections"]; bl["observed_calls"] += c["observed"]
-                if c["connections"] > 0:
-                    bl["traffic_runs"] += 1; bl["unobserved_runs"] += int(c["missed"])
+            for cov in b.get("coverage") or []:
+                bl["connections"] += cov["connections"]; bl["observed_calls"] += cov["observed"]
+                if cov["connections"] > 0:
+                    bl["traffic_runs"] += 1; bl["unobserved_runs"] += int(cov["missed"])
         for f in r["failures"]:
             c["failures"] += 1; c["attempts"] += f["attempts"]; c["recovered"] += int(f["recovered"])
             c["asked"] += int(f["asked"]); c["recommended"] += int(bool(f["recommended"])); c["skipped"] += int(bool(f.get("skipped")))
