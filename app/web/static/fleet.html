@@ -133,11 +133,16 @@
   succeeding, or the build done. <em>Tokens</em>: what the provider billed, prompt plus completion. <em>Ask s</em>:
   time spent asking the network &mdash; the product's own overhead. <em>Wait s</em>: time slept on backoff or a reset.
   Recorded since 2026-09-17 10:30 UTC. Definitions in <code>docs/fleet-metrics.md</code>.</p>
+  <h3>Outcome</h3>
+  <table id="fleet-costs-outcome"><thead><tr>
+    <th>cohort</th><th class="num">runs</th><th class="num">completed</th>
+    <th class="num">calls ok first try</th><th class="num">recovered</th><th class="num">stayed failed</th><th class="num">re-called after skip</th>
+  </tr></thead><tbody></tbody></table>
+  <h3>Cost per run</h3>
   <table id="fleet-costs"><thead><tr>
-    <th>cohort</th><th class="num">runs</th><th class="num">completed</th><th class="num">tokens / run</th>
-    <th class="num">tokens / completed</th><th class="num">model calls / run</th><th class="num">tool calls / run</th>
-    <th class="num">s / run</th><th class="num">asks / run</th><th class="num">ask s / run</th><th class="num">wait s / run</th>
-    <th class="num">first try</th><th class="num">recovered</th><th class="num">failed</th><th class="num">model re-called after skip</th>
+    <th>cohort</th><th class="num">tokens</th><th class="num">tokens / completed</th>
+    <th class="num">model calls</th><th class="num">tool calls</th><th class="num">seconds</th>
+    <th class="num">asks</th><th class="num">asking, s</th><th class="num">waiting, s</th>
   </tr></thead><tbody></tbody></table>
 
   <h2>Builders: whose fault was it?</h2>

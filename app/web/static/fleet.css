@@ -24,6 +24,10 @@
 .fleet-card .v { font-family: var(--serif); font-size: 34px; margin-top: 4px; }
 .fleet-card .n { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; }
 .fleet table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 28px; }
+/* a wide table never widens the page: on a narrow screen it scrolls inside its own box */
+.fleet table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fleet table thead, .fleet table tbody { display: table; width: 100%; table-layout: auto; }
+.fleet th { white-space: nowrap; }
 .fleet th, .fleet td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .fleet th { font-weight: 500; color: var(--ink-3); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .fleet td.num, .fleet th.num { text-align: right; font-family: var(--mono); }
