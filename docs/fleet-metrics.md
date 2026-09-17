@@ -53,6 +53,15 @@ personas), `test / ask`, `test / blind` (httpbingo endpoints), `build / ask`,
 - `canary`, `onboard` — the install canary's and the onboarding test's own
   reports, carried through unchanged.
 
+## Quota
+
+A provider that answers a *daily* quota error (groq's TPD, Gemini's quota)
+is marked dead until midnight UTC; the scheduler skips its personas and runs
+the next live one in the same tick, and the onboarding test skips its
+models. `totals.providers_out_of_quota` and `totals.skipped_for_quota_today`
+say so on the scoreboard, so a quiet afternoon for one provider is
+explicable rather than a mystery. Since 2026-09-17 22:30.
+
 ## What to compare, and what not to
 
 Ask vs blind twins share workloads, providers and one IP address. Compare

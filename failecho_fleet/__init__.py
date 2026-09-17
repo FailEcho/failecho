@@ -459,6 +459,11 @@ class Run:
         #: because the advice did not reach the model in a form it acted on.
         self.last_skip: tuple[str, str] | None = None
         self.model_retries_after_skip = 0
+        #: Set when the provider says its *daily* budget is gone. The scheduler
+        #: then skips this provider's personas until midnight UTC instead of
+        #: spending two-minute slots on 429s (a third of an afternoon's slots,
+        #: on the first day).
+        self.provider_dead_today = False
         # this persona's ETag cache (URL -> etag, body), for conditional requests
         self._etag_path = os.path.join(STATE_DIR, f"etags-{reporter}.json")
         try:
@@ -651,6 +656,8 @@ class Run:
         rec = {"service": host, "operation": "chat.completions", "error_type": et, "error_code": code,
                "asked": False, "recommended": None, "attempts": 1, "recovered": False}
         self.failures.append(rec)
+        if et == "rate_limit" and _daily_quota(exc):
+            self.provider_dead_today = True
         if not self.asks:
             return None
         rec["asked"] = True
@@ -846,8 +853,9 @@ class Run:
                             # the alternate model has its own. Not the network's
                             # call -- a fact about the agent's own account -- so
                             # both twins do it alike.
-                            if _daily_quota(exc) and p.get("alt_models"):
-                                alts = [m for m in p["alt_models"] if m != state["model"]]
+                            if _daily_quota(exc):
+                                self.provider_dead_today = True
+                                alts = [m for m in p.get("alt_models", []) if m != state["model"]]
                                 if alts:
                                     state["model"] = alts[0]
                                     self.model = f"{self.model}->{alts[0]}"
@@ -1093,6 +1101,8 @@ def write_report(state: dict) -> None:
         "generated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "canary": canary, "onboard": onboard,
         "totals": {"runs": len(runs), "personas": len(by_persona),
+                   "providers_out_of_quota": sorted(state.get("provider_dead", {})),
+                   "skipped_for_quota_today": state.get("skipped_for_quota_today", 0),
                    "tool_calls": sum(r["tool_calls"] for r in runs),
                    "failures": sum(len(r["failures"]) for r in runs), **totals_db},
         "cohorts": [{"cohort": k, **v, "attempts_per_failure": (v["attempts"] / v["failures"]) if v["failures"] else None}
@@ -1128,11 +1138,30 @@ def main(argv: list[str] | None = None) -> int:
     state = _state()
     today = dt.date.today().isoformat()
     if state.get("day") != today:
-        state["day"], state["runs_today"] = today, 0
+        state["day"], state["runs_today"], state["skipped_for_quota_today"] = today, 0, 0
     if state["runs_today"] >= MAX_RUNS_PER_DAY:
         log("daily budget spent"); return 0
 
-    idx = int(argv[argv.index("--persona") + 1]) if "--persona" in argv else persona_index(state["next"])
+    dead = state.get("provider_dead", {})
+    dead = {k: v for k, v in dead.items() if v == today}
+    state["provider_dead"] = dead
+    if "--persona" in argv:
+        idx = int(argv[argv.index("--persona") + 1])
+    else:
+        # A provider whose daily quota is gone answers nothing until midnight
+        # UTC; its personas are skipped, not run, and the slot goes to the next
+        # live one. The skip is recorded so the day's counts stay explicable.
+        skipped = 0
+        idx = persona_index(state["next"])
+        while PERSONAS[idx][2] in dead and skipped < len(PERSONAS):
+            log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone until midnight UTC")
+            state["next"] += 1
+            state["skipped_for_quota_today"] = state.get("skipped_for_quota_today", 0) + 1
+            skipped += 1
+            idx = persona_index(state["next"])
+        if skipped >= len(PERSONAS):
+            _save(state)
+            log("every provider is out of daily quota; nothing to run this tick"); return 0
     reporter, path, provider, asks, workload = PERSONAS[idx]
     run = Run(reporter, path, provider, asks)
     started = time.monotonic()
@@ -1153,6 +1182,9 @@ def main(argv: list[str] | None = None) -> int:
         state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
     run.fe.flush(timeout=20)
     run.save_etags()
+    if provider and run.provider_dead_today:
+        state["provider_dead"][provider] = today
+        log(f"  {provider}: daily quota gone; its personas are skipped until midnight UTC")
     # Did the run do its job? A model run: a real answer, not a parenthesised
     # failure. A cron run: every call eventually succeeded. A builder: the
     # task came out done. The one number a user of an agent cares about.

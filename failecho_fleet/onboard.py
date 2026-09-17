@@ -320,7 +320,16 @@ def run_once(provider: str, model: str, scenario: str, project: str, fe: FailEch
                         break
                     except Exception as exc:  # noqa: BLE001
                         et, _ = classify(exc)
-                        if et == "rate_limit" and attempt < 3:
+                        body = ""
+                        if isinstance(exc, urllib.error.HTTPError):
+                            try:
+                                body = exc.read()[:400].decode(errors="ignore")
+                            except Exception:  # noqa: BLE001
+                                body = ""
+                        if et == "rate_limit" and ("per day" in body.lower() or "tpd" in body.lower()
+                                                   or "exceeded your current quota" in body.lower()):
+                            record["provider_dead_today"] = True
+                        elif et == "rate_limit" and attempt < 3:
                             record["waited"] = record.get("waited", 0) + 25
                             time.sleep(25)
                             continue
@@ -468,7 +477,19 @@ def main(argv: list[str] | None = None) -> int:
     if state.get("day") != today:
         state["day"], state["calls_today"] = today, {}
     n = state["next"]
-    idx = int(argv[argv.index("--model") + 1]) if "--model" in argv else n % len(MODELS)
+    dead = {k: v for k, v in state.get("provider_dead", {}).items() if v == today}
+    state["provider_dead"] = dead
+    if "--model" in argv:
+        idx = int(argv[argv.index("--model") + 1])
+    else:
+        idx = n % len(MODELS)
+        hops = 0
+        while MODELS[idx][0] in dead and hops < len(MODELS):
+            log(f"onboard: skip {MODELS[idx][1]}, {MODELS[idx][0]} daily quota gone until midnight UTC")
+            n += 1; state["next"] = n; hops += 1
+            idx = n % len(MODELS)
+        if hops >= len(MODELS):
+            _dump(STATE_PATH, state); log("onboard: every provider out of daily quota"); return 0
     provider, model = MODELS[idx]
     # eight models, five scenarios, five projects: coprime, so every model
     # meets every scenario across a cycle, on a rotating kind of project
@@ -484,6 +505,9 @@ def main(argv: list[str] | None = None) -> int:
     record = run_once(provider, model, scenario, project, fe)
     fe.flush(timeout=15)
     state["calls_today"][provider] = state["calls_today"].get(provider, 0) + record["model_calls"]
+    if record.get("provider_dead_today"):
+        state["provider_dead"][provider] = today
+        log(f"onboard: {provider} daily quota gone; skipped until midnight UTC")
     state["runs"].append(record)
     state["runs"] = state["runs"][-400:]
     state["next"] = idx + 1

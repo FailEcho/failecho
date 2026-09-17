@@ -20,7 +20,9 @@
     el("fleet-updated").textContent = "Updated " + (d.generated_at || "").replace("T", " ").slice(0, 19) + " UTC.";
     var cards = el("fleet-cards"); cards.innerHTML = "";
     var t = d.totals || {};
-    cards.appendChild(card("runs", t.runs || 0, (t.personas || 0) + " personas"));
+    var quota = (t.providers_out_of_quota || []).length ? ("; out of daily quota: " + t.providers_out_of_quota.join(", ") +
+      " (" + (t.skipped_for_quota_today || 0) + " slots skipped today)") : "";
+    cards.appendChild(card("runs", t.runs || 0, (t.personas || 0) + " personas" + quota));
     cards.appendChild(card("tool calls", t.tool_calls || 0, (t.failures || 0) + " failed"));
     cards.appendChild(card("repeated across reporters", t.cross_reporter_fingerprints || 0, "fingerprints with 2+ reporters"));
     cards.appendChild(card("cross-agent help", t.cross_agent_help || 0, "recommendations built on someone else's evidence"));

@@ -450,3 +450,46 @@ def test_the_versus_table_is_built_from_the_same_ledger(tmp_path, monkeypatch):
     assert rows["retry attempts per failure"]["ask"] == 1.0 and rows["retry attempts per failure"]["blind"] == 2.0
     assert rows["pointless retries avoided"]["ask"] == 2 and rows["pointless retries avoided"]["better"] == "ask"
     assert "tasks completed" not in rows, "the test endpoints have no task to complete"
+
+
+def test_a_dead_provider_is_noted_by_the_run():
+    run = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
+    run.ask = lambda *a, **k: {"recommendation": None, "recovery_actions": []}
+    e = http_error(429); e.failecho_body = "tokens per day (TPD): Limit 200000"
+    assert run.recover_provider(F.PROVIDERS["groq"], e, Chat(0), {"model": "m", "tools": True}) is None
+    assert run.provider_dead_today is True
+    run2 = F.Run("fleet-decor-blind-a", "decorator", "groq", False)
+    e2 = http_error(429); e2.failecho_body = "tokens per minute (TPM): Limit 8000"
+    run2.recover_provider(F.PROVIDERS["groq"], e2, Chat(0), {"model": "m", "tools": True})
+    assert run2.provider_dead_today is False
+
+
+def test_the_scheduler_skips_a_dead_providers_personas(tmp_path, monkeypatch):
+    """A provider whose daily quota is gone answers nothing until midnight; a
+    third of an afternoon's two-minute slots went to its 429s on day one."""
+    import datetime as dt
+    import json
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(F, "assert_lab_only", lambda: None)
+    monkeypatch.setattr(F.signal, "signal", lambda *a, **k: None)
+    today = dt.date.today().isoformat()
+    names = [p[0] for p in F.PERSONAS]
+    # position the round-robin on a groq persona, with groq dead today
+    start = names.index("fleet-decor-ask-a")
+    (tmp_path / "state.json").write_text(json.dumps({"next": start, "runs": [], "day": today, "runs_today": 0,
+                                                     "provider_dead": {"groq": today}}))
+    ran = []
+    monkeypatch.setattr(F.Run, "run_model", lambda self, *a, **k: ran.append(self.reporter) or "(no provider key)")
+    monkeypatch.setattr(F.Run, "run_cron", lambda self, calls: ran.append(self.reporter) or "cron")
+    monkeypatch.setattr(F.Run, "run_build", lambda self, *a, **k: ran.append(self.reporter) or "(no provider key)")
+    monkeypatch.setattr(F.FailEcho, "flush", lambda self, timeout=5.0: True)
+    assert F.main([]) == 0
+    assert ran and F.PERSONAS[names.index(ran[0])][2] != "groq", f"ran {ran[0]} on a dead provider"
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["skipped_for_quota_today"] >= 1 and state["next"] > start + 1
+    report = json.loads((tmp_path / "fleet.json").read_text())
+    assert report["totals"]["providers_out_of_quota"] == ["groq"]
