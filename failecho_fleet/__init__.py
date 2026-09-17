@@ -58,7 +58,7 @@ LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or N
 PROVIDERS = {
     "groq": {"host": "api.groq.com", "url": "https://api.groq.com/openai/v1/chat/completions",
              "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 700,
-             "alt_models": ["llama-3.3-70b-versatile"]},
+             "alt_models": ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]},
     "gemini": {"host": "generativelanguage.googleapis.com",
                "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                "key": os.environ.get("GEMINI_API_KEY"), "models": ["gemini-flash-latest"], "daily_cap": 400,

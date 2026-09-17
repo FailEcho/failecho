@@ -108,8 +108,8 @@ def test_switch_model_changes_the_model_for_the_rest_of_the_run():
     run, reported = run_for("fleet-decor-ask-a", True, advice)
     state = {"model": "openai/gpt-oss-20b", "tools": True}
     resp = run.recover_provider(F.PROVIDERS["groq"], http_error(400), Chat(0), state)
-    assert resp is not None and state["model"] == "llama-3.3-70b-versatile"
-    assert run.model.endswith("->llama-3.3-70b-versatile") and reported == [("switch_model", True)]
+    assert resp is not None and state["model"] == "openai/gpt-oss-120b"
+    assert run.model.endswith("->openai/gpt-oss-120b") and reported == [("switch_model", True)]
 
 
 def test_retry_without_tool_choice_drops_the_tools():
@@ -404,8 +404,8 @@ def test_a_builder_switches_model_on_a_daily_quota(monkeypatch):
     monkeypatch.setattr(B, "available", lambda: "no kvm in tests")
     run = F.Run("fleet-build-ask", "builder", "groq", True)
     answer = run.run_build("say done", run_index=0)
-    assert answer == "done" and calls == ["openai/gpt-oss-20b", "llama-3.3-70b-versatile"]
-    assert run.model.endswith("->llama-3.3-70b-versatile") and run.tokens_prompt == 5
+    assert answer == "done" and calls == ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+    assert run.model.endswith("->openai/gpt-oss-120b") and run.tokens_prompt == 5
 
 
 def test_a_model_recalling_the_same_tool_after_a_skip_is_counted():
