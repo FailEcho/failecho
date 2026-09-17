@@ -1748,3 +1748,17 @@ def test_a_touched_card_does_not_change_the_column_count_on_a_phone():
     assert phone.count("grid-template-columns: minmax(0, 1fr);") >= 2, "rest and hover both one column"
     tablet_rule = css.index("@media (max-width: 1080px) {\n  .ways:has(.way:hover)")
     assert css.index(anchor) > tablet_rule, "phone rule must come after the tablet one"
+
+
+def test_the_lab_strip_stays_above_the_menu_scrim():
+    """With a menu open, everything below the bar dims behind a fixed scrim.
+    The lab strip sits above the bar, not below it, and dimmed it read as an
+    empty band the bar had slid down from. It stacks over the scrim."""
+    strip = CSS[CSS.index(".lab-banner {"):]
+    strip = strip[:strip.index("}")]
+    scrim = CSS[CSS.index(".scrim {"):]
+    scrim = scrim[:scrim.index("}")]
+    import re
+    z_strip = int(re.search(r"z-index:\s*(\d+)", strip).group(1))
+    z_scrim = int(re.search(r"z-index:\s*(\d+)", scrim).group(1))
+    assert "position: relative" in strip and z_strip > z_scrim

@@ -1496,6 +1496,10 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   font: 11.5px var(--sans); letter-spacing: .05em; text-transform: uppercase;
   color: var(--ink-2); background: #07070b;
   border-bottom: 2px solid transparent; border-image: var(--lab-gradient) 1;
+  /* above the scrim (z 9) that opens with a menu: the strip sits over the
+     bar in the flow, and under the scrim it went dark and read as an empty
+     band above a bar that had moved down */
+  position: relative; z-index: 12;
 }
 .lab-banner a { color: var(--ink); text-decoration: underline; }
 /* in the nav, not beside the brand, which moves when the bar opens */
