@@ -373,3 +373,36 @@ def test_a_daily_quota_is_recognised_and_a_minute_wait_is_not():
     assert not F._daily_quota(e2)
     e3 = http_error(429); e3.failecho_body = "You exceeded your current quota, please check your plan"
     assert F._daily_quota(e3)
+
+
+def test_a_builder_switches_model_on_a_daily_quota(monkeypatch):
+    """The first version referenced a `state` the builder loop did not have and
+    every builder run died with NameError the moment groq's daily quota hit."""
+    import io
+    import json as _json
+
+    calls = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+
+        def __exit__(self, *a): return False
+
+    def urlopen(req, timeout):
+        body = _json.loads(req.data)
+        calls.append(body["model"])
+        if len(calls) == 1:
+            e = http_error(429)
+            e.read = lambda: b'{"error":{"message":"Rate limit reached on tokens per day (TPD): Limit 200000"}}'
+            raise e
+        return Resp(_json.dumps({"choices": [{"message": {"content": "done"}}], "usage": {"prompt_tokens": 5, "completion_tokens": 1}}).encode())
+
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    monkeypatch.setitem(F.PROVIDERS["groq"], "key", "k")
+    import failecho_fleet.builder as B
+    monkeypatch.setattr(B, "available", lambda: "no kvm in tests")
+    run = F.Run("fleet-build-ask", "builder", "groq", True)
+    answer = run.run_build("say done", run_index=0)
+    assert answer == "done" and calls == ["openai/gpt-oss-20b", "llama-3.3-70b-versatile"]
+    assert run.model.endswith("->llama-3.3-70b-versatile") and run.tokens_prompt == 5

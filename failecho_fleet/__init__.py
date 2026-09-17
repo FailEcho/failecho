@@ -795,9 +795,10 @@ class Run:
         model = p["models"][run_index % len(p["models"])]
         self.model = model
         messages = [{"role": "system", "content": BUILDER_PROMPT}, {"role": "user", "content": task}]
+        state = {"model": model}
 
         def chat():
-            body = {"model": model, "messages": messages, "tools": BUILDER_SCHEMAS, "tool_choice": "auto",
+            body = {"model": state["model"], "messages": messages, "tools": BUILDER_SCHEMAS, "tool_choice": "auto",
                     "max_tokens": 2500}
             req = urllib.request.Request(p["url"], data=json.dumps(body).encode(), method="POST",
                                          headers={"Content-Type": "application/json", "User-Agent": UA,
