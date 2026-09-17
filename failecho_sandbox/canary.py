@@ -38,6 +38,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import sys
+import signal
 import time
 
 from . import Sandbox, SandboxError, available
@@ -196,6 +198,9 @@ def run_canary(vm: Sandbox, lab_url: str) -> list[dict]:
 
 
 def main() -> int:
+    # a stop mid-run (systemd restarting a unit we depend on) must still close
+    # the VM: SIGTERM becomes SystemExit so context managers unwind
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     if not LAB_URL:
         print("canary: CANARY_LAB_URL not set; refusing to guess an endpoint")
         return 2

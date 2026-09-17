@@ -133,8 +133,9 @@ class Sandbox:
         os.makedirs(RUN_DIR, exist_ok=True)
         self._lock = open(os.path.join(RUN_DIR, "lock"), "w")
         fcntl.flock(self._lock, fcntl.LOCK_EX)   # one VM at a time, one tap
-        os.makedirs(self.dir, mode=0o700)
         os.makedirs(SCRATCH_DIR, exist_ok=True)
+        _sweep()
+        os.makedirs(self.dir, mode=0o700)
         started = time.monotonic()
         scratch = os.path.join(SCRATCH_DIR, f"{self.id}.ext4")
         self._scratch = scratch
@@ -262,6 +263,41 @@ class Sandbox:
             return json.loads(_recv_exact(s, n))
         finally:
             s.close()
+
+
+#: A VM never lives longer than its unit's start timeout. Anything older
+#: than this under the run or scratch directories was left by a run that
+#: was killed before close() -- a systemd stop mid-run did exactly that on
+#: the first night -- and is swept before the next boot, under the lock.
+ORPHAN_AGE = 1800
+
+
+def _sweep(now: float | None = None) -> list[str]:
+    now = time.time() if now is None else now
+    removed = []
+    for root, kind in ((RUN_DIR, "dir"), (SCRATCH_DIR, "file")):
+        try:
+            names = os.listdir(root)
+        except OSError:
+            continue
+        for name in names:
+            path = os.path.join(root, name)
+            try:
+                st = os.stat(path)
+            except OSError:
+                continue
+            if now - st.st_mtime < ORPHAN_AGE:
+                continue
+            if kind == "dir" and os.path.isdir(path) and len(name) == 12:
+                shutil.rmtree(path, ignore_errors=True)
+                removed.append(path)
+            elif kind == "file" and name.endswith(".ext4"):
+                try:
+                    os.unlink(path)
+                    removed.append(path)
+                except OSError:
+                    pass
+    return removed
 
 
 def _recv_exact(s: socket.socket, n: int) -> bytes:

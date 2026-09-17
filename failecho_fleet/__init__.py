@@ -27,6 +27,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import signal
 import sqlite3
 import sys
 import time
@@ -637,6 +638,9 @@ def write_report(state: dict) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # a stop mid-run (systemd restarting a unit we depend on) must still close
+    # the VM: SIGTERM becomes SystemExit so context managers unwind
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     argv = sys.argv[1:] if argv is None else argv
     assert_lab_only()
     state = _state()

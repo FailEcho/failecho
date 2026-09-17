@@ -5,7 +5,9 @@
 Description=FailEcho install canary (clean-VM install of every package)
 After=network-online.target failecho-sandbox-proxy.service failecho-lab.service
 Wants=network-online.target failecho-sandbox-proxy.service
-Requires=failecho-lab.service
+# Wants, not Requires: a lab restart (every re-pin) must not kill a run
+# in flight; a run whose reports fail is a run that reports failed=N.
+Wants=failecho-lab.service
 
 [Service]
 Type=oneshot

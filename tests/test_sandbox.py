@@ -516,3 +516,43 @@ def test_a_joined_state_directory_is_split():
         del os.environ["STATE_DIRECTORY"]
         importlib.reload(canary)
         importlib.reload(failecho_fleet)
+
+
+def test_orphaned_vm_files_are_swept_before_the_next_boot(tmp_path, monkeypatch):
+    """A systemd stop mid-run (the lab restarting on a re-pin) killed a run
+    before close(); its run directory and 512 MiB scratch stayed behind.
+    Anything older than a unit's lifetime is removed before the next boot."""
+    import os
+    import time
+
+    import failecho_sandbox as sb
+
+    run, scratch = tmp_path / "run", tmp_path / "scratch"
+    run.mkdir(); scratch.mkdir()
+    monkeypatch.setattr(sb, "RUN_DIR", str(run))
+    monkeypatch.setattr(sb, "SCRATCH_DIR", str(scratch))
+    old = time.time() - sb.ORPHAN_AGE - 60
+    (run / "41305061ffb0").mkdir(); (run / "41305061ffb0" / "v.sock").write_text("")
+    (scratch / "41305061ffb0.ext4").write_bytes(b"\0" * 16)
+    (run / "lock").write_text("")                      # never swept
+    (run / "fresh0123abcd").mkdir()                    # a live VM's dir: too young
+    (scratch / "fresh0123abcd.ext4").write_bytes(b"")
+    for p in (run / "41305061ffb0", scratch / "41305061ffb0.ext4"):
+        os.utime(p, (old, old))
+    removed = sb._sweep()
+    assert sorted(os.path.basename(p) for p in removed) == ["41305061ffb0", "41305061ffb0.ext4"]
+    assert (run / "lock").exists() and (run / "fresh0123abcd").exists() and (scratch / "fresh0123abcd.ext4").exists()
+
+
+def test_the_units_want_the_lab_rather_than_require_it():
+    """Requires= made every lab restart -- every re-pin -- stop a run in
+    flight; the first night's log shows the kill and the orphaned VM."""
+    for name in ("failecho-fleet", "failecho-onboard", "failecho-canary"):
+        unit = (ROOT / "deploy" / f"{name}.service").read_text()
+        assert "Requires=failecho-lab.service" not in unit and "Wants=failecho-lab.service" in unit, name
+
+
+def test_sigterm_unwinds_the_vm():
+    for f in ("failecho_fleet/__init__.py", "failecho_fleet/onboard.py", "failecho_sandbox/canary.py"):
+        src = (ROOT / f).read_text()
+        assert "signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))" in src, f
