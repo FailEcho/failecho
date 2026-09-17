@@ -620,6 +620,15 @@ is normal. Only a fixed set of attribute keys is read -- never `url.full`,
 headers, bodies, `exception.*`, `gen_ai.*`, events or links. Traces carry no
 recovery outcomes, so what fixed a failure still needs `/v1/outcome`.
 
+## What a check costs you
+
+Over MCP, `check_tool_failure` answers with the compact record by default --
+known, status, the recommendation, the top recovery actions, the counts,
+pooled or neighbouring evidence when there is any -- about a quarter of the
+tokens of the full record. Pass `verbose: true` for everything (timestamps,
+per-window rates, effective counts). REST always returns the full record.
+Asking should cost less than the retry it saves; if it does not, say so.
+
 ## One failure, several names
 
 Agents name the same call differently: `GET /repos` from a wrapper that sees

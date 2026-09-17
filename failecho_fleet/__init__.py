@@ -588,8 +588,9 @@ class Run:
                 # that askers retried anyway and tied with blind)
                 rec["skipped"] = True
                 rec["seconds"] = round(time.monotonic() - started, 2)
-                return json.dumps({"error": et, "code": code, "skipped": True,
-                                   "why": "the network reports every recent recovery attempt failed"}), False
+                # the same shape blind gets, plus one flag: a fair comparison
+                # does not hand the asking side a longer prompt
+                return json.dumps({"error": et, "code": code, "skipped": True}), False
             if action is None:
                 rec["seconds"] = round(time.monotonic() - started, 2)
                 return json.dumps({"error": et, "code": code}), False

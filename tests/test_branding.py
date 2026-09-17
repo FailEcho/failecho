@@ -308,7 +308,7 @@ def test_response_fields_are_unrenamed(client):
     intel = mcp_call(
         client,
         "check_tool_failure",
-        {"service": "x", "operation": "y", "error_type": "z"},
+        {"service": "x", "operation": "y", "error_type": "z", "verbose": True},
     )
     for field in (
         "fingerprint",
@@ -320,6 +320,10 @@ def test_response_fields_are_unrenamed(client):
         "known",
     ):
         assert field in intel
+    # and the compact default keeps the names an agent acts on
+    compact = mcp_call(client, "check_tool_failure", {"service": "x", "operation": "y", "error_type": "z"})
+    for field in ("fingerprint", "recommendation", "recovery_actions", "observations", "status", "known"):
+        assert field in compact
 
 
 def test_python_client_alias_is_additive():

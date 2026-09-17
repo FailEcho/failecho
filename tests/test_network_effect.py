@@ -46,6 +46,7 @@ def report_failure(client, repository: str, reporter_id: str) -> dict:
 
 
 def check(client, repository: str) -> dict:
+    # the full record: these tests read the fields the compact default drops
     return mcp_call(
         client,
         "check_tool_failure",
@@ -57,6 +58,7 @@ def check(client, repository: str) -> dict:
             "error_type": "validation_error",
             "error_code": "422",
             "error_message": failure_message(repository),
+            "verbose": True,
         },
     )
 

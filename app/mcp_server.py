@@ -31,6 +31,7 @@ from app.core.config import (
 from app.core.privacy import hash_reporter_id
 from app.core.ratelimit import check_write_limit, client_key
 from app.core.service import (
+    compact_query,
     operator_token_from,
     query_intelligence,
     record_observation,
@@ -248,6 +249,16 @@ async def check_tool_failure(
             max_length=200,
         ),
     ] = None,
+    verbose: Annotated[
+        bool,
+        Field(
+            description=(
+                "Return the full record (timestamps, per-window rates, effective "
+                "counts, every action). Default false: the compact answer an "
+                "agent acts on, about a quarter of the tokens."
+            )
+        ),
+    ] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Query FailEcho for live intelligence about a failure."""
@@ -267,7 +278,7 @@ async def check_tool_failure(
             reporter_hash=_reporter_from(ctx, reporter_id),
             source=_source_from(ctx),
         )
-    return result.model_dump()
+    return result.model_dump() if verbose else compact_query(result)
 
 
 # ---------------------------------------------------------------------------

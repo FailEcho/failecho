@@ -334,6 +334,63 @@ async def _includes_demo_data(session: AsyncSession, fingerprint: str) -> bool:
     return bool(archived)
 
 
+def compact_query(result: QueryResponse) -> dict:
+    """The answer an agent acts on, and nothing it does not.
+
+    The full QueryResponse is ~540 tokens pretty-printed, and over MCP every
+    one of them lands in a model's context on every check. An agent that
+    pays more tokens to ask than it saves by asking stops asking. This keeps
+    what changes a decision -- known, status, the recommendation, the top
+    recovery actions, the counts, pooled or neighbouring evidence when
+    present, an unverified-success note when it applies -- and drops the
+    rest: timestamps, per-window rates, effective counts, demo flags. The
+    full record is one `verbose: true` away over MCP and is always what REST
+    returns. Nulls and empty lists are left out.
+    """
+    top = sorted(result.recovery_actions, key=lambda a: -a.attempts)[:3]
+    out: dict = {
+        "known": result.known,
+        "status": result.status,
+        "fingerprint": result.fingerprint,
+        "observations": {"total": result.observations.total, "last_1h": result.observations.last_1h,
+                         "unique_reporters": result.observations.unique_reporters},
+        "recovery_actions": [
+            {k: v for k, v in {"action": a.action, "successes": a.successes, "attempts": a.attempts,
+                               "decaying": a.decaying or None}.items() if v is not None}
+            for a in top
+        ],
+        "recommendation": None,
+    }
+    r = result.recommendation
+    if r is not None:
+        rec = {"action": r.action, "confidence": r.confidence}
+        if r.scope != "operation":
+            rec["scope"] = r.scope
+        if r.from_other_agents is not None:
+            rec["from_other_agents"] = r.from_other_agents
+        if r.decaying:
+            rec["decaying"] = True
+        if r.warning:
+            rec["warning"] = r.warning
+        out["recommendation"] = rec
+    if result.service_evidence and result.service_evidence.recovery_actions:
+        pooled = sorted(result.service_evidence.recovery_actions, key=lambda a: -a.attempts)[:2]
+        out["service_evidence"] = {"operations": result.service_evidence.operations,
+                                   "recovery_actions": [{"action": a.action, "successes": a.successes, "attempts": a.attempts} for a in pooled]}
+    if result.related_failures:
+        out["related_failures"] = [
+            {"error_type": n.error_type, "error_code": n.error_code,
+             "fixed_by": [{"action": f.action, "successes": f.successes, "attempts": f.attempts} for f in n.fixed_by[:2]],
+             "shares_a_fix_with_you": n.shares_a_fix_with_you}
+            for n in result.related_failures[:2]
+        ]
+    ev = result.success_evidence
+    if ev is not None and not ev.verified:
+        out["success_evidence"] = {"verified": False, "successes_total": ev.successes_total,
+                                   "failures_total": ev.failures_total, "write_source": ev.write_source}
+    return out
+
+
 def _action_stats(a) -> RecoveryActionStats:
     return RecoveryActionStats(
         action=a.action,

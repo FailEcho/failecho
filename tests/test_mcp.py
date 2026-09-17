@@ -98,7 +98,7 @@ def test_check_known_failure_returns_intelligence(client):
     assert result["recovery_actions"][0]["action"] == "refresh_schema"
     assert result["recommendation"]["action"] == "refresh_schema"
     assert 0 < result["recommendation"]["confidence"] < 1
-    assert result["demo_data_included"] is False
+    assert "demo_data_included" not in result, "the compact default carries no demo flag; verbose does"
 
 
 def test_report_failure_through_mcp(client):
@@ -179,7 +179,7 @@ def test_mcp_and_rest_agree_on_fingerprints(client):
     via_mcp = mcp_call(
         client,
         "check_tool_failure",
-        {**GITHUB, "error_message": "Repository 424242 was not found"},
+        {**GITHUB, "error_message": "Repository 424242 was not found", "verbose": True},
     )
     assert via_mcp["fingerprint"] == rest["fingerprint"]
     assert via_mcp["normalized_error"] == rest["normalized_error"]
@@ -255,3 +255,35 @@ def test_post_still_works_after_the_get_guard(client):
     assert r.status_code == 200
     names = {t["name"] for t in r.json()["result"]["tools"]}
     assert names == {"check_tool_failure", "report_tool_failure", "report_tool_success", "report_recovery_outcome"}
+
+
+def test_check_answers_compactly_by_default_and_fully_on_request(client):
+    """Over MCP every token of the answer lands in a model's context on every
+    check. The default keeps what changes a decision; verbose is the record."""
+    import json
+
+    from tests.conftest import insert_recovery, mcp_call, observe
+
+    fp = observe(client)["fingerprint"]
+    for i in range(6):
+        insert_recovery(fingerprint=fp, action="refresh_schema", successful=True, minutes_ago=10 + i, reporter_hash=f"r{i % 3}")
+    args = {"service": "github-mcp", "operation": "create_issue", "version": "2.8.1", "schema_hash": "a817ce",
+            "error_type": "validation_error", "error_code": "422", "error_message": "Repository 918272 was not found"}
+    compact = mcp_call(client, "check_tool_failure", args)
+    full = mcp_call(client, "check_tool_failure", {**args, "verbose": True})
+    assert compact["known"] and compact["recommendation"]["action"] == "refresh_schema"
+    assert compact["recovery_actions"][0] == {"action": "refresh_schema", "successes": 6, "attempts": 6}
+    assert set(compact) <= {"known", "status", "fingerprint", "observations", "recovery_actions", "recommendation",
+                            "service_evidence", "related_failures", "success_evidence"}
+    for gone in ("first_seen", "failure_rate", "evidence_sources", "demo_data_included", "looks_new"):
+        assert gone not in compact and gone in full
+    assert "effective_attempts" not in compact["recovery_actions"][0] and "effective_attempts" in full["recovery_actions"][0]
+    assert len(json.dumps(compact)) < 0.5 * len(json.dumps(full))
+
+
+def test_check_unknown_stays_honest_in_the_compact_shape(client):
+    from tests.conftest import mcp_call
+
+    result = mcp_call(client, "check_tool_failure", {"service": "x.example", "operation": "op", "error_type": "timeout"})
+    assert result["known"] is False and result["recommendation"] is None and result["recovery_actions"] == []
+    assert result["observations"]["total"] == 0
