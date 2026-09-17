@@ -195,7 +195,9 @@ def test_demo_agents_never_count_as_real_adoption(client):
     stats = client.get("/v1/stats").json()
     assert stats["observations_total"] > 0
     assert stats["demo_agent_observations"] == 0, "TestClient sends no demo header"
-    assert stats["real_observations_total"] == stats["observations_total"]
+    # Every row is `agent`; single-service explorers inside a minute are
+    # below the adoption threshold, so they are held as sparse, not lost.
+    assert stats["real_observations_total"] + stats["sparse_observations"] == stats["observations_total"]
 
     # Now the same traffic, self-labelled as a demo agent.
     demo = client.post(

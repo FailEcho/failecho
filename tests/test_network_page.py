@@ -121,7 +121,13 @@ def test_real_active_incidents_counts_real_rows_only(client):
     from tests.conftest import insert_observation, observe
 
     insert_observation(source="synthetic", fingerprint="f" * 32, minutes_ago=0)
-    observe(client)  # real
+    # a real reporter past the adoption threshold, then its live failure
+    from app.core.privacy import hash_reporter_id
+
+    for i, service in enumerate(("api.github.com", "api.github.com", "pypi.org", "pypi.org", "api.github.com")):
+        insert_observation(service=service, operation="op", reporter_hash=hash_reporter_id("real-agent"),
+                           minutes_ago=60 - i * 5, fingerprint=None)
+    observe(client, headers={"X-Reporter-ID": "real-agent"})  # real
     stats = client.get("/v1/stats").json()
     assert stats["real_active_failures"] == 1
     assert stats["active_failures"] == 2

@@ -285,7 +285,7 @@ def test_a_failure_is_reported_as_metadata_only(server, run_hook):
     assert code == 0 and out == ""
 
     after = get(server, "/v1/stats")
-    assert after["real_observations_total"] == before["real_observations_total"] + 1
+    assert after["observations_total"] == before["observations_total"] + 1
     known = ask(server, "merge_pr", "validation_error", "422")
     assert known["known"] is True
     assert known["normalized_error"] is None  # the error text never left
@@ -340,9 +340,11 @@ def test_a_retry_that_fails_again_is_a_failed_recovery(server, run_hook):
 
 
 def test_successes_are_counted(server, run_hook):
-    before = get(server, "/v1/stats")["real_successes_24h"]
+    before = get(server, "/v1/stats")["observations_total"]
     run_hook(success(tool="mcp__linear__create_issue"))
-    assert get(server, "/v1/stats")["real_successes_24h"] == before + 1
+    # one hook run is one reporter with one row: stored, below the adoption
+    # threshold, so it lands in observations_total and sparse_observations
+    assert get(server, "/v1/stats")["observations_total"] == before + 1
 
 
 def test_the_operator_token_labels_reports_first_party(server, run_hook):

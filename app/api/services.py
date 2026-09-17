@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Query
-from sqlalchemy import case, func, select
+from sqlalchemy import case, false, func, select
 
 from app.api.deps import SessionDep
 from app.core.cache import dashboard_cache
 from datetime import timedelta
 
+from app.core.adoption import established_reporters, threshold_description
 from app.core.clock import ago, isoformat_z, utcnow
 from app.core.config import (
     COUNTER_CROSS_AGENT_HELP,
@@ -21,6 +22,7 @@ from app.core.config import (
     SOURCE_FIRST_PARTY,
     SOURCE_SYNTHETIC,
     settings,
+    SOURCE_AGENT_SPARSE,
 )
 from app.core.intelligence import (
     WindowCounts,
@@ -211,6 +213,18 @@ async def stats(session: SessionDep) -> NetworkStats:
                     func.sum(
                         case(
                             (
+                                HourlyStat.source == SOURCE_AGENT_SPARSE,
+                                HourlyStat.success_count + HourlyStat.failure_count,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("sparse"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
                                 HourlyStat.source == SOURCE_FIRST_PARTY,
                                 HourlyStat.success_count + HourlyStat.failure_count,
                             ),
@@ -228,6 +242,7 @@ async def stats(session: SessionDep) -> NetworkStats:
     # Counted directly, never as "total minus the other kinds": a subtraction
     # silently turns every newly added source into real adoption.
     archived_real = int(archived_row.real or 0)
+    archived_sparse = int(archived_row.sparse or 0)
     archived_first_party = int(archived_row.first_party or 0)
 
     long_row = (
@@ -252,11 +267,18 @@ async def stats(session: SessionDep) -> NetworkStats:
         )
     ).scalar_one()
 
+    # ---- real telemetry: `agent` rows from established reporters ----------
+    # Every agent row is evidence; only rows from reporters that have met the
+    # adoption threshold (app/core/adoption.py) are counted as adoption here.
+    established = await established_reporters(session)
+    is_established = (Observation.source == SOURCE_AGENT,
+                      Observation.reporter_hash.in_(sorted(established)) if established else false())
+
     real_active_failures = (
         await session.execute(
             select(func.count(func.distinct(Observation.fingerprint))).where(
                 Observation.fingerprint.is_not(None),
-                Observation.source == SOURCE_AGENT,
+                *is_established,
                 Observation.created_at >= ago(settings.window_short_seconds),
             )
         )
@@ -291,12 +313,13 @@ async def stats(session: SessionDep) -> NetworkStats:
         )
     ).scalar_one()
 
-    # ---- real telemetry, kept strictly separate from demo data -----------
     real_total = (
-        await session.execute(
-            select(func.count()).where(Observation.source == SOURCE_AGENT)
-        )
+        await session.execute(select(func.count()).where(*is_established))
     ).scalar_one()
+    agent_rows = (
+        await session.execute(select(func.count()).where(Observation.source == SOURCE_AGENT))
+    ).scalar_one()
+    sparse_total = int(agent_rows or 0) - int(real_total or 0) + archived_sparse
 
     real_day = (
         await session.execute(
@@ -309,11 +332,23 @@ async def stats(session: SessionDep) -> NetworkStats:
                     0,
                 ).label("failures"),
             ).where(
-                Observation.source == SOURCE_AGENT,
+                *is_established,
                 Observation.created_at >= ago(DAY_SECONDS),
             )
         )
     ).one()
+
+    # Loop closure is about everyone who reports, established or not: an
+    # outcome is filed against a failure regardless of who counts as adoption.
+    agent_failures_day = (
+        await session.execute(
+            select(func.count()).where(
+                Observation.source == SOURCE_AGENT,
+                Observation.outcome == OUTCOME_FAILURE,
+                Observation.created_at >= ago(DAY_SECONDS),
+            )
+        )
+    ).scalar_one()
 
     real_recoveries_day = (
         await session.execute(
@@ -371,13 +406,15 @@ async def stats(session: SessionDep) -> NetworkStats:
             round(known_hits / total_queries, 4) if total_queries else None
         ),
         recovery_outcome_ratio_24h=(
-            round(int(real_recoveries_day or 0) / real_failures, 4)
-            if real_failures
+            round(int(real_recoveries_day or 0) / int(agent_failures_day), 4)
+            if agent_failures_day
             else None
         ),
         cross_agent_help_24h=counters.get(COUNTER_CROSS_AGENT_HELP, 0),
         real_reporters_24h=int(real_day.reporters or 0),
         real_failure_fingerprints=int(real_day.fingerprints or 0),
+        sparse_observations=sparse_total,
+        adoption_threshold=threshold_description(),
         archived_observations=archived_total,
         generated_at=isoformat_z(utcnow()) or "",
     ))

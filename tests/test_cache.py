@@ -69,7 +69,7 @@ def test_dashboard_endpoints_are_served_from_cache(client, warm_cache):
     observe(client)
 
     first = client.get("/v1/stats").json()
-    assert first["real_observations_24h"] == 1
+    assert first["observations_total"] == 1
 
     # A write lands, but within the TTL the cached snapshot is still served.
     observe(client)
@@ -78,7 +78,7 @@ def test_dashboard_endpoints_are_served_from_cache(client, warm_cache):
 
     warm_cache.clear()
     third = client.get("/v1/stats").json()
-    assert third["real_observations_24h"] == 2, "fresh read sees both writes"
+    assert third["observations_total"] == 2, "fresh read sees both writes"
 
 
 def test_each_endpoint_caches_independently(client, warm_cache):

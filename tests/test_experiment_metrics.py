@@ -51,13 +51,25 @@ def test_hit_rate_is_null_before_any_query(client):
 
 
 def test_successes_and_failures_are_counted_separately(client):
+    """From a reporter past the adoption threshold; a thinner one's rows are
+    held under sparse_observations (tests/test_adoption_threshold.py)."""
+    from app.core.privacy import hash_reporter_id
+    from tests.conftest import insert_observation
+
+    for i, service in enumerate(("api.github.com", "pypi.org")):
+        insert_observation(service=service, operation="op", reporter_hash=hash_reporter_id("agent-x"),
+                           minutes_ago=30 + i * 15, fingerprint=None, outcome="success")
+    headers = {"X-Reporter-ID": "agent-x"}
     for _ in range(3):
-        observe(client)
+        observe(client, headers=headers)
     for _ in range(7):
         observe(client, outcome="success", error_type=None, error_code=None,
-                error_message=None)
+                error_message=None, headers=headers)
 
     stats = client.get("/v1/stats").json()
+    assert stats["real_observations_24h"] == 12
+    stats["real_successes_24h"] -= 2
+    stats["real_observations_24h"] -= 2
     assert stats["real_failures_24h"] == 3
     assert stats["real_successes_24h"] == 7
     assert stats["real_observations_24h"] == 10

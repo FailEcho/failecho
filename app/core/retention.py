@@ -23,11 +23,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import case, delete, false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.adoption import established_reporters
 from app.core.clock import utcnow
-from app.core.config import OUTCOME_FAILURE, OUTCOME_SUCCESS, settings
+from app.core.config import (
+    OUTCOME_FAILURE,
+    OUTCOME_SUCCESS,
+    SOURCE_AGENT,
+    SOURCE_AGENT_SPARSE,
+    settings,
+)
 from app.core.intelligence import _cap
 from app.db.database import hour_bucket_expr
 from app.db.models import (
@@ -154,6 +161,17 @@ async def aggregate_and_prune(
     report = PruneReport(cutoff=cutoff, dry_run=dry_run)
 
     # ---- observations ----------------------------------------------------
+    # Archives keep a source label and lose reporter identity, so this is the
+    # last moment an `agent` row's reporter can be judged against the adoption
+    # threshold. Rows from established reporters archive as `agent`; the rest
+    # -- anonymous, or too thin while the raw rows lived -- as `agent_sparse`.
+    # Both stay evidence; only the label the front page counts changes.
+    established = await established_reporters(session)
+    archive_source = case(
+        (Observation.source != SOURCE_AGENT, Observation.source),
+        (Observation.reporter_hash.in_(sorted(established)) if established else false(), SOURCE_AGENT),
+        else_=SOURCE_AGENT_SPARSE,
+    )
     bucket = hour_bucket_expr(Observation.created_at)
     rows = (
         await session.execute(
@@ -164,7 +182,7 @@ async def aggregate_and_prune(
                 Observation.version,
                 Observation.schema_hash,
                 Observation.fingerprint,
-                Observation.source,
+                archive_source.label("source"),
                 func.coalesce(
                     func.sum(case((Observation.outcome == OUTCOME_SUCCESS, 1), else_=0)),
                     0,
@@ -185,7 +203,7 @@ async def aggregate_and_prune(
                 Observation.version,
                 Observation.schema_hash,
                 Observation.fingerprint,
-                Observation.source,
+                archive_source,
             )
         )
     ).all()

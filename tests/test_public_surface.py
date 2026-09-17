@@ -19,21 +19,32 @@ ROOT = Path(__file__).resolve().parents[1]
 # ---------------------------------------------------------------------------
 
 
+def established(reporter: str) -> None:
+    """An `agent` reporter past the adoption threshold: five observations,
+    two services, spread over twenty minutes (tests/test_adoption_threshold.py).
+    Stored under the hash the API would give `reporter`, so later API reports
+    with X-Reporter-ID: reporter belong to the same, established, reporter."""
+    from app.core.privacy import hash_reporter_id
+
+    for i, service in enumerate(("api.github.com", "api.github.com", "pypi.org", "pypi.org", "api.github.com")):
+        insert_observation(service=service, operation="op", reporter_hash=hash_reporter_id(reporter),
+                           minutes_ago=60 - i * 5, fingerprint=None)
+
+
 def test_real_and_synthetic_counts_never_mix(client):
-    for _ in range(3):
-        observe(client, headers={"X-Reporter-ID": "real-agent"})
+    established("real-agent")
     for _ in range(7):
         insert_observation(source="synthetic", reporter_hash="demo-1")
 
     stats = client.get("/v1/stats").json()
-    assert stats["observations_total"] == 10
-    assert stats["real_observations_total"] == 3
-    assert stats["real_observations_24h"] == 3
+    assert stats["observations_total"] == 12
+    assert stats["real_observations_total"] == 5
+    assert stats["real_observations_24h"] == 5
     assert stats["real_reporters_24h"] == 1
     assert stats["synthetic_observations"] == 7
     assert stats["demo_data"] is True
     # The headline real number must never include demo rows.
-    assert stats["real_observations_total"] + stats["synthetic_observations"] == 10
+    assert stats["real_observations_total"] + stats["synthetic_observations"] == 12
 
 
 def test_no_demo_data_means_no_banner(client):
@@ -41,12 +52,14 @@ def test_no_demo_data_means_no_banner(client):
     stats = client.get("/v1/stats").json()
     assert stats["demo_data"] is False
     assert stats["synthetic_observations"] == 0
-    assert stats["real_observations_total"] == 1
+    # one anonymous report is real, kept, and not yet adoption
+    assert stats["real_observations_total"] == 0 and stats["sparse_observations"] == 1
 
 
 def test_real_fingerprint_count_is_real_only(client):
-    observe(client)
-    observe(client, error_message="Permission denied", error_code="403")
+    established("real-agent")
+    observe(client, headers={"X-Reporter-ID": "real-agent"})
+    observe(client, error_message="Permission denied", error_code="403", headers={"X-Reporter-ID": "real-agent"})
     insert_observation(source="synthetic", fingerprint="f" * 32)
 
     stats = client.get("/v1/stats").json()
@@ -233,7 +246,7 @@ def test_reporter_kind_header_labels_demo_traffic(client, rows):
 
     stats = client.get("/v1/stats").json()
     assert stats["demo_agent_observations"] == 1
-    assert stats["real_observations_total"] == 1
+    assert stats["real_observations_total"] == 0 and stats["sparse_observations"] == 1
     assert stats["observations_total"] == 2
     assert stats["demo_data"] is True
 

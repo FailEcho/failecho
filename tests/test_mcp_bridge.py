@@ -122,7 +122,7 @@ def test_relay_presents_itself_as_the_network(upstream):
 
 def test_relayed_reports_land_in_the_shared_network(upstream):
     relay = warmed(f"{upstream}/mcp")
-    before = stats(upstream)["real_observations_total"]
+    before = stats(upstream)["observations_total"]
 
     async def report(session):
         return await session.call_tool(
@@ -146,7 +146,7 @@ def test_relayed_reports_land_in_the_shared_network(upstream):
     assert seen["known"] is True
     assert seen["observations"]["total"] >= 1
     assert seen["fingerprint"] == reported.structured_content["fingerprint"]
-    assert stats(upstream)["real_observations_total"] == before + 1
+    assert stats(upstream)["observations_total"] == before + 1
 
 
 def test_the_demo_label_travels_through_the_relay(upstream):

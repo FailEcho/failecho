@@ -285,7 +285,11 @@ up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
       <div class="statcard">
         <p class="statcard-label">Independent agents</p>
         <p class="statcard-value" id="stat-real-24h">—</p>
-        <p class="statcard-body">observations from independent agents today. The network is new, and this number is not dressed up.</p>
+        <p class="statcard-body">observations from independent agents today. The network is new, and this number is not dressed up.
+          A reporter is counted once it has <span id="adopt-min-obs">5</span> observations across
+          <span id="adopt-min-svc">2</span> services over <span id="adopt-min-span">10 minutes</span>; a
+          scanner that posts junk under fresh ids does not move it.<span id="sparse-note" hidden> <span id="stat-sparse">0</span>
+          thinner or anonymous rows are stored and used as evidence, not counted here.</span></p>
       </div>
       <div class="statcard">
         <p class="statcard-label">Our own agents</p>

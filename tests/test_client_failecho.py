@@ -87,7 +87,7 @@ def test_success_is_reported_and_result_returned(client):
     assert outcome.result == {"id": 7}
     assert bridge.paths() == ["/v1/observe"]
     assert bridge.sent[0][1]["outcome"] == "success"
-    assert client.get("/v1/stats").json()["real_successes_24h"] == 1
+    assert client.get("/v1/stats").json()["sparse_observations"] == 1
 
 
 def test_failure_reports_then_queries_and_returns_a_decision(client):
@@ -143,8 +143,9 @@ def test_all_three_telemetry_kinds_are_captured(client):
         run(echo.observe_tool_call(service="github-mcp", operation="create_issue", call=fixed))
 
     stats = client.get("/v1/stats").json()
-    assert stats["real_failures_24h"] == 1
-    assert stats["real_successes_24h"] == 1
+    # two rows from one new reporter: stored, evidence, below the adoption
+    # threshold -- so held as sparse, while the loop-closure ratio counts them
+    assert stats["sparse_observations"] == 2 and stats["real_observations_24h"] == 0
     assert stats["recovery_outcomes_total"] == 1
     assert stats["recovery_outcome_ratio_24h"] == 1.0
 

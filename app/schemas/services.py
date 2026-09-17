@@ -104,7 +104,28 @@ class NetworkStats(BaseModel):
         ),
     )
     real_observations_total: int = Field(
-        default=0, description="Observations reported by real agents, all time."
+        default=0,
+        description=(
+            "Observations from independent agents, all time -- reporters that "
+            "have met the adoption threshold (see adoption_threshold). Rows "
+            "from thinner reporters are stored and used as evidence but counted "
+            "under sparse_observations instead."
+        ),
+    )
+    sparse_observations: int = Field(
+        default=0,
+        description=(
+            "Anonymous or thin `agent` rows: real, kept, used as evidence, not "
+            "yet counted as adoption because their reporter has not met the "
+            "threshold. One scanner cannot write the adoption number."
+        ),
+    )
+    adoption_threshold: dict = Field(
+        default_factory=dict,
+        description=(
+            "What a reporter must show before it counts as an independent "
+            "agent: min_observations, min_services, min_span_seconds."
+        ),
     )
     real_observations_24h: int = Field(
         default=0, description="Observations reported by real agents in the last 24h."

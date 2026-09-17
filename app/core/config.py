@@ -35,6 +35,11 @@ SOURCE_AGENT = "agent"
 SOURCE_FIRST_PARTY = "first_party"
 SOURCE_DEMO_AGENT = "demo_agent"
 SOURCE_SYNTHETIC = "synthetic"
+#: Archive label for `agent` rows whose reporter never became established
+#: (see Settings.adoption_min_*) while the raw rows were kept. Real rows,
+#: still evidence, never adoption. Only ever written by retention; a live
+#: row is always `agent` and is judged against the threshold when counted.
+SOURCE_AGENT_SPARSE = "agent_sparse"
 
 # Illustrative sources: demo data, never field evidence and never adoption.
 # first_party is deliberately absent -- it is field evidence, just not
@@ -194,6 +199,21 @@ class Settings:
     # made (demo and anonymous data must keep working) but carry less weight.
     min_unique_reporters_for_full_confidence: int = field(
         default_factory=lambda: _env_int("FIN_MIN_UNIQUE_REPORTERS", 3)
+    )
+    # Adoption threshold. A reporter counts as an independent agent on the
+    # front page only once it has this many observations, across this many
+    # distinct services, spanning at least this long. Below that its rows are
+    # stored and used as evidence but held out of the adoption numbers. Set
+    # after a fuzzer put eleven rows under eight fresh reporter ids on the
+    # front page as "11 independent observations" (2026-09-16).
+    adoption_min_observations: int = field(
+        default_factory=lambda: _env_int("FIN_ADOPTION_MIN_OBSERVATIONS", 5)
+    )
+    adoption_min_services: int = field(
+        default_factory=lambda: _env_int("FIN_ADOPTION_MIN_SERVICES", 2)
+    )
+    adoption_min_span_seconds: int = field(
+        default_factory=lambda: _env_int("FIN_ADOPTION_MIN_SPAN_SECONDS", 600)
     )
     # Multiplier applied to confidence when reporter diversity is unproven.
     low_diversity_confidence_factor: float = field(
