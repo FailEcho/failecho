@@ -284,3 +284,37 @@ def test_a_plain_403_from_github_is_still_explored_as_a_limit(monkeypatch):
     run, reported = tool_run("fleet-explore-c", True, {"fingerprint": "fp", "recommendation": None, "recovery_actions": []}, gh)
     _, ok = run.call("github_repo", {"owner": "a", "repo": "b"})
     assert ok and run.failures[-1]["error_type"] == "auth_error" and reported == [("wait_until_reset", True)]
+
+
+def test_twins_trade_places_every_cycle():
+    """Whoever runs second on GitHub's hourly budget meets the 403s the first
+    one used it up for: gh-ask 0 failures, gh-blind 47, identical work. On
+    odd cycles the twins swap, so over two cycles each side runs second once."""
+    n = len(F.PERSONAS)
+    names = [p[0] for p in F.PERSONAS]
+    a, b = names.index("fleet-gh-ask"), names.index("fleet-gh-blind")
+    assert F.persona_index(a) == a and F.persona_index(b) == b                 # cycle 0
+    assert F.persona_index(n + a) == b and F.persona_index(n + b) == a         # cycle 1
+    assert F.persona_index(2 * n + a) == a                                     # cycle 2
+    # everyone still runs exactly once per cycle
+    for cycle in range(3):
+        assert sorted(F.persona_index(cycle * n + i) for i in range(n)) == list(range(n))
+    # explorers have no twin and never move
+    e = names.index("fleet-explore-c")
+    assert F.persona_index(n + e) == e
+
+
+def test_the_proof_table_starts_when_the_order_became_fair(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    f = {"service": "api.github.com", "operation": "github_repo", "error_type": "rate_limit", "error_code": "403",
+         "asked": False, "recommended": None, "attempts": 2, "recovered": False, "seconds": 3.0}
+    state = {"runs": [
+        {"at": "2026-09-17T05:00:00+00:00", "reporter": "fleet-gh-blind", "path": "decorator", "provider": None, "asks": False, "tool_calls": 1, "failures": [f]},
+        {"at": "2026-09-17T07:00:00+00:00", "reporter": "fleet-gh-blind", "path": "decorator", "provider": None, "asks": False, "tool_calls": 1, "failures": [f]},
+    ]}
+    F.write_report(state)
+    import json
+    rows = json.loads((tmp_path / "fleet.json").read_text())["real_targets"]
+    assert len(rows) == 1 and rows[0]["failures"] == 1

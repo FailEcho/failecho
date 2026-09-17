@@ -210,6 +210,16 @@ limit, from a per-persona ETag cache). Explorers discover, askers inherit,
 blind keeps its default. The scoreboard's "real services, real limits"
 table is the proof table: real services, controlled twins only.
 
+## Correction: the twins ran in a fixed order, 2026-09-17 06:30 UTC
+
+Every ask twin ran before its blind twin, two minutes apart. On GitHub's
+hourly budget the one that runs second meets the 403s the first one used
+the budget up for: `fleet-gh-ask` 0 failures, `fleet-gh-blind` 47,
+identical work, 31 runs each. That would have made the proof table lie in
+our favour. From 06:30 the twins trade places every cycle, and the
+real-services table counts only runs from then on. The numbers before it
+stay in the state file and in this note.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

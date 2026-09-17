@@ -197,6 +197,35 @@ PERSONAS = [
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind"}
 EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c"}
 
+#: Ask/blind twins by reporter. The round-robin ran every ask twin before
+#: its blind twin, two minutes apart, and on GitHub's hourly budget the twin
+#: that runs second meets the 403s the first one used up the budget for:
+#: gh-ask 0 failures, gh-blind 47, identical work. Since 2026-09-17 06:30 UTC
+#: twins swap order every cycle, and the proof table counts only runs from
+#: then on.
+TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fleet-decor-blind-b"),
+         ("fleet-auto-ask-a", "fleet-auto-blind-a"), ("fleet-auto-ask-b", "fleet-auto-blind-b"),
+         ("fleet-mcp-ask", "fleet-mcp-blind"), ("fleet-cron-a", "fleet-cron-b"),
+         ("fleet-test-ask", "fleet-test-blind"), ("fleet-gh-ask", "fleet-gh-blind"),
+         ("fleet-build-ask", "fleet-build-blind"), ("fleet-limits-ask", "fleet-limits-blind")]
+FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
+
+
+def persona_index(position: int) -> int:
+    """Which persona runs at this position of the round-robin: on odd cycles
+    the twins trade places, so neither side always runs second."""
+    n = len(PERSONAS)
+    idx, cycle = position % n, position // n
+    if cycle % 2 == 0:
+        return idx
+    names = [p[0] for p in PERSONAS]
+    swap = {}
+    for a, b in TWINS:
+        if a in names and b in names:
+            swap[names.index(a)] = names.index(b)
+            swap[names.index(b)] = names.index(a)
+    return swap.get(idx, idx)
+
 #: What an agent can do about a tool call failing, beyond the default.
 #: Explorers try these in order, skipping what the network has evidence for.
 TOOL_ACTIONS = {
@@ -848,6 +877,8 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS:
             continue
+        if r["at"] < FAIR_ORDER_SINCE:
+            continue   # before the twins alternated order; see TWINS
         side = "ask" if r["asks"] else "blind"
         for f in r["failures"]:
             if f["operation"] == "chat.completions" or f["service"] == "httpbingo.org":
@@ -939,7 +970,7 @@ def main(argv: list[str] | None = None) -> int:
     if state["runs_today"] >= MAX_RUNS_PER_DAY:
         log("daily budget spent"); return 0
 
-    idx = int(argv[argv.index("--persona") + 1]) if "--persona" in argv else state["next"] % len(PERSONAS)
+    idx = int(argv[argv.index("--persona") + 1]) if "--persona" in argv else persona_index(state["next"])
     reporter, path, provider, asks, workload = PERSONAS[idx]
     run = Run(reporter, path, provider, asks)
     started = time.monotonic()
@@ -970,7 +1001,7 @@ def main(argv: list[str] | None = None) -> int:
         record["answer"] = answer[:200]
     state["runs"].append(record)
     state["runs"] = state["runs"][-5000:]
-    state["next"] = idx + 1
+    state["next"] = state["next"] + 1 if "--persona" not in argv else idx + 1
     state["runs_today"] += 1
     _save(state)
     write_report(state)

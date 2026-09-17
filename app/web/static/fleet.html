@@ -99,7 +99,9 @@
   controlled twins &mdash; no test endpoints, no model providers, no explorers. Each failure is a documented policy
   being enforced on agents behind one address: GitHub's 403 at 60 an hour, crates.io's 429 above one a second,
   Stack Exchange's 300 a day. The asking side spends what the network says is worth spending &mdash; a reset wait,
-  a conditional request that a 304 does not count against the limit &mdash; and skips the rest.</p>
+  a conditional request that a 304 does not count against the limit &mdash; and skips the rest. Counted from
+  2026-09-17 06:30 UTC, when the twins started trading places each cycle: before that every ask twin ran first
+  and its blind twin met the rate limits it had used up.</p>
   <table id="fleet-real"><thead><tr>
     <th>service</th><th>cohort</th><th class="num">failures</th><th class="num">attempts / failure</th>
     <th class="num">recovered</th><th class="num">skipped</th><th class="num">seconds lost</th>
