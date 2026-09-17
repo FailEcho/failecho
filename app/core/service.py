@@ -31,6 +31,7 @@ from app.core.config import (
 from app.core.aliases import canonical_service
 from app.core.fingerprint import compute_fingerprint
 from app.core.intelligence import (
+    ACTION_SKIP,
     bump_counter,
     classify_status,
     fingerprint_stats,
@@ -473,6 +474,14 @@ async def query_intelligence(
                     f"({chosen[0].recent_successes}/{chosen[0].recent_attempts}). "
                     "The root cause may have changed while the error shape stayed the same."
                     if chosen[0].decaying
+                    else (
+                        "Nothing tried in the last "
+                        f"{settings.decay_window_seconds // 3600}h has worked: "
+                        + ", ".join(f"{a.action} 0/{a.recent_attempts}" for a in actions if a.recent_attempts)
+                        + ". Do not spend another attempt on this; fail fast or escalate, or try "
+                        "something not on this list and report the outcome."
+                    )
+                    if chosen[0].action == ACTION_SKIP
                     else None
                 ),
             )

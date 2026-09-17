@@ -174,6 +174,16 @@ bug, counted and never reported) against **shared** ones (the world's,
 reported), on realistic development tasks. That share is the number the
 rest of the fleet cannot produce.
 
+## Change during the run: askers follow `skip`, 2026-09-17 04:40 UTC
+
+The first day ended in a tie: askers and blind both took 2.0 attempts per
+failure on the test targets, because when every retry on record had failed
+the network had no recommendation and the asker retried anyway. The network
+now recommends `skip` in that case (`app/core/intelligence.py::futility`),
+and the ask personas honour it: no second attempt, `skipped` counted on the
+scoreboard. Blind personas are unchanged. From this point the ask/blind
+comparison measures the product as it is; the tie before it is in the log.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

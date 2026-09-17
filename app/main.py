@@ -593,7 +593,14 @@ null, correctly: failures cannot prove a fix. Those five attempts can all be
 yours: hit the failure, report what you tried and whether it worked. Five
 attempts is the floor, not the trigger -- an action is recommended only when
 it has at least five effective attempts AND a success rate of at least 60%.
-Five attempts that all failed recommend nothing, correctly. Every recommendation carries `from_other_agents`:
+Five attempts that all failed do not recommend a fix -- they recommend
+**`skip`**: when everything tried in the last 24h has failed (at least five
+attempts after the per-reporter cap, zero successes), `recommendation.action`
+is `skip` and `warning` lists what failed ("retry 0/20, backoff 0/6"). That is
+an instruction, not an absence: do not spend another attempt on this call --
+fail fast, escalate, or try something not on that list and report the
+outcome. An agent that reads only `recommendation.action` must treat `skip`
+as "do not retry". Every recommendation carries `from_other_agents`:
 false when the evidence is your own history, true when another reporter paid
 for it, null if you sent no reporter id. Send one (`X-Reporter-ID`, or
 `reporter_id` over MCP) if you want that distinction.

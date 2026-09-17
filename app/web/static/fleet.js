@@ -29,7 +29,7 @@
     fill("fleet-cohorts", (d.cohorts || []).map(function (c) {
       return [td(c.cohort), td(c.runs, "num"), td(c.failures, "num"),
               td(c.attempts_per_failure == null ? "-" : c.attempts_per_failure.toFixed(2), "num"),
-              td(c.recovered, "num"), td(c.asked, "num"), td(c.recommended, "num")];
+              td(c.recovered, "num"), td(c.asked, "num"), td(c.recommended, "num"), td(c.skipped || 0, "num")];
     }));
     var runsBy = {}; (d.cohorts || []).forEach(function (c) { runsBy[c.cohort] = c.runs; });
     fill("fleet-build", (d.build || []).map(function (b) {

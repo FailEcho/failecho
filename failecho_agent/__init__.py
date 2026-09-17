@@ -220,7 +220,7 @@ class Agent:
         """What to try after a failure. A recommendation from the network wins;
         otherwise the same rules the docs give any agent."""
         rec = (advice or {}).get("recommendation") or {}
-        if rec.get("action") in ("backoff", "retry", "refresh_schema"):
+        if rec.get("action") in ("backoff", "retry", "refresh_schema", "skip"):
             return rec["action"]
         return {"rate_limit": "backoff", "server_error": "retry", "timeout": "retry",
                 "connection_error": "retry"}.get(error_type)
@@ -241,6 +241,9 @@ class Agent:
             action = self.decide(error_type, self.ask_network(service, name, error_type, code))
             if action is None:
                 return json.dumps({"error": error_type, "code": code, "retried": False}), False
+            if action == "skip":
+                # the network: every recent recovery attempt failed; do not spend another
+                return json.dumps({"error": error_type, "code": code, "retried": False, "skipped": True}), False
             if action == "backoff":
                 time.sleep(random.uniform(2, 6))
             # refresh_schema means nothing for a REST call; treat as a plain retry

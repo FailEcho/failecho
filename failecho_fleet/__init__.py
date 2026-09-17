@@ -370,9 +370,16 @@ class Run:
                     r = advice.get("recommendation") or {}
                     if r.get("action"):
                         rec["recommended"] = r["action"]
-                        action = r["action"] if r["action"] in ("backoff", "retry", "refresh_schema") else action
+                        action = r["action"] if r["action"] in ("backoff", "retry", "refresh_schema", "skip") else action
                         if r.get("decaying"):
                             rec["recommended"] += " (decaying)"
+            if action == "skip":
+                # the network says nothing tried recently has worked: an asker
+                # spends no second attempt (since 2026-09-17 04:40 UTC; before
+                # that askers retried anyway and tied with blind)
+                rec["skipped"] = True
+                return json.dumps({"error": et, "code": code, "skipped": True,
+                                   "why": "the network reports every recent recovery attempt failed"}), False
             if action is None:
                 return json.dumps({"error": et, "code": code}), False
             if action == "backoff":
@@ -559,7 +566,7 @@ def _save(state: dict) -> None:
 def write_report(state: dict) -> None:
     runs = state["runs"]
     by_persona: dict[str, dict] = {}
-    blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0}
+    blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0, "skipped": 0}
     cohorts = {"real / ask": blank(), "real / blind": blank(), "test / ask": blank(), "test / blind": blank(),
                "build / ask": blank(), "build / blind": blank()}
     # the builders' second ledger: what happened inside the VM
@@ -580,7 +587,7 @@ def write_report(state: dict) -> None:
             bl["sandbox_down"] += int(b.get("sandbox", "ok") != "ok")
         for f in r["failures"]:
             c["failures"] += 1; c["attempts"] += f["attempts"]; c["recovered"] += int(f["recovered"])
-            c["asked"] += int(f["asked"]); c["recommended"] += int(bool(f["recommended"]))
+            c["asked"] += int(f["asked"]); c["recommended"] += int(bool(f["recommended"])); c["skipped"] += int(bool(f.get("skipped")))
 
     repeats, naming, totals_db = [], [], {}
     if LAB_DB and os.path.exists(LAB_DB):

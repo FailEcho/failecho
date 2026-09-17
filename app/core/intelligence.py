@@ -690,10 +690,68 @@ def recommend(actions: list[RecoveryAction]) -> tuple[RecoveryAction, float] | N
         and a.effective_success_rate >= settings.min_recovery_success_rate
     ]
     if not eligible:
-        return None
+        return futility(actions)
     best = max(eligible, key=lambda a: (a.evidence_score, a.capped_attempts))
     confidence = min(best.evidence_score, settings.max_confidence)
     return best, confidence
+
+
+#: The recommendation the network gives when the evidence says nothing works.
+ACTION_SKIP = "skip"
+
+
+def futility(actions: list[RecoveryAction]) -> tuple[RecoveryAction, float] | None:
+    """Recommend ``skip`` when everything tried recently has failed.
+
+    The network's first job was to say what worked. Its second is to say
+    when nothing does: an endpoint that has answered 503 to every retry for
+    the last day is one where the next retry is a wasted attempt and, for a
+    timeout, wasted seconds. Without this, an agent that asks is told "retry:
+    0 of 20 worked" and then retries anyway, exactly like one that never
+    asked -- which is what the lab's ask/blind tie showed.
+
+    Eligibility, all inside the decay window (default 24h) so a fix that
+    landed yesterday is not skipped today:
+
+    * at least ``min_recovery_attempts`` attempts, summed across actions and
+      counted after the per-reporter cap (one reporter's retry storm is not
+      a verdict)
+    * zero successes among them
+
+    Confidence is the Wilson lower bound on the *failure* rate, discounted
+    for low reporter diversity the same way a positive recommendation is.
+    The action is a real instruction -- do not spend another attempt on
+    this; fail fast, escalate, or try something not on the list and report
+    the outcome -- and it is reported as a recommendation so a client that
+    only reads ``recommendation.action`` sees it.
+    """
+    recent = [a for a in actions if a.recent_attempts > 0]
+    if not recent:
+        return None
+    attempts = sum(a.recent_attempts for a in recent)
+    successes = sum(a.recent_successes for a in recent)
+    # capped attempts are lifetime; scale the recent sum by the lifetime cap
+    # ratio so a single reporter repeating itself cannot reach the floor
+    lifetime_attempts = sum(a.attempts for a in recent) or 1
+    capped_lifetime = sum(a.capped_attempts for a in recent)
+    capped_recent = int(attempts * capped_lifetime / lifetime_attempts)
+    if successes > 0 or capped_recent < settings.min_recovery_attempts:
+        return None
+    hashes = frozenset().union(*(a.reporter_hashes for a in recent))
+    reporters = max(len(hashes), max(a.unique_reporters for a in recent))
+    verdict = RecoveryAction(
+        action=ACTION_SKIP,
+        attempts=attempts,
+        successes=0,
+        effective_attempts=capped_recent,
+        effective_successes=0,
+        unique_reporters=reporters,
+        recent_attempts=attempts,
+        recent_successes=0,
+        reporter_hashes=hashes,
+    )
+    confidence = wilson_lower_bound(capped_recent, capped_recent) * verdict.diversity_factor
+    return verdict, min(confidence, settings.max_confidence)
 
 
 # ---------------------------------------------------------------------------

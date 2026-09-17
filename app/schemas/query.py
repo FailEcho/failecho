@@ -188,7 +188,14 @@ class RelatedFailure(BaseModel):
 class Recommendation(BaseModel):
     """The single action the network would try next, when evidence allows."""
 
-    action: str = Field(description="Recommended recovery action.")
+    action: str = Field(
+        description=(
+            "Recommended recovery action. Usually something that worked for "
+            "others (retry, backoff, refresh_schema, ...). The value 'skip' is "
+            "the network saying nothing anyone tried recently has worked: do "
+            "not spend another attempt, fail fast or escalate -- see warning."
+        )
+    )
     confidence: float = Field(
         description=(
             "Wilson lower bound, capped below 1.0. Not a model output -- "

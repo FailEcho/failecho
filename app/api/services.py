@@ -25,6 +25,7 @@ from app.core.config import (
     SOURCE_AGENT_SPARSE,
 )
 from app.core.intelligence import (
+    ACTION_SKIP,
     WindowCounts,
     classify_status,
     recommend,
@@ -474,7 +475,9 @@ async def recovery_intelligence(
             continue
         actions = await recovery_actions(session, fingerprint)
         chosen = recommend(actions)
-        if chosen is None:
+        # this panel lists fixes; "nothing works, skip" is a query answer,
+        # not a fix to advertise on the homepage
+        if chosen is None or chosen[0].action == ACTION_SKIP:
             continue
         action, confidence = chosen
 
