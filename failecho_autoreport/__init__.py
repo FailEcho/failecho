@@ -68,7 +68,7 @@ __all__ = ["FailEcho", "classify"]
 class _NoFingerprint(Exception):
     """An outcome arrived with no failure to attach it to."""
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 DEFAULT_ENDPOINT = "https://failecho.com"
 
@@ -175,6 +175,9 @@ class FailEcho:
         #: to ones the program reported through recovered().
         self.inferred = 0
         self.sent_outcomes = 0
+        #: Failure observations queued, so a summary can say how many of the
+        #: calls it reported were failures without re-reading the queue.
+        self.queued_failures = 0
         #: wrap() is best-effort by design, so it counts what it managed.
         #: wrapped == 0 after wrapping a tool list means nothing is reporting.
         self.wrapped = 0
@@ -358,6 +361,8 @@ class FailEcho:
         try:
             self._queue.put_nowait((kind, body))
             self.queued += 1
+            if kind == "observe" and body.get("outcome") == "failure":
+                self.queued_failures += 1
         except queue.Full:
             self.dropped += 1
             return

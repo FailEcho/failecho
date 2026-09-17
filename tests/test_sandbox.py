@@ -556,3 +556,24 @@ def test_sigterm_unwinds_the_vm():
     for f in ("failecho_fleet/__init__.py", "failecho_fleet/onboard.py", "failecho_sandbox/canary.py"):
         src = (ROOT / f).read_text()
         assert "signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))" in src, f
+
+
+def test_absorbed_failures_inside_a_successful_run_are_filed_as_shared():
+    """A retry helper that eats three 503s and exits 0 is three shared
+    failures the exit code will never show. The in-guest wrapper reported
+    them to the lab; the ledger counts them from its summary line."""
+    from failecho_sandbox import Result
+
+    b = builder.Builder("fleet-build-ask", "https://lab.example", fe=None)
+    b.venv_ready = True
+
+    class VM:
+        def run(self, argv, files=None, timeout=60, env=None, as_root=False):
+            return Result(exit=0, stdout="ok\n",
+                          stderr="[failecho] observing outbound HTTP via urllib; reporting to https://lab.example\n"
+                                 "[failecho] reported 13 calls (3 failures), 3 recovery outcomes inferred\n", seconds=2.0)
+
+    b.vm = VM()
+    out = b.run_python("print('ok')")
+    assert out["shared_failures_absorbed"] == 3 and len(b.shared_failures) == 3 and b.local_failures == 0
+    assert "[failecho]" not in out["stderr"] and b.last_ok

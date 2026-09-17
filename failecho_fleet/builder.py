@@ -130,6 +130,8 @@ SHARED_SIGNALS = (
 #: pip and uv name the index in their errors; the traceback of a script does
 #: not name the host, and we do not go looking in the model's code for it.
 INDEX_HOSTS = re.compile(r"(files\.pythonhosted\.org|pypi\.org)")
+#: The in-guest wrapper's summary line, e.g. "reported 12 calls (3 failures)".
+_SUMMARY_FAILURES = re.compile(r"reported \d+ calls? \((\d+) failures?\)")
 
 
 #: The fence refusing a host is the sandbox's doing, not the world's. A
@@ -277,9 +279,20 @@ class Builder:
         self.vm_runs += 1
         r = self.vm.run(["/work/venv/bin/python", "-m", "failecho_autoreport", "run", filename],
                         files={filename: code}, timeout=90, env=self.guest_env)
-        # the wrapper's own two lines are not the program's output
+        # The wrapper's own lines are not the program's output -- but its
+        # summary says how many of the program's calls failed, and a failure
+        # the program's own retry absorbed is a shared failure the run's exit
+        # code will never show. Those are filed here, from the summary.
+        summary = next((l for l in r.stderr.splitlines() if l.startswith("[failecho] reported")), "")
+        m = _SUMMARY_FAILURES.search(summary)
+        absorbed = int(m.group(1)) if m else 0
         r["stderr"] = "\n".join(l for l in r.stderr.splitlines() if not l.startswith("[failecho]"))
-        return {"step": "run", **self._account(r, None)}
+        out = {"step": "run", **self._account(r, None)}
+        if absorbed and r.ok:
+            # reported to the lab from inside the VM already; counted here only
+            self.shared_failures.extend({"service": "(inside the run)", "error_type": "reported"} for _ in range(absorbed))
+            out["shared_failures_absorbed"] = absorbed
+        return out
 
     def resolve_python_deps(self, requirements: list) -> dict:
         if self.vm is None:

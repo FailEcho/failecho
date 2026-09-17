@@ -94,6 +94,7 @@ def _run(argv: list[str]) -> int:
         fe.flush(timeout=10)
         calls = fe.sent - fe.sent_outcomes
         print(f"[failecho] reported {calls} call{'s' if calls != 1 else ''}"
+              + (f" ({fe.queued_failures} failure{'s' if fe.queued_failures != 1 else ''})" if fe.queued_failures else "")
               + (f", {fe.sent_outcomes} recovery outcome{'s' if fe.sent_outcomes != 1 else ''}"
                  + (" inferred" if fe.inferred else "") if fe.sent_outcomes else "")
               + (f", {fe.failed} could not be sent" if fe.failed else "")

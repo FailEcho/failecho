@@ -383,3 +383,15 @@ def test_wrap_takes_per_tool_declarations():
     drained(client)
     by_op = {b["operation"]: b.get("mutates") for b in client.bodies}
     assert by_op == {"create_issue": True, "get_issue": False}
+
+
+def test_the_run_summary_counts_failures():
+    """The builders read this line to count shared failures a program's own
+    retry absorbed; the exit code never shows those."""
+    client = Recorder()
+    client.record_failure("api.github.com", "x", RuntimeError("503"))
+    client.record_failure("api.github.com", "x", RuntimeError("503"))
+    client.record_success("api.github.com", "x")
+    assert client.queued_failures == 2 and client.queued == 3
+    from failecho_autoreport import __version__
+    assert __version__ == "0.1.3"
