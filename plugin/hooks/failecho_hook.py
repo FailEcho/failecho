@@ -399,12 +399,25 @@ def context_note(service: str, operation: str, answer: dict | None) -> str | Non
         f"(evidence from: {sources}).{status_text}"
     ]
     recommendation = answer.get("recommendation")
-    if recommendation:
+    if recommendation and recommendation.get("action") == "skip":
+        # the network's verdict that nothing works: said as an instruction,
+        # because "recovery that worked: skip (0/56)" reads as nonsense
+        tried = ", ".join(
+            f"{a['action']} 0/{a.get('recent_attempts') or a['attempts']}"
+            for a in (answer.get("recovery_actions") or [])[:3]
+        )
+        lines.append(
+            f"Nothing tried in the last 24h has worked ({tried}). Do not retry this call; "
+            "fail fast, or try something different and it will be recorded."
+        )
+    elif recommendation:
+        pooled = " (evidence pooled from other operation names on this service)" \
+            if recommendation.get("scope") == "service" else ""
         lines.append(
             f"Recovery that worked for others: {recommendation['action']} "
             f"({recommendation.get('based_on_successes')}/"
             f"{recommendation.get('based_on_attempts')} attempts, "
-            f"confidence {recommendation.get('confidence')})."
+            f"confidence {recommendation.get('confidence')}){pooled}."
         )
     else:
         tried = [

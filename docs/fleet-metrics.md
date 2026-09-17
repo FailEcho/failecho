@@ -23,6 +23,7 @@ carry the field.
 | `metrics.calls_first_try` | tool calls that succeeded without a retry |
 | `metrics.calls_recovered` | failed calls a retry fixed |
 | `metrics.calls_failed` | failed calls that stayed failed (including skips) |
+| `metrics.model_retries_after_skip` | the model called the same tool with the same arguments right after the network said skip — a wasted turn, and the sign the advice did not reach the model in a form it acted on (since 2026-09-17 15:00) |
 | `build` | builders only: `vm_runs`, `local_failures`, `shared_failures[]`, `task_done`, `coverage[]` (per program: connections the fence saw vs calls the wrapper observed), `sandbox` |
 | `task`, `answer` | builders only: what was asked (160 chars) and how the model summed up (200 chars) |
 

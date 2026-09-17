@@ -396,3 +396,24 @@ def test_the_note_for_claude_is_factual_and_only_appears_with_evidence():
     degraded = hook.context_note("svc", "op", {"known": True, "status": "MAJOR",
                                                "observations": {}, "evidence_sources": []})
     assert "Current status: MAJOR." in degraded
+
+
+def test_the_note_says_skip_as_an_instruction():
+    """'Recovery that worked for others: skip (0/56 attempts)' reads as
+    nonsense. The verdict is an instruction: do not retry this call."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location("hook", Path(__file__).resolve().parents[1] / "plugin" / "hooks" / "failecho_hook.py")
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    answer = {"known": True, "status": "MAJOR", "observations": {"total": 56, "last_1h": 20, "unique_reporters": 2},
+              "evidence_sources": ["agent"],
+              "recovery_actions": [{"action": "retry", "attempts": 56, "successes": 0, "recent_attempts": 56}],
+              "recommendation": {"action": "skip", "confidence": 0.65, "based_on_attempts": 56, "based_on_successes": 0}}
+    note = hook.context_note("httpbingo.org", "always_broken", answer)
+    assert "Do not retry this call" in note and "retry 0/56" in note
+    assert "worked for others: skip" not in note
+    pooled = dict(answer, recommendation={"action": "wait_until_reset", "confidence": 0.7, "based_on_attempts": 6,
+                                          "based_on_successes": 6, "scope": "service"})
+    assert "pooled from other operation names" in hook.context_note("api.github.com", "GET /repos", pooled)

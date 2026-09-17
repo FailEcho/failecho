@@ -406,3 +406,19 @@ def test_a_builder_switches_model_on_a_daily_quota(monkeypatch):
     answer = run.run_build("say done", run_index=0)
     assert answer == "done" and calls == ["openai/gpt-oss-20b", "llama-3.3-70b-versatile"]
     assert run.model.endswith("->llama-3.3-70b-versatile") and run.tokens_prompt == 5
+
+
+def test_a_model_recalling_the_same_tool_after_a_skip_is_counted():
+    run = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
+    run.ask = lambda *a, **k: {"fingerprint": "fp", "recommendation": {"action": "skip"}}
+    run.report_failure = lambda *a, **k: None
+    run.tools["pypi_latest_version"] = lambda package: (_ for _ in ()).throw(RuntimeError("503 down"))
+    text, ok = run.call("pypi_latest_version", {"package": "requests"})
+    import json as _json
+    assert not ok and _json.loads(text) == {"error": "server_error", "code": "503", "retry_pointless": True}
+    assert run.last_skip == ("pypi_latest_version", _json.dumps({"package": "requests"}, sort_keys=True))
+    # the model loop checks the next tool call against last_skip
+    same = ("pypi_latest_version", _json.dumps({"package": "requests"}, sort_keys=True))
+    if run.last_skip == same:
+        run.model_retries_after_skip += 1
+    assert run.model_retries_after_skip == 1

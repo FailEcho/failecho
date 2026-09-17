@@ -454,6 +454,11 @@ class Run:
         self.ask_seconds = 0.0
         self.wait_seconds = 0.0
         self.completed: bool | None = None
+        #: The model calling the very same tool with the very same arguments
+        #: right after the network said skip: a turn, and its tokens, wasted
+        #: because the advice did not reach the model in a form it acted on.
+        self.last_skip: tuple[str, str] | None = None
+        self.model_retries_after_skip = 0
         # this persona's ETag cache (URL -> etag, body), for conditional requests
         self._etag_path = os.path.join(STATE_DIR, f"etags-{reporter}.json")
         try:
@@ -588,9 +593,11 @@ class Run:
                 # that askers retried anyway and tied with blind)
                 rec["skipped"] = True
                 rec["seconds"] = round(time.monotonic() - started, 2)
-                # the same shape blind gets, plus one flag: a fair comparison
-                # does not hand the asking side a longer prompt
-                return json.dumps({"error": et, "code": code, "skipped": True}), False
+                # The same shape blind gets, plus one flag the model can act
+                # on. "skipped" alone left the model calling the same tool
+                # again -- a whole extra turn; "retry_pointless" says why.
+                self.last_skip = (name, json.dumps(args, sort_keys=True))
+                return json.dumps({"error": et, "code": code, "retry_pointless": True}), False
             if action is None:
                 rec["seconds"] = round(time.monotonic() - started, 2)
                 return json.dumps({"error": et, "code": code}), False
@@ -775,6 +782,9 @@ class Run:
                 except ValueError:
                     args = {}
                 name = c["function"]["name"]
+                if self.last_skip == (name, json.dumps(args, sort_keys=True)):
+                    self.model_retries_after_skip += 1
+                self.last_skip = None
                 result, _ = self.call(name, args) if name in self.tools else (json.dumps({"error": "unknown tool"}), False)
                 messages.append({"role": "tool", "tool_call_id": c["id"], "content": result})
         return "(model budget exhausted)"
@@ -968,7 +978,8 @@ def write_report(state: dict) -> None:
         c = costs.setdefault(key, {"cohort": key, "runs": 0, "completed": 0, "tokens": 0, "tokens_prompt": 0,
                                    "tokens_completion": 0, "model_calls": 0, "tool_calls": 0, "seconds": 0.0,
                                    "asks": 0, "ask_seconds": 0.0, "wait_seconds": 0.0, "calls_first_try": 0,
-                                   "calls_recovered": 0, "calls_failed": 0, "failure_seconds": 0.0})
+                                   "calls_recovered": 0, "calls_failed": 0, "failure_seconds": 0.0,
+                                   "model_retries_after_skip": 0})
         c["runs"] += 1; c["completed"] += int(bool(m.get("completed")))
         c["tokens_prompt"] += m.get("tokens_prompt", 0); c["tokens_completion"] += m.get("tokens_completion", 0)
         c["tokens"] = c["tokens_prompt"] + c["tokens_completion"]
@@ -978,6 +989,7 @@ def write_report(state: dict) -> None:
         c["calls_first_try"] += m.get("calls_first_try", 0); c["calls_recovered"] += m.get("calls_recovered", 0)
         c["calls_failed"] += m.get("calls_failed", 0)
         c["failure_seconds"] += sum(float(f.get("seconds") or 0) for f in r["failures"])
+        c["model_retries_after_skip"] += m.get("model_retries_after_skip", 0)
     for c in costs.values():
         n = c["runs"] or 1
         c.update(completed_rate=round(c["completed"] / n, 3), tokens_per_run=round(c["tokens"] / n),
@@ -1109,6 +1121,7 @@ def main(argv: list[str] | None = None) -> int:
               "metrics": {"tokens_prompt": run.tokens_prompt, "tokens_completion": run.tokens_completion,
                           "asks": run.asks_made, "ask_seconds": round(run.ask_seconds, 3),
                           "wait_seconds": round(run.wait_seconds, 2), "completed": run.completed,
+                          "model_retries_after_skip": run.model_retries_after_skip,
                           "calls_first_try": run.tool_calls - sum(f["attempts"] for f in run.failures),
                           "calls_recovered": sum(1 for f in run.failures if f["recovered"]),
                           "calls_failed": sum(1 for f in run.failures if not f["recovered"])}}
