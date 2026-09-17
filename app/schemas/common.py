@@ -92,15 +92,13 @@ class StrictModel(BaseModel):
 #: How to name what was called. Fingerprints only match when agents name the
 #: same thing the same way, which is the difference between shared evidence
 #: and a private log.
+# Every MCP client puts these strings into the model's context on every
+# turn, for every tool that carries them. Short on purpose.
 SERVICE_NAMING = (
-    "What was called, named the way other agents will name it: an MCP "
-    "server's own name (the one it reports in serverInfo.name), or an HTTP "
-    "API's host, e.g. 'api.github.com'. Not your client's local alias for it."
+    "The MCP server's own name (serverInfo.name) or the API host, e.g. "
+    "'api.github.com'. Not your client's local alias."
 )
-OPERATION_NAMING = (
-    "The tool or endpoint exactly as the server defines it, e.g. "
-    "'create_issue' -- without client prefixes such as 'mcp__github__'."
-)
+OPERATION_NAMING = "The tool or endpoint as the server names it, e.g. 'create_issue', not 'mcp__github__create_issue'."
 
 
 class CallIdentity(StrictModel):

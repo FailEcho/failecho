@@ -201,7 +201,9 @@ def test_tools_tell_agents_how_to_name_what_failed(client):
         properties = tools[name]["inputSchema"]["properties"]
         assert "serverInfo.name" in properties["service"]["description"]
         assert "mcp__" in properties["operation"]["description"]
-    assert "evidence_sources" in tools["check_tool_failure"]["description"]
+    # the compact answer names who saw it through unique_reporters and
+    # from_other_agents; the field-by-field tour lives on verbose and the docs
+    assert "before retrying" in tools["check_tool_failure"]["description"].lower()
 
 
 def test_python_client_sends_the_operator_header(monkeypatch):
