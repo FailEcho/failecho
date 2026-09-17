@@ -399,7 +399,8 @@
         body.appendChild(tr);
       });
     });
-    if (body.children.length) { table.hidden = false; if (note) note.hidden = false; }
+    var card = el("home-versus-card");
+    if (body.children.length && card) card.hidden = false;
   }
 
   function loadVersus() {

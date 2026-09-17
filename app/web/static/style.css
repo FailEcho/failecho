@@ -1510,9 +1510,29 @@ section[id], h2[id] { scroll-margin-top: 100px; }
 .echo--skip { border-left: 3px solid var(--red); }
 .echo--skip .action { color: var(--red); }
 
-/* with vs without, on the home page: a few live rows from the lab */
-.versus { width: 100%; border-collapse: collapse; margin: 1rem 0 0.4rem; font-size: 0.92rem; }
-.versus th, .versus td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; }
-.versus th.num, .versus td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.versus td.win { font-weight: 700; color: var(--healthy); }
-.versus--teaser thead th { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
+/* Ask vs Blind, on the home page: a few live rows from the lab, on a solid
+   card so the picture behind the band never competes with the numbers */
+.versus-card {
+  background: rgba(8, 10, 16, 0.92); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r); padding: 22px 26px 18px; margin: 30px auto 6px; max-width: 860px; text-align: left;
+}
+.versus-kicker { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #fff; letter-spacing: 0.01em; }
+.versus-kicker span { font-weight: 400; color: var(--ink-2); margin-left: 10px; font-size: 13px; }
+.versus { width: 100%; border-collapse: collapse; font-size: 15px; }
+.versus th, .versus td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; vertical-align: baseline; }
+.versus thead th { font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); font-weight: 500; padding-bottom: 8px; }
+.versus thead th .versus-sub { display: block; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink-2); font-weight: 400; margin-top: 2px; }
+.versus thead th.num { color: #fff; font-size: 14px; }
+.versus th.num, .versus td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; width: 20%; }
+.versus tbody tr:last-child td { border-bottom: 0; }
+.versus td.win { font-weight: 700; color: #fff; }
+.versus td:not(.win).num { color: rgba(255,255,255,0.72); }
+.band--lab .versus td:first-child { color: rgba(255,255,255,0.88); }
+.versus-note { margin: 14px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+.versus-note b { color: #fff; font-weight: 700; }
+.band--lab .versus-card + .hero-actions { margin-top: 26px; }
+@media (max-width: 620px) {
+  .versus-card { padding: 16px 14px 12px; }
+  .versus { font-size: 13.5px; }
+  .versus th, .versus td { padding: 8px 6px; }
+}

@@ -319,13 +319,16 @@ up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
         Every number there is ours, none of it is adoption, and the page says so
         on every screen.
       </p>
-      <table class="versus versus--teaser" id="home-versus" aria-label="With FailEcho versus without, live from the lab" hidden>
-        <thead><tr><th>live from the lab</th><th class="num">with FailEcho</th><th class="num">without</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <p class="band-sub" id="home-versus-note" hidden>Same tasks, same models, same address; bold is the better side.
-        The full table, and every number behind it, is on
-        <a href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">the lab scoreboard</a>.</p>
+      <div class="versus-card" id="home-versus-card" hidden>
+        <p class="versus-kicker">Ask vs Blind <span>live from the lab</span></p>
+        <table class="versus versus--teaser" id="home-versus" aria-label="Ask versus Blind, live from the lab">
+          <thead><tr><th>benchmark</th><th class="num">Ask<span class="versus-sub">with FailEcho</span></th><th class="num">Blind<span class="versus-sub">without</span></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="versus-note" id="home-versus-note">Same tasks, same models, same address. <b>Bold</b> is the better side;
+          neither is bold when they are within 2%. The full table, and every number behind it, is on
+          <a href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">the lab scoreboard</a>.</p>
+      </div>
     </div>
     <p class="hero-actions">
       <a class="btn btn--red" href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">Watch the scoreboard</a>

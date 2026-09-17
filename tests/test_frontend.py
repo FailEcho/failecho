@@ -246,7 +246,10 @@ def test_static_assets_stay_small():
     # new crops. Three raises in one day, each for something asked for; the
     # comments that carry the reasoning were trimmed twice already and are
     # worth more than the last kilobyte.
-    assert len(CSS) < 65_000
+    # 65k -> 67k, 2026-09-17: the Ask-vs-Blind card on the home page -- a
+    # solid card over the lab's picture, product-style column headers.
+    # Requested.
+    assert len(CSS) < 67_000
     # 31k -> 33k: the with-vs-without rows the home page fetches from the lab.
     assert len(JS) < 33_000
     # 57k -> 58k for the distribution line under the hero and the panel
@@ -269,7 +272,8 @@ def test_static_assets_stay_small():
     # 113k -> 117k: the with-vs-without teaser in the lab section, its rows
     # fetched live from the lab so the front page never carries a stale
     # claim. Requested.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 117_000
+    # 117k -> 119k: the card's own styles.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 119_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -296,7 +300,8 @@ def test_static_assets_stay_small():
     # PNG that was never committed. Still under a fifth of the old hero ground.
     # 197k -> 208k: the four install cards' own render (10.8KB), on request.
     # 208k -> 212k: the with-vs-without teaser (markup, styles, the fetch).
-    assert per_visit < 212_000, f"page weight crept to {per_visit} bytes"
+    # 212k -> 214k: the card's styles.
+    assert per_visit < 214_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 
