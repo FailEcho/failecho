@@ -80,7 +80,6 @@
     var th = stats.adoption_threshold || {};
     if (th.min_observations) {
       setStat("adopt-min-obs", number(th.min_observations));
-      setStat("adopt-min-svc", number(th.min_services));
       setStat("adopt-min-span", Math.round(th.min_span_seconds / 60) + " minutes");
     }
     show("sparse-note", (stats.sparse_observations || 0) > 0);

@@ -10,8 +10,9 @@ reporter id) never establish adoption; they still count as evidence.
 The threshold exists because of 2026-09-16: a fuzzer sent eleven junk rows
 under eight fresh reporter ids and the front page said "11 independent
 observations". One scanner should not be able to write the adoption number.
-Five observations across two services over ten minutes is a low bar for
-any real agent and an awkward one for a probe; it is stated on the page.
+Five observations over ten minutes is a low bar for any real agent and an
+awkward one for a probe; it is stated on the page. The services leg is a
+knob left at one: an agent whose whole job is one API is still an agent.
 """
 
 from __future__ import annotations

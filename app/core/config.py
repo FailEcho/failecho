@@ -201,16 +201,17 @@ class Settings:
         default_factory=lambda: _env_int("FIN_MIN_UNIQUE_REPORTERS", 3)
     )
     # Adoption threshold. A reporter counts as an independent agent on the
-    # front page only once it has this many observations, across this many
-    # distinct services, spanning at least this long. Below that its rows are
-    # stored and used as evidence but held out of the adoption numbers. Set
-    # after a fuzzer put eleven rows under eight fresh reporter ids on the
-    # front page as "11 independent observations" (2026-09-16).
+    # front page only once it has this many observations spanning at least
+    # this long (and across at least this many services, 1 by default: an
+    # agent whose whole job is one API is still an agent). Below that its
+    # rows are stored and used as evidence but held out of the adoption
+    # numbers. Set after a fuzzer put eleven rows under eight fresh reporter
+    # ids on the front page as "11 independent observations" (2026-09-16).
     adoption_min_observations: int = field(
         default_factory=lambda: _env_int("FIN_ADOPTION_MIN_OBSERVATIONS", 5)
     )
     adoption_min_services: int = field(
-        default_factory=lambda: _env_int("FIN_ADOPTION_MIN_SERVICES", 2)
+        default_factory=lambda: _env_int("FIN_ADOPTION_MIN_SERVICES", 1)
     )
     adoption_min_span_seconds: int = field(
         default_factory=lambda: _env_int("FIN_ADOPTION_MIN_SPAN_SECONDS", 600)

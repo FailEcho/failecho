@@ -50,17 +50,19 @@ def test_an_agent_that_looks_like_one_counts(client):
 
 
 def test_each_leg_of_the_threshold_is_required(client):
-    # enough rows, one service
-    for i in range(6):
-        insert_observation(service="api.github.com", reporter_hash="one-service", minutes_ago=60 - i * 5)
-    # two services, enough rows, all within a minute
+    # enough rows, all within a minute: a burst, not an agent
     for i in range(6):
         insert_observation(service=("api.github.com", "pypi.org")[i % 2], reporter_hash="burst", minutes_ago=1)
-    # two services, spread out, four rows
+    # spread out, four rows: not yet
     for i in range(4):
         insert_observation(service=("api.github.com", "pypi.org")[i % 2], reporter_hash="thin", minutes_ago=60 - i * 10)
     s = stats(client)
-    assert s["real_observations_total"] == 0 and s["sparse_observations"] == 16
+    assert s["real_observations_total"] == 0 and s["sparse_observations"] == 10
+    # one service is enough: an agent whose whole job is GitHub is an agent
+    for i in range(6):
+        insert_observation(service="api.github.com", reporter_hash="one-service", minutes_ago=60 - i * 5)
+    s = stats(client)
+    assert s["real_observations_total"] == 6 and s["sparse_observations"] == 10
 
 
 def test_anonymous_rows_never_establish_adoption(client):
@@ -75,7 +77,7 @@ def test_the_threshold_is_stated_in_the_response(client):
     assert s["adoption_threshold"] == {"min_observations": settings.adoption_min_observations,
                                        "min_services": settings.adoption_min_services,
                                        "min_span_seconds": settings.adoption_min_span_seconds}
-    assert s["adoption_threshold"]["min_observations"] >= 5
+    assert s["adoption_threshold"]["min_observations"] >= 5 and s["adoption_threshold"]["min_span_seconds"] >= 600
 
 
 def test_first_party_and_demo_are_untouched_by_the_threshold(client):
