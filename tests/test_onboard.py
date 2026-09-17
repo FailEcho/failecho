@@ -238,7 +238,8 @@ def test_the_rotation_covers_every_model_scenario_and_project():
 
 def test_every_model_belongs_to_a_configured_provider():
     for provider, model in onboard.MODELS:
-        assert provider in PROVIDERS and model in PROVIDERS[provider]["models"], (provider, model)
+        p = PROVIDERS[provider]
+        assert model in p["models"] + p.get("alt_models", []), (provider, model)
 
 
 def test_the_report_aggregates_per_model(tmp_path, monkeypatch):

@@ -364,3 +364,12 @@ def test_every_cost_a_run_pays_is_recorded_and_aggregated(tmp_path, monkeypatch)
     doc = open(ROOT_DOC).read()
     for field in ("tokens_prompt", "ask_seconds", "wait_seconds", "completed", "calls_first_try", "tokens_per_completed", "failure_seconds_per_run"):
         assert field in doc, f"{field} is not defined in docs/fleet-metrics.md"
+
+
+def test_a_daily_quota_is_recognised_and_a_minute_wait_is_not():
+    e = http_error(429); e.failecho_body = '{"error":{"message":"Rate limit reached ... on tokens per day (TPD): Limit 200000"}}'
+    assert F._daily_quota(e)
+    e2 = http_error(429); e2.failecho_body = '{"error":{"message":"... on tokens per minute (TPM): Limit 8000"}}'
+    assert not F._daily_quota(e2)
+    e3 = http_error(429); e3.failecho_body = "You exceeded your current quota, please check your plan"
+    assert F._daily_quota(e3)

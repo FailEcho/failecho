@@ -81,7 +81,10 @@ DAILY_CAP_PER_PROVIDER = int(os.environ.get("ONBOARD_DAILY_CAP") or 60)
 #: Rotated in order, one per run. Every model the fleet has verified makes
 #: real tool calls; the point is the spread from a 2.6B free model to a 31B.
 MODELS = [
-    ("groq", "openai/gpt-oss-20b"),
+    # llama-3.3-70b rather than gpt-oss-20b on groq: the 23 KB document times
+    # five calls is ~30k tokens a run, and gpt-oss-20b's 200k tokens-a-day
+    # budget is shared with six fleet personas; llama's is its own
+    ("groq", "llama-3.3-70b-versatile"),
     ("ollama", "gpt-oss:20b"),
     ("openrouter", "nex-agi/nex-n2.5-mini:free"),
     ("ollama", "nemotron-3-nano:30b"),

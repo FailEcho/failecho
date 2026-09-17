@@ -245,6 +245,13 @@ def log(msg: str) -> None:
     print(f"[fleet] {msg}", flush=True)
 
 
+def _daily_quota(exc: BaseException) -> bool:
+    """Did the provider say the *daily* budget is gone (groq's TPD, Gemini's
+    quota)? Then a minute's wait is pointless."""
+    body = (getattr(exc, "failecho_body", "") or "").lower()
+    return "per day" in body or "tpd" in body or "rpd" in body or "exceeded your current quota" in body
+
+
 def _seconds(value: str) -> float:
     """A Retry-After or ratelimit-reset header as seconds: '7', '2.5s', '1m3s'."""
     value = str(value).strip().lower()
@@ -736,7 +743,9 @@ class Run:
             except urllib.error.HTTPError as e:
                 # a provider rejecting our request is data, and if it is OUR
                 # request shape that is wrong, the journal is where we find out
-                log(f"  provider {p['host']} HTTP {e.code}: {e.read()[:200].decode(errors='ignore')!r}")
+                body = e.read()[:400].decode(errors="ignore")
+                e.failecho_body = body
+                log(f"  provider {p['host']} HTTP {e.code}: {body[:200]!r}")
                 raise
 
         # The auto path's urllib patch already observes this call by route.
@@ -796,7 +805,9 @@ class Run:
                 with urllib.request.urlopen(req, timeout=90) as r:
                     return self._count_tokens(json.load(r))
             except urllib.error.HTTPError as e:
-                log(f"  provider {p['host']} HTTP {e.code}: {e.read()[:200].decode(errors='ignore')!r}")
+                body = e.read()[:400].decode(errors="ignore")
+                e.failecho_body = body
+                log(f"  provider {p['host']} HTTP {e.code}: {body[:200]!r}")
                 raise
 
         chat = self.fe.watch(service=p["host"], operation="chat.completions", mutates=False)(chat)
@@ -819,6 +830,16 @@ class Run:
                     except Exception as exc:  # noqa: BLE001
                         et, code = classify(exc)
                         if et == "rate_limit" and attempt < 3:
+                            # a per-day quota does not come back in a minute;
+                            # the alternate model has its own. Not the network's
+                            # call -- a fact about the agent's own account -- so
+                            # both twins do it alike.
+                            if _daily_quota(exc) and p.get("alt_models"):
+                                alts = [m for m in p["alt_models"] if m != state["model"]]
+                                if alts:
+                                    state["model"] = alts[0]
+                                    self.model = f"{self.model}->{alts[0]}"
+                                    continue
                             self._sleep(25)
                             continue
                         self.failures.append({"service": p["host"], "operation": "chat.completions", "error_type": et,
