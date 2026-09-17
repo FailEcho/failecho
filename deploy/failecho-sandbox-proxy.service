@@ -11,6 +11,9 @@ User=failecho
 Group=failecho
 WorkingDirectory=/srv/failecho-lab/app
 ExecStart=/srv/failecho/.venv/bin/python -m failecho_sandbox.proxy
+# counters for the builders' coverage check, beside the VM sockets
+RuntimeDirectory=failecho-sandbox
+RuntimeDirectoryPreserve=yes
 Restart=always
 RestartSec=2
 MemoryMax=60M

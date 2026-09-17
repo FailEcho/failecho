@@ -41,6 +41,11 @@
       return [td(c.cohort), td(pf, "num"), td(pr, "num"), td(pf ? Math.round(100 * pr / pf) + "%" : "-", "num"), td(c.explored || 0, "num")];
     }));
     var runsBy = {}; (d.cohorts || []).forEach(function (c) { runsBy[c.cohort] = c.runs; });
+    var cov = (d.build || []).reduce(function (acc, b) {
+      acc.t += b.traffic_runs || 0; acc.u += b.unobserved_runs || 0; acc.c += b.connections || 0; acc.o += b.observed_calls || 0; return acc;
+    }, { t: 0, u: 0, c: 0, o: 0 });
+    el("fleet-coverage").textContent = cov.t ? ("So far: " + cov.t + " runs with traffic, " + cov.u + " where the wrapper saw nothing; " +
+      cov.c + " connections opened, " + cov.o + " calls observed.") : "No runs with traffic measured yet.";
     fill("fleet-build", (d.build || []).map(function (b) {
       return [td(b.cohort), td(runsBy[b.cohort] || 0, "num"), td(b.vm_runs, "num"), td(b.tasks_done, "num"),
               td(b.local, "num"), td(b.shared, "num"),

@@ -815,8 +815,9 @@ def write_report(state: dict) -> None:
     cohorts = {"real / ask": blank(), "real / blind": blank(), "test / ask": blank(), "test / blind": blank(),
                "build / ask": blank(), "build / blind": blank(), "explore": blank()}
     # the builders' second ledger: what happened inside the VM
-    build = {"build / ask": {"vm_runs": 0, "local": 0, "shared": 0, "tasks_done": 0, "sandbox_down": 0},
-             "build / blind": {"vm_runs": 0, "local": 0, "shared": 0, "tasks_done": 0, "sandbox_down": 0}}
+    blank_build = lambda: {"vm_runs": 0, "local": 0, "shared": 0, "tasks_done": 0, "sandbox_down": 0,
+                           "traffic_runs": 0, "unobserved_runs": 0, "connections": 0, "observed_calls": 0}
+    build = {"build / ask": blank_build(), "build / blind": blank_build()}
     for r in runs:
         p = by_persona.setdefault(r["reporter"], {"reporter": r["reporter"], "path": r["path"], "provider": r["provider"] or "none",
                                                    "asks": r["asks"], "runs": 0, "tool_calls": 0, "failures": 0, "last": ""})
@@ -830,6 +831,10 @@ def write_report(state: dict) -> None:
             bl["vm_runs"] += b.get("vm_runs", 0); bl["local"] += b.get("local_failures", 0)
             bl["shared"] += len(b.get("shared_failures") or []); bl["tasks_done"] += int(bool(b.get("task_done")))
             bl["sandbox_down"] += int(b.get("sandbox", "ok") != "ok")
+            for c in b.get("coverage") or []:
+                bl["connections"] += c["connections"]; bl["observed_calls"] += c["observed"]
+                if c["connections"] > 0:
+                    bl["traffic_runs"] += 1; bl["unobserved_runs"] += int(c["missed"])
         for f in r["failures"]:
             c["failures"] += 1; c["attempts"] += f["attempts"]; c["recovered"] += int(f["recovered"])
             c["asked"] += int(f["asked"]); c["recommended"] += int(bool(f["recommended"])); c["skipped"] += int(bool(f.get("skipped")))

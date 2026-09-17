@@ -34,6 +34,7 @@ personas' tools, so the ask/blind twins still differ in exactly one thing.
 from __future__ import annotations
 
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -132,6 +133,7 @@ SHARED_SIGNALS = (
 INDEX_HOSTS = re.compile(r"(files\.pythonhosted\.org|pypi\.org)")
 #: The in-guest wrapper's summary line, e.g. "reported 12 calls (3 failures)".
 _SUMMARY_FAILURES = re.compile(r"reported \d+ calls? \((\d+) failures?\)")
+_SUMMARY_CALLS = re.compile(r"reported (\d+) calls?")
 
 
 #: The fence refusing a host is the sandbox's doing, not the world's. A
@@ -180,6 +182,21 @@ def fetch_doc(url: str) -> dict:
     return {"url": url, "text": text[:6000]}
 
 
+PROXY_STATS = os.environ.get("FAILECHO_SANDBOX_PROXY_STATS") or "/run/failecho-sandbox/proxy-stats.json"
+LAB_HOSTS = ("lab.failecho.com",)
+
+
+def _proxy_connections() -> int | None:
+    """Connections the fence has opened for the guest so far, excluding the
+    ones to the lab (that is the wrapper reporting, not the task's traffic)."""
+    try:
+        with open(PROXY_STATS, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return sum(n for host, n in d.get("by_host", {}).items() if host not in LAB_HOSTS)
+    except (OSError, ValueError):
+        return None
+
+
 class Builder:
     """The VM side of a builder run: one sandbox for the whole run, a venv
     made on first use, and the local/shared ledger."""
@@ -194,6 +211,11 @@ class Builder:
         self.shared_failures: list[dict] = []
         self.last_ok = False
         self.boot_error: str | None = None
+        #: Coverage of the zero-code wrapper on code nobody wrote for it: per
+        #: run_python, how many connections the fence saw the task open and
+        #: how many calls the wrapper said it observed. A run with traffic
+        #: and nothing observed is a client the wrapper does not patch.
+        self.coverage: list[dict] = []
         # What the guest is told, and all it is told. No endpoint means the
         # in-guest wrapper stays off (FAILECHO_DISABLED), never a default.
         if lab_public_url:
@@ -277,8 +299,10 @@ class Builder:
             if not r.ok:
                 return {"step": "pip install", **self._account(r, "pip")}
         self.vm_runs += 1
+        before = _proxy_connections()
         r = self.vm.run(["/work/venv/bin/python", "-m", "failecho_autoreport", "run", filename],
                         files={filename: code}, timeout=90, env=self.guest_env)
+        after = _proxy_connections()
         # The wrapper's own lines are not the program's output -- but its
         # summary says how many of the program's calls failed, and a failure
         # the program's own retry absorbed is a shared failure the run's exit
@@ -286,6 +310,12 @@ class Builder:
         summary = next((l for l in r.stderr.splitlines() if l.startswith("[failecho] reported")), "")
         m = _SUMMARY_FAILURES.search(summary)
         absorbed = int(m.group(1)) if m else 0
+        mc = _SUMMARY_CALLS.search(summary)
+        observed = int(mc.group(1)) if mc else 0
+        if before is not None and after is not None:
+            connections = max(after - before, 0)
+            self.coverage.append({"connections": connections, "observed": observed,
+                                  "missed": bool(connections > 0 and observed == 0)})
         r["stderr"] = "\n".join(l for l in r.stderr.splitlines() if not l.startswith("[failecho]"))
         out = {"step": "run", **self._account(r, None)}
         if absorbed and r.ok:
@@ -309,4 +339,5 @@ class Builder:
     def summary(self) -> dict:
         return {"vm_runs": self.vm_runs, "local_failures": self.local_failures,
                 "shared_failures": self.shared_failures, "last_ok": self.last_ok,
+                "coverage": self.coverage,
                 "sandbox": "ok" if self.vm is not None else f"unavailable: {self.boot_error}"}

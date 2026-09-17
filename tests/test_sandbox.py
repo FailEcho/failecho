@@ -313,7 +313,8 @@ def test_the_scoreboard_has_a_build_ledger(tmp_path, monkeypatch):
     report = json.loads((tmp_path / "fleet.json").read_text())
     build = {b["cohort"]: b for b in report["build"]}
     assert build["build / ask"] == {"cohort": "build / ask", "vm_runs": 3, "local": 2, "shared": 1, "tasks_done": 1,
-                                    "sandbox_down": 0, "shared_share": pytest.approx(1 / 3)}
+                                    "sandbox_down": 0, "shared_share": pytest.approx(1 / 3),
+                                    "traffic_runs": 0, "unobserved_runs": 0, "connections": 0, "observed_calls": 0}
     assert build["build / blind"]["sandbox_down"] == 1 and build["build / blind"]["shared_share"] is None
     assert {c["cohort"] for c in report["cohorts"]} >= {"build / ask", "build / blind"}
 
@@ -577,3 +578,56 @@ def test_absorbed_failures_inside_a_successful_run_are_filed_as_shared():
     out = b.run_python("print('ok')")
     assert out["shared_failures_absorbed"] == 3 and len(b.shared_failures) == 3 and b.local_failures == 0
     assert "[failecho]" not in out["stderr"] and b.last_ok
+
+
+def test_the_proxy_writes_counts_by_host_and_nothing_else(tmp_path, monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr(fence, "STATS_PATH", str(tmp_path / "stats.json"))
+    p = fence.Proxy(ALLOW)
+    p.allowed, p.by_host = 3, {"pypi.org": 2, "lab.failecho.com": 1}
+    p.write_stats()
+    d = json.loads((tmp_path / "stats.json").read_text())
+    assert d["allowed"] == 3 and d["by_host"] == {"pypi.org": 2, "lab.failecho.com": 1}
+    assert set(d) == {"allowed", "denied", "by_host", "at"}, "hosts and counts; never a path"
+
+
+def test_coverage_counts_task_connections_and_excludes_the_labs(tmp_path, monkeypatch):
+    """Two connections to pypi and one to the lab (the wrapper reporting)
+    before; four to pypi and two to the lab after: the task opened two."""
+    from failecho_sandbox import Result
+
+    stats = tmp_path / "stats.json"
+    monkeypatch.setattr(builder, "PROXY_STATS", str(stats))
+    b = builder.Builder("fleet-build-ask", "https://lab.failecho.com", fe=None)
+    b.venv_ready = True
+    class VM:
+        def run(self, argv, files=None, timeout=60, env=None, as_root=False):
+            # the task runs: two more connections to pypi, one more report to the lab
+            stats.write_text(json.dumps({"by_host": {"pypi.org": 4, "lab.failecho.com": 2}}))
+            return Result(exit=0, stdout="", stderr="[failecho] reported 2 calls\n", seconds=1.0)
+
+    stats.write_text(json.dumps({"by_host": {"pypi.org": 2, "lab.failecho.com": 1}}))
+    b.vm = VM()
+    b.run_python("import urllib.request")
+    assert b.coverage == [{"connections": 2, "observed": 2, "missed": False}]
+
+
+def test_a_run_with_traffic_and_no_observed_calls_is_a_miss(tmp_path, monkeypatch):
+    from failecho_sandbox import Result
+
+    stats = tmp_path / "stats.json"
+    monkeypatch.setattr(builder, "PROXY_STATS", str(stats))
+    b = builder.Builder("fleet-build-blind", None, fe=None)
+    b.venv_ready = True
+    stats.write_text(json.dumps({"by_host": {"api.github.com": 5}}))
+
+    class VM:
+        def run(self, argv, files=None, timeout=60, env=None, as_root=False):
+            stats.write_text(json.dumps({"by_host": {"api.github.com": 8}}))
+            return Result(exit=0, stdout="", stderr="[failecho] reported 0 calls\n", seconds=1.0)
+
+    b.vm = VM()
+    b.run_python("import subprocess; subprocess.run(['curl', 'https://api.github.com'])")
+    assert b.coverage == [{"connections": 3, "observed": 0, "missed": True}]
+    assert b.summary()["coverage"] == b.coverage

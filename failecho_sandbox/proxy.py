@@ -27,6 +27,7 @@ is how "the package index" quietly becomes "anything on that CDN".
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import sys
@@ -35,6 +36,10 @@ import time
 LISTEN_HOST = os.environ.get("FAILECHO_SANDBOX_PROXY_HOST", "172.16.0.1")
 LISTEN_PORT = int(os.environ.get("FAILECHO_SANDBOX_PROXY_PORT") or 8888)
 ALLOW_FILE = os.environ.get("FAILECHO_SANDBOX_ALLOW") or ""
+#: Running totals, rewritten after every decision, so the host can tell how
+#: many connections a task actually made and compare that with how many
+#: calls the in-guest wrapper said it observed. Counts by host, nothing else.
+STATS_PATH = os.environ.get("FAILECHO_SANDBOX_PROXY_STATS") or "/run/failecho-sandbox/proxy-stats.json"
 MAX_CONNECTIONS = 16
 IDLE_TIMEOUT = 120
 CONNECT_TIMEOUT = 15
@@ -104,6 +109,17 @@ class Proxy:
         self.active = 0
         self.allowed = 0
         self.denied = 0
+        self.by_host: dict[str, int] = {}
+
+    def write_stats(self) -> None:
+        try:
+            tmp = STATS_PATH + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"allowed": self.allowed, "denied": self.denied, "by_host": self.by_host,
+                           "at": time.time()}, fh)
+            os.replace(tmp, STATS_PATH)
+        except OSError:
+            pass
 
     def log(self, msg: str) -> None:
         print(f"[sandbox-proxy] {msg}", flush=True)
@@ -141,6 +157,7 @@ class Proxy:
             where = decide(method, target, self.allow)
             if where is None:
                 self.denied += 1
+                self.write_stats()
                 self.log(f"deny {method} {_host_only(target)} from {peer[0] if peer else '?'}")
                 writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
                 await writer.drain()
@@ -153,6 +170,8 @@ class Proxy:
                 await writer.drain()
                 return
             self.allowed += 1
+            self.by_host[host] = self.by_host.get(host, 0) + 1
+            self.write_stats()
             if method.upper() == "CONNECT":
                 writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 await writer.drain()
