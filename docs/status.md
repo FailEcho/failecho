@@ -1,4 +1,4 @@
-# Where everything stands — 2026-09-16, 16:00 UTC
+# Where everything stands — 2026-09-17, 04:20 UTC
 
 One page. Every line says built or not, tested how, and whether reality has
 confirmed it yet. "Live" means production. "Lab" means lab.failecho.com.
@@ -16,7 +16,9 @@ not run by us.
 | MCP endpoint, four tools, Streamable HTTP | yes | unit, run, prod | yes | listed on the MCP registry, Glama, awesome-mcp-servers |
 | Wilson-score recommendation, per-reporter cap, diversity discount | yes | unit | in lab only | production has zero recovery outcomes so far |
 | Privacy: normalizer, hashed reporter ids, column contract | yes | unit | yes | `mutates` added 2026-09-16, deliberately, with the reason in the test |
-| Retention to hourly aggregates | yes | unit | yes | pre-existing |
+| Retention to hourly aggregates | yes | unit | yes | pre-existing; since 2026-09-17 folds thin reporters into `agent_sparse` |
+| Adoption threshold (5 observations over 10 min per reporter; `sparse_observations`) | yes | unit (8), prod, lab | yes | after a fuzzer put 11 junk rows on the front page as independent; purged, threshold shipped, stated on page and in `/v1/stats` |
+| Service-name shape (no URL, path, printf) | yes | unit, prod | yes | the fuzzer's exact probes now 422 |
 | Write rate limit, body caps, security headers, Cloudflare firewall | yes | unit, run | yes | |
 | `decaying` on actions and recommendation | yes | unit (rows a month apart) | **no** | needs a fix that stopped working; never happened yet |
 | `success_evidence.verified` (unverified success) | yes | unit | **no** | fires at 20 write successes, zero failures; the lab's `echo_write` will reach it today |
@@ -53,7 +55,7 @@ not run by us.
 | Fleet, lab, 18 personas, 4 providers, every 2 min | running since ~09:00 UTC; frozen at `9f91a5d` 11:30–15:45, re-pinned to `76a4559` at 15:45 to add two builders (first sixteen rows pinned by a test); 139 runs, 102 failures, **11 fingerprints across 2+ reporters**, 68 recovery outcomes, **cross_agent_help 3** |
 | Onboarding test: 8 free models × 5 scenes × 5 project kinds, hourly | built 2026-09-16; host-graded per scene (clean, other server, already present, home dir, read-only); Ollama gpt-oss:20b passed all five scenes at least once; groq hits 8k TPM with the 23 KB doc |
 | Install canary: every pip path from a clean VM, daily 04:10 UTC | built 2026-09-16; 8 paths incl. pip/npx/uvx relay handshakes and both framework snippets; all green in 83 s; found: LlamaIndex result object (page fixed), Node fetch ignores HTTPS_PROXY (relay README), scratch on tmpfs (moved) |
-| Zero-code mode infers retry/backoff outcomes | `failecho-autoreport` 0.1.2 on PyPI; 12 unit tests; clean-room 503,503,200 produced "backoff failed" then "backoff worked" on the lab; builders now feed outcomes from inside the VM |
+| Zero-code mode infers retry/backoff outcomes | `failecho-autoreport` 0.1.3 on PyPI (0.1.3: run summary counts failures, builders count absorbed shared failures); 12 unit tests; clean-room 503,503,200 produced "backoff failed" then "backoff worked" on the lab; builders now feed outcomes from inside the VM |
 | Sandbox: Firecracker microVM for model-written code | installed 2026-09-16; selftest 9/9 as root and as `failecho`; first scheduled builder run 15:50 UTC, 7.1 s, task done, 5 GitHub calls reported from inside the VM; `docs/sandbox.md` |
 
 What the fleet has shown in three hours: the naming split (same Groq 400 on
