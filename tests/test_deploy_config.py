@@ -59,6 +59,10 @@ def test_the_policy_allows_no_third_party_code():
     assert "cdn." not in policy and "unsafe-eval" not in policy
     assert "frame-ancestors 'none'" in policy
     assert "object-src 'none'" in policy and "base-uri 'none'" in policy
+    # the one other origin a page may talk to is the lab, and only to read
+    connect = policy[policy.index("connect-src"):]
+    connect = connect[:connect.index(";")]
+    assert connect == "connect-src 'self' https://lab.failecho.com"
 
 
 def test_the_proxy_caps_a_body_the_app_cannot_measure():

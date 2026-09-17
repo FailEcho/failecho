@@ -19,7 +19,10 @@ failecho.com {
 		# bundle is served from /static/vendor for exactly this reason -- so
 		# the policy can say 'self' and mean it. No inline script: the only
 		# inline block on any page is application/ld+json, which is data.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; upgrade-insecure-requests"
+		# connect-src also names the lab, our own second instance: the home
+		# page reads its fleet.json for the with-vs-without rows. Reads only,
+		# same software, same operator; still not 'self', so it is listed.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://lab.failecho.com; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; upgrade-insecure-requests"
 
 		# A JSON response that a browser decides is HTML is an XSS.
 		X-Content-Type-Options "nosniff"
