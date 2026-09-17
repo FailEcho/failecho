@@ -122,5 +122,9 @@
       .then(function (d) { if (d) render(d); else el("fleet-updated").textContent = "No runs yet."; })
       .catch(function () {});
   }
+  Array.prototype.forEach.call(document.querySelectorAll(".fleet table"), function (table) {
+    var box = document.createElement("div"); box.className = "scroll";
+    table.parentNode.insertBefore(box, table); box.appendChild(table);
+  });
   load(); setInterval(load, 60000);
 })();
