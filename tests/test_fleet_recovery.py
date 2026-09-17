@@ -422,3 +422,31 @@ def test_a_model_recalling_the_same_tool_after_a_skip_is_counted():
     if run.last_skip == same:
         run.model_retries_after_skip += 1
     assert run.model_retries_after_skip == 1
+
+
+def test_the_versus_table_is_built_from_the_same_ledger(tmp_path, monkeypatch):
+    """Metrics as rows, with and without as columns, the better side marked,
+    a tie inside 2%. Nothing in it that the cost and cohort tables do not say."""
+    import json
+
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    def run(reporter, asks, seconds, tokens, done, failures):
+        return {"at": "t", "reporter": reporter, "path": "decorator", "provider": None, "asks": asks, "tool_calls": 11,
+                "model_calls": 0, "seconds": seconds, "failures": failures,
+                "metrics": {"tokens_prompt": tokens, "tokens_completion": 0, "asks": 0, "ask_seconds": 0, "wait_seconds": 0,
+                            "completed": done, "calls_first_try": 9, "calls_recovered": 0, "calls_failed": 2}}
+    f_skip = {"service": "httpbingo.org", "operation": "always_broken", "error_type": "server_error", "error_code": "503",
+              "asked": True, "recommended": "skip", "attempts": 1, "recovered": False, "skipped": True, "seconds": 0.5}
+    f_retry = dict(f_skip, asked=False, recommended=None, attempts=2, skipped=False, seconds=8.5)
+    state = {"runs": [run("fleet-test-ask", True, 25.0, 0, False, [f_skip, f_skip]),
+                      run("fleet-test-blind", False, 34.0, 0, False, [f_retry, f_retry])]}
+    F.write_report(state)
+    versus = json.loads((tmp_path / "fleet.json").read_text())["versus"]
+    assert [g["group"] for g in versus] == ["test"]
+    rows = {r["metric"]: r for r in versus[0]["rows"]}
+    assert rows["seconds per run"] == {"metric": "seconds per run", "unit": "s", "ask": 25.0, "blind": 34.0, "better": "ask"}
+    assert rows["retry attempts per failure"]["ask"] == 1.0 and rows["retry attempts per failure"]["blind"] == 2.0
+    assert rows["pointless retries avoided"]["ask"] == 2 and rows["pointless retries avoided"]["better"] == "ask"
+    assert "tasks completed" not in rows, "the test endpoints have no task to complete"

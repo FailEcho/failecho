@@ -1005,6 +1005,51 @@ def write_report(state: dict) -> None:
             c[k] = round(c[k], 1)
     cost_rows = [costs[k] for k in ("real / ask", "real / blind", "test / ask", "test / blind",
                                     "build / ask", "build / blind", "explore") if k in costs]
+
+    # With FailEcho against without, the way a vendor benchmark table reads:
+    # metrics as rows, the two sides as columns, the better side marked. Built
+    # from the same numbers as the cost and cohort tables, so it cannot say
+    # anything they do not.
+    def _better(ask, blind, lower_is_better=True):
+        if ask is None or blind is None:
+            return "tie"
+        if max(abs(ask), abs(blind)) == 0 or abs(ask - blind) / max(abs(ask), abs(blind), 1e-9) < 0.02:
+            return "tie"
+        return ("ask" if ask < blind else "blind") if lower_is_better else ("ask" if ask > blind else "blind")
+
+    def _pct(v):
+        return None if v is None else round(v * 100, 1)
+
+    versus = []
+    for key, label in (("test", "Flaky, broken and slow endpoints (httpbingo)"),
+                       ("real", "Real APIs (PyPI, npm, GitHub, crates.io, Stack Exchange)"),
+                       ("build", "Coding agents (write and run code in a VM)")):
+        a, b = costs.get(f"{key} / ask"), costs.get(f"{key} / blind")
+        ca, cb = cohorts.get(f"{key} / ask"), cohorts.get(f"{key} / blind")
+        if not a or not b:
+            continue
+        apf_a = (ca["attempts"] / ca["failures"]) if ca and ca["failures"] else None
+        apf_b = (cb["attempts"] / cb["failures"]) if cb and cb["failures"] else None
+        rows = [
+            {"metric": "tasks completed", "unit": "%", "ask": _pct(a["completed_rate"]), "blind": _pct(b["completed_rate"]),
+             "better": _better(a["completed_rate"], b["completed_rate"], lower_is_better=False)},
+            {"metric": "tokens per completed task", "unit": "", "ask": a["tokens_per_completed"], "blind": b["tokens_per_completed"],
+             "better": _better(a["tokens_per_completed"], b["tokens_per_completed"])},
+            {"metric": "seconds per run", "unit": "s", "ask": a["seconds_per_run"], "blind": b["seconds_per_run"],
+             "better": _better(a["seconds_per_run"], b["seconds_per_run"])},
+            {"metric": "seconds lost inside failures, per run", "unit": "s", "ask": a["failure_seconds_per_run"], "blind": b["failure_seconds_per_run"],
+             "better": _better(a["failure_seconds_per_run"], b["failure_seconds_per_run"])},
+            {"metric": "retry attempts per failure", "unit": "", "ask": round(apf_a, 2) if apf_a else None, "blind": round(apf_b, 2) if apf_b else None,
+             "better": _better(apf_a, apf_b)},
+            {"metric": "pointless retries avoided", "unit": "", "ask": ca["skipped"] if ca else 0, "blind": cb["skipped"] if cb else 0,
+             "better": _better(-(ca["skipped"] if ca else 0), -(cb["skipped"] if cb else 0))},
+        ]
+        if key == "test":
+            rows = [r for r in rows if r["metric"] not in ("tasks completed", "tokens per completed task")]
+        if key == "build":
+            rows.append({"metric": "seconds waiting on rate limits, per run", "unit": "s", "ask": a["wait_seconds_per_run"],
+                         "blind": b["wait_seconds_per_run"], "better": _better(a["wait_seconds_per_run"], b["wait_seconds_per_run"])})
+        versus.append({"group": key, "label": label, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": rows})
     for row in real_targets:
         row["attempts_per_failure"] = round(row["attempts"] / row["failures"], 2) if row["failures"] else None
         row["seconds"] = round(row["seconds"], 1)
@@ -1064,7 +1109,7 @@ def write_report(state: dict) -> None:
              "answer": r.get("answer")}
             for r in runs if r.get("build") and r["reporter"] in BUILD_PERSONAS
         ][-12:][::-1],
-        "repeats": repeats, "naming": naming, "real_targets": real_targets, "costs": cost_rows,
+        "repeats": repeats, "naming": naming, "real_targets": real_targets, "costs": cost_rows, "versus": versus,
         "personas": sorted(by_persona.values(), key=lambda p: p["reporter"]),
     }
     os.makedirs(os.path.dirname(REPORT_PATH) or ".", exist_ok=True)

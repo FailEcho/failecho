@@ -26,6 +26,20 @@
     cards.appendChild(card("cross-agent help", t.cross_agent_help || 0, "recommendations built on someone else's evidence"));
     cards.appendChild(card("recovery outcomes", t.recovery_outcomes || 0, (t.decaying || 0) + " decaying, " + (t.related_pairs || 0) + " related pairs"));
 
+    var vb = el("fleet-versus").querySelector("tbody"); vb.innerHTML = "";
+    (d.versus || []).forEach(function (g) {
+      var h = document.createElement("tr"); h.className = "group";
+      var th = document.createElement("th"); th.colSpan = 3;
+      th.textContent = g.label + " (" + g.runs_ask + " / " + g.runs_blind + " runs)"; h.appendChild(th); vb.appendChild(h);
+      g.rows.forEach(function (r) {
+        function cell(v, side) {
+          var c = td(v == null ? "-" : (r.unit === "%" ? v + "%" : v), "num" + (r.better === side ? " win" : ""));
+          return c;
+        }
+        vb.appendChild(row([td(r.metric), cell(r.ask, "ask"), cell(r.blind, "blind")]));
+      });
+    });
+    if (!(d.versus || []).length) vb.appendChild(row([td("nothing yet")]));
     fill("fleet-cohorts", (d.cohorts || []).map(function (c) {
       return [td(c.cohort), td(c.runs, "num"), td(c.failures, "num"),
               td(c.attempts_per_failure == null ? "-" : c.attempts_per_failure.toFixed(2), "num"),

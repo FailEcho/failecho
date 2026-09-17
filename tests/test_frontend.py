@@ -82,7 +82,9 @@ def test_the_front_page_stays_brief():
     # 14k -> 15k for the three cards that close the page, 15k -> 16k for the
     # four install cards carrying two faces each.
     # 16k -> 19k for the lab's section. See the six-section note above.
-    assert len(HTML) < 19_000
+    # 19k -> 20k for the with-vs-without teaser inside the lab section, fed
+    # live from the lab and hidden until it answers.
+    assert len(HTML) < 20_000
 
 
 def test_it_routes_to_the_pages_that_hold_the_detail(client):
@@ -245,7 +247,8 @@ def test_static_assets_stay_small():
     # comments that carry the reasoning were trimmed twice already and are
     # worth more than the last kilobyte.
     assert len(CSS) < 65_000
-    assert len(JS) < 31_000
+    # 31k -> 33k: the with-vs-without rows the home page fetches from the lab.
+    assert len(JS) < 33_000
     # 57k -> 58k for the distribution line under the hero and the panel
     # height that stops a tab switch resizing the artwork. The stylesheet
     # stayed under its own cap without raising it; there is no dead CSS left
@@ -263,7 +266,10 @@ def test_static_assets_stay_small():
     # 110k -> 111k: the lab linked from the nav, the footer and the own-agents
     # card, and the lab banner's non-sticky form plus its bar tag.
     # 111k -> 113k: the lab's section on the home page and its picture band.
-    assert sum(len(x) for x in (HTML, CSS, JS)) < 113_000
+    # 113k -> 117k: the with-vs-without teaser in the lab section, its rows
+    # fetched live from the lab so the front page never carries a stale
+    # claim. Requested.
+    assert sum(len(x) for x in (HTML, CSS, JS)) < 117_000
 
     # No decorative download at all: the artwork was behind the hero, where
     # it was the wrong shape at most window sizes, then a mirrored pair above
@@ -289,7 +295,8 @@ def test_static_assets_stay_small():
     # wrapped in the lab's picture -- 47KB of WebP at 1200px, from a 2.1MB
     # PNG that was never committed. Still under a fifth of the old hero ground.
     # 197k -> 208k: the four install cards' own render (10.8KB), on request.
-    assert per_visit < 208_000, f"page weight crept to {per_visit} bytes"
+    # 208k -> 212k: the with-vs-without teaser (markup, styles, the fetch).
+    assert per_visit < 212_000, f"page weight crept to {per_visit} bytes"
     assert not list(STATIC.glob("*.jpg")), "no photographic assets"
 
 

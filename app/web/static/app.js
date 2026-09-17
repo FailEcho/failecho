@@ -376,6 +376,44 @@
     });
   }
 
+  // -- with vs without, live from the lab ----------------------------------
+  // A handful of headline rows from the lab's own ledger. The lab is another
+  // origin (or absent); nothing here can make the front page wait or fail.
+  function renderVersus(d) {
+    var table = el("home-versus"), note = el("home-versus-note");
+    if (!table || !d || !(d.versus || []).length) return;
+    var pick = { test: ["seconds per run", "retry attempts per failure"],
+                 real: ["tasks completed", "tokens per completed task"],
+                 build: ["seconds per run", "tokens per completed task"] };
+    var labels = { test: "flaky endpoints", real: "real APIs", build: "coding agents" };
+    var body = table.querySelector("tbody"); body.innerHTML = "";
+    d.versus.forEach(function (g) {
+      (g.rows || []).forEach(function (r) {
+        if ((pick[g.group] || []).indexOf(r.metric) === -1 || r.ask == null || r.blind == null) return;
+        var tr = document.createElement("tr");
+        var name = document.createElement("td"); name.textContent = labels[g.group] + ": " + r.metric; tr.appendChild(name);
+        [["ask", r.ask], ["blind", r.blind]].forEach(function (side) {
+          var c = document.createElement("td"); c.className = "num" + (r.better === side[0] ? " win" : "");
+          c.textContent = r.unit === "%" ? side[1] + "%" : side[1]; tr.appendChild(c);
+        });
+        body.appendChild(tr);
+      });
+    });
+    if (body.children.length) { table.hidden = false; if (note) note.hidden = false; }
+  }
+
+  function loadVersus() {
+    var table = el("home-versus");
+    if (!table) return;
+    var lab = (document.querySelector('a[href$="/fleet"][rel~="external"]') || {}).href;
+    if (!lab) return;
+    var base = lab.replace(/\/fleet$/, "");
+    fetch(base + "/fleet.json", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(renderVersus)
+      .catch(function () {});
+  }
+
   function refresh() {
     // Each page asks only for what it shows: the homepage carries two numbers,
     // /network carries the tables.
@@ -760,4 +798,5 @@
     refresh();
     if (!document.hidden) startPolling();
   }
+  loadVersus();
 })();

@@ -32,3 +32,7 @@
 .fleet h2 { font-family: var(--serif); font-weight: 400; font-size: 22px; margin: 0 0 12px; }
 
 .fleet h3 { font-size: 1.05rem; margin: 1.6rem 0 0.5rem; font-weight: 500; }
+
+/* the with-vs-without table: metrics as rows, the two sides as columns */
+.fleet .versus tr.group th { text-align: left; padding-top: 1.1rem; font-weight: 500; color: var(--ink-2); font-size: 0.8rem; letter-spacing: 0.02em; text-transform: uppercase; }
+.fleet .versus td.win { font-weight: 700; color: var(--healthy); }

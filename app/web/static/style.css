@@ -1509,3 +1509,10 @@ section[id], h2[id] { scroll-margin-top: 100px; }
 /* a verdict, not a fix: the network saying nothing works right now */
 .echo--skip { border-left: 3px solid var(--red); }
 .echo--skip .action { color: var(--red); }
+
+/* with vs without, on the home page: a few live rows from the lab */
+.versus { width: 100%; border-collapse: collapse; margin: 1rem 0 0.4rem; font-size: 0.92rem; }
+.versus th, .versus td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; }
+.versus th.num, .versus td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.versus td.win { font-weight: 700; color: var(--healthy); }
+.versus--teaser thead th { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }

@@ -79,6 +79,15 @@
 
   <div class="fleet-grid" id="fleet-cards"></div>
 
+  <h2>With FailEcho vs without</h2>
+  <p class="sub">Same tasks, same models, same address. One twin asks the network before it retries and does what
+  it says; the other retries by fixed rules. Every number is a live average over the runs so far, from the same
+  ledger as the tables below; bold is the better side, blank when they are within 2%. Our own agents, in a lab:
+  a measurement of the mechanism, not adoption.</p>
+  <table id="fleet-versus" class="versus"><thead><tr>
+    <th>benchmark</th><th class="num">with FailEcho</th><th class="num">without</th>
+  </tr></thead><tbody></tbody></table>
+
   <h2>Askers vs blind</h2>
   <p class="sub">Attempts each cohort needed to get past a failure, on the same workloads.
   Lower is better. A tie means the network had nothing to say when asked. <em>Skipped on advice</em> is the
