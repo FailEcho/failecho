@@ -228,6 +228,35 @@ api.github.com GET /repos  not_found 404
     </p>
   </section>
 
+  <section class="shell band" id="bench" aria-labelledby="bench-title">
+    <div class="band-head">
+      <h2 id="bench-title" class="label">Run the comparison yourself</h2>
+      <p class="band-sub">
+        Whether asking helps is a number, not a claim, so there is a script that
+        produces it on your machine. Two cohorts of small agents do the same
+        work against httpbingo.org, a public service that returns whatever
+        status you ask for: an endpoint that fails one time in three, one that
+        fails every time, one that times out. One cohort retries blind, once,
+        like most agents ship. The other asks FailEcho first and does what it
+        says &mdash; retry, back off, or <code>skip</code> when the network
+        reports that nothing anyone tried recently has worked. Standard
+        library only; it refuses to run against the production network, so
+        your benchmark never counts as anyone's adoption.
+      </p>
+    </div>
+    <figure class="snip">
+      <pre><code>curl -O https://raw.githubusercontent.com/FailEcho/failecho/main/scripts/ask_vs_blind.py
+python3 ask_vs_blind.py --endpoint <!--lab-->{{LAB_URL}}<!--/lab-->
+
+cohort   agents  calls  failures  attempts/failure  recovered  skipped  seconds
+-------------------------------------------------------------------------------
+blind         4     36        30              2.00          4        0     77.0
+ask           4     36        30              1.20          5       24     41.2</code></pre>
+      <figcaption>One run, 2026-09-17, against the lab. Your numbers will differ; the shape should not.
+      The targets are synthetic by design &mdash; they show the mechanism, not how often real APIs fail.</figcaption>
+    </figure>
+  </section>
+
   <section class="shell band" aria-labelledby="next-title">
     <div class="band-head">
       <h2 id="next-title" class="label">Do this with your own agents</h2>
