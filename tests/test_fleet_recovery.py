@@ -871,6 +871,7 @@ def test_a_provider_at_our_daily_cap_is_skipped_and_cap_skips_are_not_runs(tmp_p
               "answer": "(provider nvidia daily cap reached; run skipped)",
               "metrics": {"tokens_prompt": 0, "tokens_completion": 0, "asks": 0, "ask_seconds": 0, "wait_seconds": 0,
                           "completed": False, "calls_first_try": 0, "calls_recovered": 0, "calls_failed": 0}}
-    F.write_report({"runs": [capped]})
+    legacy = dict(capped); del legacy["answer"]   # records before the fix carry no answer
+    F.write_report({"runs": [capped, legacy]})
     report = json.loads((tmp_path / "fleet.json").read_text())
     assert report["totals"]["runs"] == 0 and not report["costs"]

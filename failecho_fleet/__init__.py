@@ -1140,8 +1140,18 @@ def _save(state: dict) -> None:
 _NOT_A_RUN = ("daily cap reached; run skipped", "(no provider key)")
 
 
+def _is_run(r: dict) -> bool:
+    """False for a record of a run that never started. Records before
+    18 Sep 19:40 carry no answer for those; they are the ones with a
+    provider, no calls of any kind, no failures, and no time spent."""
+    if any(m in (r.get("answer") or "") for m in _NOT_A_RUN):
+        return False
+    return not (r.get("provider") and not r.get("tool_calls") and not r.get("model_calls")
+                and not r.get("failures") and float(r.get("seconds") or 0) < 1.0)
+
+
 def write_report(state: dict) -> None:
-    runs = [r for r in state["runs"] if not any(m in (r.get("answer") or "") for m in _NOT_A_RUN)]
+    runs = [r for r in state["runs"] if _is_run(r)]
     by_persona: dict[str, dict] = {}
     blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0, "skipped": 0,
                      "provider_failures": 0, "provider_recovered": 0, "explored": 0}
@@ -1573,6 +1583,8 @@ def main(argv: list[str] | None = None) -> int:
     if run.build is not None:
         record["build"] = run.build
         record["task"] = task[:160] if path == "builder" else None
+        record["answer"] = answer[:200]
+    if any(m in answer for m in _NOT_A_RUN):
         record["answer"] = answer[:200]
     if run.opencode is not None:
         record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "steps", "exit",
