@@ -104,6 +104,13 @@ PROVIDERS = {
     "mistral": {"host": "api.mistral.ai", "url": "https://api.mistral.ai/v1/chat/completions",
                 "key": os.environ.get("MISTRAL_API_KEY"), "models": ["ministral-8b-latest"], "daily_cap": 400,
                 "alt_models": ["ministral-14b-latest", "codestral-latest"]},
+    # xKiro (added 2026-09-18 08:00 UTC, user-issued key): a routing gateway
+    # whose site states its free tier as 500,000 tokens a day. Tool calls
+    # verified on all three models. 300 calls a day at the fleet's prompt
+    # sizes (~1k tokens on the qwen chat template) stays well inside that.
+    "xkiro": {"host": "api.xkiro.com", "url": "https://api.xkiro.com/v1/chat/completions",
+              "key": os.environ.get("XKIRO_API_KEY"), "models": ["qwen/qwen3.6-27b:free"], "daily_cap": 300,
+              "alt_models": ["minimax/minimax-m2.7-highspeed:free", "qwen/qwen3.5-flash:free"]},
     "ollama": {"host": "ollama.com", "url": "https://ollama.com/v1/chat/completions",
                "key": os.environ.get("LLAMA_API_KEY"),
                "models": ["gpt-oss:20b", "nemotron-3-nano:30b", "gemma4:31b"], "daily_cap": 150,
@@ -256,9 +263,17 @@ PERSONAS = [
     ("fleet-decor-ask-d",  "decorator", "mistral", True,  PYPI_NPM),
     ("fleet-decor-blind-d","decorator", "mistral", False, PYPI_NPM),
     ("fleet-explore-e",    "decorator", "mistral", True,  GITHUB),
+    # xKiro (2026-09-18 08:00 UTC): decorator twins, builder twins, explorer.
+    ("fleet-decor-ask-e",  "decorator", "xkiro",  True,  GITHUB),
+    ("fleet-decor-blind-e","decorator", "xkiro",  False, GITHUB),
+    ("fleet-build-ask-x",  "builder",   "xkiro",  True,  BUILDER_TASKS),
+    ("fleet-build-blind-x","builder",   "xkiro",  False, BUILDER_TASKS),
+    ("fleet-explore-f",    "decorator", "xkiro",  True,  PYPI_NPM),
 ]
-BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n"}
-EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c", "fleet-explore-d", "fleet-explore-e"}
+BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
+                  "fleet-build-ask-x", "fleet-build-blind-x"}
+EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c", "fleet-explore-d", "fleet-explore-e",
+                     "fleet-explore-f"}
 
 #: Ask/blind twins by reporter. The round-robin ran every ask twin before
 #: its blind twin, two minutes apart, and on GitHub's hourly budget the twin
@@ -272,7 +287,8 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-test-ask", "fleet-test-blind"), ("fleet-gh-ask", "fleet-gh-blind"),
          ("fleet-build-ask", "fleet-build-blind"), ("fleet-limits-ask", "fleet-limits-blind"),
          ("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n"),
-         ("fleet-decor-ask-d", "fleet-decor-blind-d")]
+         ("fleet-decor-ask-d", "fleet-decor-blind-d"), ("fleet-decor-ask-e", "fleet-decor-blind-e"),
+         ("fleet-build-ask-x", "fleet-build-blind-x")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 

@@ -290,6 +290,16 @@ FreeTierError: OpenCode's free tier can only be used from within
 OpenCode`, and everything else on it is pay-per-use, so it is not in the
 fleet. No paid request was sent.
 
+## Change during the run: xKiro joins, 2026-09-18 08:00 UTC
+
+User-issued key for xkiro.com, a routing gateway; its site states the
+free tier as 500,000 tokens a day. `qwen/qwen3.6-27b:free`,
+`minimax/minimax-m2.7-highspeed:free` and `qwen/qwen3.5-flash:free` all
+make real tool calls, checked by hand. Cap 300 calls a day. Decorator
+twins on GitHub, builder twins, an explorer on PyPI/npm; the onboarding
+test takes the qwen as its eleventh model. Thirty-six personas; a full
+cycle is 72 minutes. Three builder pairs now, on groq, NVIDIA and xKiro.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

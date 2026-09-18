@@ -94,6 +94,7 @@ MODELS = [
     ("openrouter", "inclusionai/ling-3.0-flash-vl:free"),
     ("nvidia", "nvidia/nemotron-3-super-120b-a12b"),
     ("mistral", "ministral-14b-latest"),
+    ("xkiro", "qwen/qwen3.6-27b:free"),
 ]
 
 
