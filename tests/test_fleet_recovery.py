@@ -408,6 +408,50 @@ def test_a_builder_switches_model_on_a_daily_quota(monkeypatch):
     assert run.model.endswith("->openai/gpt-oss-120b") and run.tokens_prompt == 5
 
 
+def test_a_builder_fetching_an_off_list_host_is_told_so_and_nothing_is_reported(monkeypatch):
+    """18 Sep 03:xx: a task said to test on httpbingo.org/json, both builders
+    called fetch_doc on it, the allowlist raised, and the raise was reported
+    to the lab as httpbingo.org fetch_doc/error -- our fence, filed as the
+    host failing. Now the model is told what fetch_doc is for and no call
+    or report happens."""
+    import io
+    import json as _json
+
+    calls = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+
+        def __exit__(self, *a): return False
+
+    def urlopen(req, timeout):
+        calls.append(_json.loads(req.data))
+        if "messages" not in calls[-1]:
+            return Resp(b'{"known": false, "status": "INSUFFICIENT_DATA"}')
+        if len([c for c in calls if "messages" in c]) == 1:
+            body = {"choices": [{"message": {"content": None, "tool_calls": [
+                {"id": "t1", "type": "function", "function": {"name": "fetch_doc", "arguments": _json.dumps({"url": "https://httpbingo.org/json"})}}]}}],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 1}}
+        else:
+            body = {"choices": [{"message": {"content": "done"}}], "usage": {"prompt_tokens": 5, "completion_tokens": 1}}
+        return Resp(_json.dumps(body).encode())
+
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    monkeypatch.setitem(F.PROVIDERS["groq"], "key", "k")
+    import failecho_fleet.builder as B
+    monkeypatch.setattr(B, "available", lambda: "no kvm in tests")
+    reported = []
+    monkeypatch.setattr(F, "fetch_doc", lambda url: reported.append(url) or {"url": url, "text": ""})
+    run = F.Run("fleet-build-ask", "builder", "groq", True)
+    run.report_failure = lambda *a, **k: reported.append(a)
+    assert run.run_build("test on httpbingo.org/json", run_index=0) == "done"
+    assert reported == [] and run.failures == []
+    chats = [c for c in calls if "messages" in c]
+    tool_reply = _json.loads(chats[1]["messages"][-1]["content"])
+    assert "documentation only" in tool_reply["error"] and "run_python" in tool_reply["error"]
+
+
 def test_a_model_recalling_the_same_tool_after_a_skip_is_counted():
     run = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
     run.ask = lambda *a, **k: {"fingerprint": "fp", "recommendation": {"action": "skip"}}

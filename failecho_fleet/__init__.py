@@ -38,7 +38,7 @@ import urllib.request
 
 from failecho_autoreport import FailEcho, classify
 
-from .builder import BUILDER_SCHEMAS, BUILDER_TASKS, SYSTEM_PROMPT as BUILDER_PROMPT, Builder, fetch_doc
+from .builder import BUILDER_SCHEMAS, BUILDER_TASKS, DOC_HOSTS, SYSTEM_PROMPT as BUILDER_PROMPT, Builder, fetch_doc
 
 __version__ = "0.1.0"
 UA = "failecho-fleet/0.1 (+https://failecho.com; lab)"
@@ -893,11 +893,20 @@ class Run:
                     elif name == "resolve_python_deps":
                         result = json.dumps(b.resolve_python_deps(args.get("requirements") if isinstance(args.get("requirements"), list) else []))
                     elif name == "fetch_doc":
-                        self.tool_calls -= 1   # call() counts it
                         url = str(args.get("url") or "")
                         host = (urllib.parse.urlsplit(url).hostname or "").lower() or "invalid"
-                        wrapped = self.fe.watch(service=host, operation="fetch_doc", mutates=False)(fetch_doc)
-                        result, _ = self.call("fetch_doc", {"url": url}, fn=wrapped, service=host)
+                        if host not in DOC_HOSTS:
+                            # our allowlist refusing is not the host failing:
+                            # nothing was called, nothing is reported (18 Sep
+                            # 03:xx both builders filed httpbingo.org
+                            # fetch_doc/error for fetching task data this way)
+                            self.tool_calls += 1
+                            result = json.dumps({"error": "fetch_doc reads documentation only, from: " + ", ".join(DOC_HOSTS)
+                                                 + ". Fetch data from inside run_python."})
+                        else:
+                            self.tool_calls -= 1   # call() counts it
+                            wrapped = self.fe.watch(service=host, operation="fetch_doc", mutates=False)(fetch_doc)
+                            result, _ = self.call("fetch_doc", {"url": url}, fn=wrapped, service=host)
                     else:
                         result = json.dumps({"error": "unknown tool"})
                     messages.append({"role": "tool", "tool_call_id": c["id"], "content": result[:6000]})
