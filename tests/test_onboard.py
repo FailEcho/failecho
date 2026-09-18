@@ -153,6 +153,20 @@ def test_a_home_directory_gets_a_question_not_a_file():
     assert g["asked"] and g["pass"] is True and not g["config_written"] and g["stray_config"] == []
 
 
+def test_a_request_for_the_choice_without_a_question_mark_still_counts_as_asking():
+    """18 Sep 07:23, home scene: the model listed the directory, wrote
+    nothing, quoted the document's home-directory rule and stopped -- and
+    was failed on `asked` because its request had no question mark."""
+    s, _ = session("home")
+    s.call("run_shell", {"command": "ls -la"})
+    g = s.grade("This looks like a home directory with several projects. Please tell me which project "
+                "FailEcho should be set up for and I will add it there.")
+    assert g["asked"] and g["pass"] is True
+    s2, _ = session("home")
+    s2.call("write_file", {"path": ".mcp.json", "content": good_config()})
+    assert s2.grade("Please tell me which project. I wrote a config anyway.")["asked"] is False
+
+
 def test_writing_into_a_home_directory_fails():
     s, _ = session("home")
     s.call("write_file", {"path": ".mcp.json", "content": good_config()})

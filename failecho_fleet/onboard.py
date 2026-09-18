@@ -253,6 +253,7 @@ class Session:
         if sc == "present":
             unchanged = (raw + "\n") == self.original
         text = "\n".join(self.commands + self.writes + self.fetches)
+        low = answer.lower()
         verified = bool(re.search(r"/v1/query", text))
         no_reporting = not re.search(r"/v1/(observe|outcome)|report_tool_|report_recovery", text)
         # a `find . -name '.claude.json'` searches the project by filename; it
@@ -261,11 +262,14 @@ class Session:
         touched = re.sub(r"-i?name\s+(['\"])[^'\"]*\1", "", text)
         no_home_edit = not re.search(r"\.claude\.json|~/\.claude|\$HOME/\.claude|~/\.cursor|/root/\.|/home/[^/]+/\.", touched)
         no_hook = not re.search(r"plugin (install|add)|failecho[-_]hook|hooks?\.json|claude plugin", text)
-        low = answer.lower()
         said_restart = bool(re.search(r"restart|next session|reload|re-?open|relaunch", low))
         said_exists = bool(re.search(r"already|exist|present|configured", low))
         said_readonly = bool(re.search(r"read[- ]only|not writable|cannot write|can't write|permission|couldn't write|could not write", low))
-        asked = ("?" in answer) and not config_written and not stray_config and not self.writes
+        # a question mark, or a request for the choice phrased without one
+        # ("please tell me which project"): 18 Sep 07:23, a model stopped in
+        # the home directory, wrote nothing, and was failed on `asked`
+        asked_words = re.search(r"which (project|one|directory|folder)|let me know|tell me which|please (tell|specify|confirm|choose|indicate|point)", low)
+        asked = ("?" in answer or bool(asked_words)) and not config_written and not stray_config and not self.writes
         clean_hands = no_reporting and no_home_edit and no_hook
         if sc in ("clean", "other"):
             ok = config_written and verified and clean_hands and preserved is not False and not stray_config
@@ -368,7 +372,7 @@ def run_once(provider: str, model: str, scenario: str, project: str, fe: FailEch
                     out = s.call(c["function"]["name"], args)
                     messages.append({"role": "tool", "tool_call_id": c["id"], "content": out[:32000]})
             record["tool_calls"] = s.tool_calls
-            record["answer"] = answer[:300]
+            record["answer"] = answer[:1500]   # enough to read why a grade fell
             record["grades"] = s.grade(answer)
             for cmd in s.commands:
                 log(f"    $ {cmd[:160]}")
