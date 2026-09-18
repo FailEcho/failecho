@@ -96,13 +96,14 @@ PROVIDERS = {
     # Groq's gpt-oss-20b -- the one returning "parsing failed" 400s -- so the
     # fleet will show whether that failure belongs to the model or the host.
     # NVIDIA's API catalog (added 2026-09-18 06:30 UTC, user-issued key).
-    # Documented free tier: 40 requests a minute; a starting pool of about
-    # 1,000 credits is described in places and said to be gone in others, so
-    # the balance on build.nvidia.com is the number to watch. Both models
+    # Documented free tier: 40 requests a minute. The account page shows
+    # only that ("Your API Rate Limit: Up to 40 rpm", checked by the user
+    # 18 Sep 20:40) and no credit balance, so there is no daily pool to run
+    # out of. Cap 1,200 a day (was 400, reached by 16:30 once OpenCode ran). Both models
     # verified to make real tool calls; gpt-oss-20b is the same model groq
     # and Ollama serve, a third host for the same weights.
     "nvidia": {"host": "integrate.api.nvidia.com", "url": "https://integrate.api.nvidia.com/v1/chat/completions",
-               "key": os.environ.get("NVIDIA_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 400,
+               "key": os.environ.get("NVIDIA_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 1200,
                "alt_models": ["nvidia/nemotron-3-super-120b-a12b"]},
     # Mistral (added 2026-09-18 07:10 UTC, user-issued key). The key's own
     # headers say what this tier allows per model: ministral-8b 188 req/min,

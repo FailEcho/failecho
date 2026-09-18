@@ -728,8 +728,9 @@ def test_provider_caps_stay_within_the_documented_free_tiers():
     assert F.PROVIDERS["gemini"]["daily_cap"] <= 20 * (1 + len(F.PROVIDERS["gemini"]["alt_models"]))
     assert F.PROVIDERS["openrouter"]["daily_cap"] <= 50
     assert F.PROVIDERS["groq"]["daily_cap"] <= 1000
-    # NVIDIA documents 40 requests a minute; 400 a day is well inside it
-    assert F.PROVIDERS["nvidia"]["daily_cap"] <= 40 * 60 * 24 // 100
+    # NVIDIA documents 40 requests a minute and shows no daily pool; stay
+    # under an hour's worth of that rate per day
+    assert F.PROVIDERS["nvidia"]["daily_cap"] <= 40 * 60
     # Mistral's headers for this key: ministral-8b 188 a minute; 400 a day is well inside it
     assert F.PROVIDERS["mistral"]["daily_cap"] <= 188 * 60 * 24 // 100
     # xKiro states 1,000,000 tokens a day for a Telegram-verified account; 600 calls at ~1k tokens is inside it
