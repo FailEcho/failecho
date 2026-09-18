@@ -839,3 +839,38 @@ def test_the_etag_cache_keeps_only_small_answers(tmp_path, monkeypatch):
     saved = json.loads((tmp_path / "etags-fleet-decor-ask-a.json").read_text())
     assert len(saved) == 50 and "https://registry.npmjs.org/express" not in saved
     assert (tmp_path / "etags-fleet-decor-ask-a.json").stat().st_size < 10_000
+
+
+def test_a_provider_at_our_daily_cap_is_skipped_and_cap_skips_are_not_runs(tmp_path, monkeypatch):
+    """18 Sep: NVIDIA reached the fleet's own cap of 400 at ~16:30 and its
+    four VM-lane personas kept running in 0 s, filed as failed tasks."""
+    import datetime as dt
+    import json
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(F, "assert_lab_only", lambda: None)
+    monkeypatch.setattr(F.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(F.FailEcho, "flush", lambda self, timeout=5.0: True)
+    today = dt.date.today().isoformat()
+    vm = F.lane_personas("vm")
+    start = next(i for i, j in enumerate(vm) if F.PERSONAS[j][2] == "nvidia")
+    (tmp_path / "state.json").write_text(json.dumps({
+        "next_vm": start, "runs": [], "day": today, "runs_today": 0, "provider_day": today,
+        "provider_calls_today": {"nvidia": F.PROVIDERS["nvidia"]["daily_cap"]}}))
+    ran = []
+    monkeypatch.setattr(F.Run, "run_build", lambda self, *a, **k: ran.append(self.reporter) or "done")
+    monkeypatch.setattr(F.Run, "run_opencode", lambda self, *a, **k: ran.append(self.reporter) or "done")
+    assert F.main(["--lane", "vm"]) == 0
+    assert ran and F.PERSONAS[[p[0] for p in F.PERSONAS].index(ran[0])][2] != "nvidia"
+
+    capped = {"at": "2026-09-18T17:00:00+00:00", "reporter": "fleet-oc-ask-n", "path": "opencode", "provider": "nvidia",
+              "asks": True, "tool_calls": 0, "model_calls": 0, "seconds": 0.0, "failures": [],
+              "answer": "(provider nvidia daily cap reached; run skipped)",
+              "metrics": {"tokens_prompt": 0, "tokens_completion": 0, "asks": 0, "ask_seconds": 0, "wait_seconds": 0,
+                          "completed": False, "calls_first_try": 0, "calls_recovered": 0, "calls_failed": 0}}
+    F.write_report({"runs": [capped]})
+    report = json.loads((tmp_path / "fleet.json").read_text())
+    assert report["totals"]["runs"] == 0 and not report["costs"]

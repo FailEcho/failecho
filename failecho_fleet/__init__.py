@@ -1136,8 +1136,12 @@ def _save(state: dict) -> None:
         json.dump(state, fh)
 
 
+#: A run that never started because a cap said no is not a run.
+_NOT_A_RUN = ("daily cap reached; run skipped", "(no provider key)")
+
+
 def write_report(state: dict) -> None:
-    runs = state["runs"]
+    runs = [r for r in state["runs"] if not any(m in (r.get("answer") or "") for m in _NOT_A_RUN)]
     by_persona: dict[str, dict] = {}
     blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0, "skipped": 0,
                      "provider_failures": 0, "provider_recovered": 0, "explored": 0}
@@ -1495,12 +1499,21 @@ def main(argv: list[str] | None = None) -> int:
             # resets at midnight Pacific), so a dead mark expires after
             # QUOTA_PROBE_SECONDS and the next persona on that provider is the
             # probe: it either runs, or re-marks the provider for another spell.
+            # A provider at our own daily cap is skipped the same way: before
+            # 18 Sep 19:30 its personas ran, returned "(daily cap reached)"
+            # in 0 s, and were filed as failed tasks -- 45 of them for NVIDIA
+            # in three hours, dragging the build and OpenCode rows.
+            calls = state.get("provider_calls_today", {}) if state.get("provider_day") == today else {}
+            capped = {name for name, p in PROVIDERS.items() if calls.get(name, 0) >= p.get("daily_cap", 10**9)}
             skipped = 0
             members = len(lane_personas(lane))
             idx = persona_index(state[cursor], lane)
-            while PERSONAS[idx][2] in dead and skipped < members:
-                log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone; next probe after "
-                    f"{QUOTA_PROBE_SECONDS // 60} min")
+            while (PERSONAS[idx][2] in dead or PERSONAS[idx][2] in capped) and skipped < members:
+                if PERSONAS[idx][2] in capped:
+                    log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} at its daily cap")
+                else:
+                    log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone; next probe after "
+                        f"{QUOTA_PROBE_SECONDS // 60} min")
                 state[cursor] += 1
                 state["skipped_for_quota_today"] = state.get("skipped_for_quota_today", 0) + 1
                 skipped += 1
