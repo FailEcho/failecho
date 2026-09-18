@@ -1219,6 +1219,73 @@ def write_report(state: dict) -> None:
             {"metric": "tokens per completed task", "unit": "", "ask": tpc(a), "blind": tpc(b), "better": _better(tpc(a), tpc(b))},
             {"metric": "seconds per run", "unit": "s", "ask": spr(a), "blind": spr(b), "better": _better(spr(a), spr(b))},
         ]})
+    # What the advice is worth, by failure shape: once a call has failed,
+    # what happened to the second attempt when the network recommended it,
+    # when the asker had no advice (it then does what blind does), and when
+    # blind retried -- and, for the skip verdict, what blind's retries
+    # yielded in the same hour on the same shape the network told askers to
+    # skip. The forfeited-recovery rate is the cost of a skip.
+    shapes: dict[tuple, dict] = {}
+    skipped_keys: set[tuple] = set()
+    for r in runs:
+        if r["at"] < FAIR_ORDER_SINCE or r["reporter"] in EXPLORER_PERSONAS:
+            continue
+        for f in r["failures"]:
+            k = (f["service"], f["error_type"], f.get("error_code"))
+            row = shapes.setdefault(k, {"service": k[0], "error_type": k[1], "error_code": k[2], "skipped": 0,
+                                        "advised_retries": 0, "advised_recovered": 0, "unadvised_retries": 0,
+                                        "unadvised_recovered": 0, "blind_retries": 0, "blind_recovered": 0,
+                                        "blind_retries_where_skipped": 0, "blind_recovered_where_skipped": 0})
+            if r["asks"] and f.get("skipped"):
+                row["skipped"] += 1
+                skipped_keys.add((r["at"][:13], f["service"], f["operation"], f["error_type"], f.get("error_code")))
+                continue
+            if f["attempts"] < 2:
+                continue
+            side = ("advised" if f.get("recommended") else "unadvised") if r["asks"] else "blind"
+            row[side + "_retries"] += 1
+            row[side + "_recovered"] += int(f["recovered"])
+    for r in runs:
+        if r["at"] < FAIR_ORDER_SINCE or r["asks"] or r["reporter"] in EXPLORER_PERSONAS:
+            continue
+        for f in r["failures"]:
+            if f["attempts"] >= 2 and (r["at"][:13], f["service"], f["operation"], f["error_type"], f.get("error_code")) in skipped_keys:
+                row = shapes[(f["service"], f["error_type"], f.get("error_code"))]
+                row["blind_retries_where_skipped"] += 1
+                row["blind_recovered_where_skipped"] += int(f["recovered"])
+    advice = sorted((row for row in shapes.values()
+                     if row["skipped"] + row["advised_retries"] + row["unadvised_retries"] + row["blind_retries"] >= 8),
+                    key=lambda x: -(x["skipped"] + x["advised_retries"] + x["unadvised_retries"] + x["blind_retries"]))
+
+    # Does the network get better as evidence accumulates? Per half day, for
+    # the model-driven and cron twins: the share of an asker's failures the
+    # network had a recommendation for, and what each side completed.
+    halves: dict[str, dict] = {}
+    for r in runs:
+        if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS:
+            continue
+        if not r.get("metrics"):
+            continue
+        half = r["at"][:10] + (" 00-12" if r["at"][11:13] < "12" else " 12-24")
+        h = halves.setdefault(half, {"period": half, "ask_runs": 0, "ask_completed": 0, "blind_runs": 0, "blind_completed": 0,
+                                     "ask_failures": 0, "ask_advised": 0, "ask_failure_seconds": 0.0, "blind_failure_seconds": 0.0})
+        side = "ask" if r["asks"] else "blind"
+        h[side + "_runs"] += 1
+        h[side + "_completed"] += int(bool(r["metrics"].get("completed")))
+        h[side + "_failure_seconds"] += sum(float(f.get("seconds") or 0) for f in r["failures"])
+        if r["asks"]:
+            for f in r["failures"]:
+                h["ask_failures"] += 1
+                h["ask_advised"] += int(bool(f.get("recommended")))
+    timeline = []
+    for h in (halves[k] for k in sorted(halves)):
+        h["advised_share"] = round(h["ask_advised"] / h["ask_failures"], 3) if h["ask_failures"] else None
+        h["ask_completed_rate"] = round(h["ask_completed"] / h["ask_runs"], 3) if h["ask_runs"] else None
+        h["blind_completed_rate"] = round(h["blind_completed"] / h["blind_runs"], 3) if h["blind_runs"] else None
+        h["ask_failure_seconds_per_run"] = round(h["ask_failure_seconds"] / h["ask_runs"], 2) if h["ask_runs"] else None
+        h["blind_failure_seconds_per_run"] = round(h["blind_failure_seconds"] / h["blind_runs"], 2) if h["blind_runs"] else None
+        timeline.append(h)
+
     for row in real_targets:
         row["attempts_per_failure"] = round(row["attempts"] / row["failures"], 2) if row["failures"] else None
         row["seconds"] = round(row["seconds"], 1)
@@ -1281,6 +1348,7 @@ def write_report(state: dict) -> None:
             for r in runs if r.get("build") and r["reporter"] in BUILD_PERSONAS
         ][-12:][::-1],
         "repeats": repeats, "naming": naming, "real_targets": real_targets, "costs": cost_rows, "versus": versus,
+        "advice": advice, "timeline": timeline,
         "personas": sorted(by_persona.values(), key=lambda p: p["reporter"]),
     }
     os.makedirs(os.path.dirname(REPORT_PATH) or ".", exist_ok=True)

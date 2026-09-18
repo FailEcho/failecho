@@ -59,6 +59,19 @@
               td(r.attempts_per_failure == null ? "-" : r.attempts_per_failure.toFixed(2), "num"),
               td(r.recovered, "num"), td(r.skipped, "num"), td(r.seconds, "num")];
     }));
+    function ratio(n, k) { return k ? n + "/" + k + " (" + Math.round(100 * n / k) + "%)" : "-"; }
+    fill("fleet-advice", (d.advice || []).map(function (a) {
+      return [td(a.service), td(a.error_type + (a.error_code ? " " + a.error_code : "")),
+              td(ratio(a.advised_recovered, a.advised_retries), "num"), td(ratio(a.unadvised_recovered, a.unadvised_retries), "num"),
+              td(ratio(a.blind_recovered, a.blind_retries), "num"), td(a.skipped, "num"),
+              td(ratio(a.blind_recovered_where_skipped, a.blind_retries_where_skipped), "num")];
+    }));
+    fill("fleet-timeline", (d.timeline || []).map(function (h) {
+      function pct(v) { return v == null ? "-" : Math.round(100 * v) + "%"; }
+      return [td(h.period), td(h.ask_failures ? pct(h.advised_share) + " (" + h.ask_advised + "/" + h.ask_failures + ")" : "-", "num"),
+              td(pct(h.ask_completed_rate) + " (" + h.ask_runs + ")", "num"), td(pct(h.blind_completed_rate) + " (" + h.blind_runs + ")", "num"),
+              td(h.ask_failure_seconds_per_run, "num"), td(h.blind_failure_seconds_per_run, "num")];
+    }));
     fill("fleet-provider", (d.cohorts || []).filter(function (c) { return c.cohort.indexOf("test") !== 0 && c.cohort.indexOf("build") !== 0; }).map(function (c) {
       var pf = c.provider_failures || 0, pr = c.provider_recovered || 0;
       return [td(c.cohort), td(pf, "num"), td(pr, "num"), td(pf ? Math.round(100 * pr / pf) + "%" : "-", "num"), td(c.explored || 0, "num")];

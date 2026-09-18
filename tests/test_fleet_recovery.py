@@ -718,3 +718,41 @@ def test_the_nvidia_personas_are_twins_and_the_onboarding_rotation_stays_coprime
     assert by["fleet-explore-e"][2] == "mistral" and "fleet-explore-e" in F.EXPLORER_PERSONAS
     assert "fleet-explore-d" in F.EXPLORER_PERSONAS and by["fleet-explore-d"][2] == "nvidia"
     assert ("nvidia", "nvidia/nemotron-3-super-120b-a12b") in onboard.MODELS
+
+
+def test_the_advice_table_and_the_timeline_are_built_from_the_ledger(tmp_path, monkeypatch):
+    """By failure shape: advised, unadvised and blind second attempts, skips,
+    and blind's yield in the hour and shape the network said skip. And per
+    half day, the share of failures the network had advice for."""
+    import json
+
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    def f(recommended, attempts, recovered, skipped=False):
+        return {"service": "httpbingo.org", "operation": "always_broken", "error_type": "server_error", "error_code": "503",
+                "asked": recommended is not None, "recommended": recommended, "attempts": attempts, "recovered": recovered,
+                "skipped": skipped, "seconds": 1.0}
+    def run(reporter, asks, at, failures, done=False):
+        return {"at": at, "reporter": reporter, "path": "decorator", "provider": None, "asks": asks, "tool_calls": 3,
+                "model_calls": 0, "seconds": 2.0, "failures": failures,
+                "metrics": {"tokens_prompt": 0, "tokens_completion": 0, "asks": 0, "ask_seconds": 0, "wait_seconds": 0,
+                            "completed": done, "calls_first_try": 1, "calls_recovered": 0, "calls_failed": 1}}
+    t1, t2 = "2026-09-18T03:10:00+00:00", "2026-09-18T03:20:00+00:00"
+    state = {"runs": [
+        run("fleet-cron-a", True, t1, [f("retry", 2, True)] * 3 + [f("skip", 1, False, skipped=True)] * 3 + [f(None, 2, False)] * 2, done=True),
+        run("fleet-cron-b", False, t2, [f(None, 2, True), f(None, 2, False), f(None, 2, False), f(None, 2, False)]),
+        run("fleet-explore-c", True, t2, [f("retry", 2, False)] * 10),   # explorers stay out
+    ]}
+    F.write_report(state)
+    report = json.loads((tmp_path / "fleet.json").read_text())
+    (a,) = report["advice"]
+    assert (a["service"], a["error_type"], a["error_code"]) == ("httpbingo.org", "server_error", "503")
+    assert (a["advised_retries"], a["advised_recovered"]) == (3, 3)
+    assert (a["unadvised_retries"], a["unadvised_recovered"]) == (2, 0)
+    assert (a["blind_retries"], a["blind_recovered"]) == (4, 1)
+    assert a["skipped"] == 3 and (a["blind_retries_where_skipped"], a["blind_recovered_where_skipped"]) == (4, 1)
+    (h,) = report["timeline"]
+    assert h["period"] == "2026-09-18 00-12" and h["ask_runs"] == 1 and h["blind_runs"] == 1
+    assert h["ask_failures"] == 8 and h["ask_advised"] == 6 and h["advised_share"] == 0.75
+    assert h["ask_completed_rate"] == 1.0 and h["blind_completed_rate"] == 0.0

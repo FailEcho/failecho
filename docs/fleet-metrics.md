@@ -78,6 +78,25 @@ failures met (should be near-equal between cohorts; if not, the sample is
 skewed), provider failures recovered, tokens per completed task, seconds
 per run. `since` is carried in the group so a reader sees the window.
 
+## `advice` and `timeline` (since 2026-09-18 08:50)
+
+`advice`: per (service, error class, code), twins only, since the fair
+order: second attempts and their outcome when the network recommended
+them (`advised_*`), when the asker had no advice and did what blind does
+(`unadvised_*`), and blind's (`blind_*`); `skipped`; and
+`blind_*_where_skipped`, blind's retries and recoveries in the same hour
+on the same shape the network told askers to skip -- the forfeited
+recoveries, i.e. the cost of a skip. First cut of the data, 08:40 UTC:
+httpbingo 503 advised 26/37 recovered against blind 38/91; GitHub 403
+unadvised 6/179 against blind 9/145 (nobody recovers it, and the network
+says skip); in the hours and shapes the network said skip, blind retried
+165 times and recovered once.
+
+`timeline`: per half day, model-driven and cron twins: the share of an
+asker's failures the network had a recommendation for, completion per
+side, failure seconds per run. Advised share 17 Sep morning 0/16,
+afternoon 6/88, 18 Sep morning 58/218 -- the network's own learning curve.
+
 ## What to compare, and what not to
 
 Ask vs blind twins share workloads, providers and one IP address. Compare

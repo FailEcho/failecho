@@ -118,6 +118,27 @@
     <th class="num">recovered</th><th class="num">skipped</th><th class="num">seconds lost</th>
   </tr></thead><tbody></tbody></table>
 
+  <h2>What the advice is worth, by failure shape</h2>
+  <p class="sub">Once a call has failed, what happened to the second attempt: when the network recommended it
+  (<em>advised</em>), when the asker had nothing from the network and did what blind does (<em>no advice</em>),
+  and when blind retried. The last column is the cost of a skip: in the same hour, on the same shape the
+  network told askers to skip, how many of blind's retries recovered. Since 2026-09-17 06:30 UTC, twins only,
+  shapes with at least eight events.</p>
+  <table id="fleet-advice"><thead><tr>
+    <th>service</th><th>class</th><th class="num">advised</th><th class="num">no advice</th><th class="num">blind</th>
+    <th class="num">skipped</th><th class="num">blind recovered where skipped</th>
+  </tr></thead><tbody></tbody></table>
+
+  <h2>Does it get better with evidence?</h2>
+  <p class="sub">Per half day, model-driven and cron twins: the share of an asker's failures the network had a
+  recommendation for, what each side completed, and seconds lost inside failures per run. Twins share one address
+  and GitHub's hourly budget, so completion moves with who met the 403s; the advised share is the network's own
+  curve.</p>
+  <table id="fleet-timeline"><thead><tr>
+    <th>period (UTC)</th><th class="num">advised share</th><th class="num">ask completed</th><th class="num">blind completed</th>
+    <th class="num">ask fail-s / run</th><th class="num">blind fail-s / run</th>
+  </tr></thead><tbody></tbody></table>
+
   <h2>When the model provider fails</h2>
   <p class="sub">Groq, Gemini, OpenRouter, NVIDIA, Mistral, xKiro and Ollama fail for real every day: 429s, 503s, timeouts, a 400 when a model
   emits broken tool JSON. Blind personas give up. Askers do what the network recommends. Two explorers try an
