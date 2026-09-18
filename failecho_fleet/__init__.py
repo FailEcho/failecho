@@ -555,6 +555,17 @@ TOOL_SCHEMAS = [
 # ---------------------------------------------------------------------------
 
 
+def completion(resp):
+    """A chat completion, or an error a recovery path can handle. Providers
+    sometimes answer 200 with an error object and no ``choices``
+    (2026-09-18 21:53, a light-lane run); indexing into that killed the run."""
+    if isinstance(resp, dict) and resp.get("choices"):
+        return resp
+    err = resp.get("error") if isinstance(resp, dict) else None
+    msg = (err.get("message") if isinstance(err, dict) else err) or "no choices in response"
+    raise ValueError(f"provider returned no completion: {str(msg)[:120]}")
+
+
 class Run:
     """Everything one run needs to know about itself, and the scoreboard row it
     leaves behind."""
@@ -911,7 +922,7 @@ class Run:
                                                   "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
             try:
                 with urllib.request.urlopen(req, timeout=60) as r:
-                    return self._count_tokens(json.load(r))
+                    return self._count_tokens(completion(json.load(r)))
             except urllib.error.HTTPError as e:
                 # a provider rejecting our request is data, and if it is OUR
                 # request shape that is wrong, the journal is where we find out
@@ -1006,7 +1017,7 @@ class Run:
                                                   "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
             try:
                 with urllib.request.urlopen(req, timeout=90) as r:
-                    return self._count_tokens(json.load(r))
+                    return self._count_tokens(completion(json.load(r)))
             except urllib.error.HTTPError as e:
                 body = e.read()[:400].decode(errors="ignore")
                 e.failecho_body = body

@@ -67,7 +67,7 @@ from failecho_autoreport import FailEcho, classify
 
 from failecho_sandbox import Sandbox, SandboxError, available
 
-from . import LAB_ENDPOINT, PROVIDERS, QUOTA_PROBE_SECONDS, UA, _quota_probe_due, assert_lab_only, log
+from . import LAB_ENDPOINT, PROVIDERS, QUOTA_PROBE_SECONDS, UA, _quota_probe_due, assert_lab_only, completion, log
 
 STATE_DIR = ((os.environ.get("STATE_DIRECTORY") or "").split(":")[0]
              or os.environ.get("FLEET_STATE_DIR") or "/tmp/failecho-fleet")
@@ -319,7 +319,7 @@ def run_once(provider: str, model: str, scenario: str, project: str, fe: FailEch
                                               "Authorization": f"Bearer {p['key']}", **p.get("headers", {})})
         try:
             with urllib.request.urlopen(req, timeout=90) as r:
-                return json.load(r)
+                return completion(json.load(r))
         except urllib.error.HTTPError as e:
             log(f"  provider {p['host']} HTTP {e.code}: {e.read()[:200].decode(errors='ignore')!r}")
             raise

@@ -915,3 +915,13 @@ def test_a_provider_over_its_daily_token_tier_is_skipped(tmp_path, monkeypatch):
     F.main(["--lane", "light"])
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["provider_tokens_today"]["groq"] == 1000 and state["provider_calls_today"]["groq"] == 2
+
+
+def test_completion_without_choices_is_a_provider_error_not_a_crash():
+    import pytest
+    from failecho_fleet import completion
+    ok = {"choices": [{"message": {"content": "ok"}}]}
+    assert completion(ok) is ok
+    for bad in ({"error": {"message": "overloaded"}}, {"choices": []}, {}, None):
+        with pytest.raises(ValueError, match="no completion"):
+            completion(bad)
