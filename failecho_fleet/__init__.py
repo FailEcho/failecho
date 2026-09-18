@@ -93,11 +93,12 @@ PROVIDERS = {
                "alt_models": ["nemotron-3-nano:30b", "gpt-oss:20b"]},
 }
 
-#: What an agent can do about a model provider failing, beyond retrying. The
-#: explorers try these in order, one per failure, skipping any the network
-#: already has evidence for, and report what happened; askers then inherit
-#: whichever the network recommends. Blind personas give up on a provider
-#: failure, which is what the fleet did on its first day.
+#: What an agent can do about a model provider failing, beyond retrying.
+#: Explorers try these, one per failure, and report what happened; askers
+#: then inherit whichever the network recommends. Blind personas, and askers
+#: the network has nothing for, do what an agent without the network does:
+#: one plain retry after a short pause (since PROVIDER_CONTROL_SINCE; on the
+#: first day they gave up at once, which flattered the ask side).
 PROVIDER_ACTIONS = {
     "rate_limit": ["wait_until_reset", "backoff", "switch_model"],
     "validation_error": ["retry_without_tool_choice", "switch_model", "retry"],
@@ -107,6 +108,30 @@ PROVIDER_ACTIONS = {
 }
 KNOWN_ACTIONS = ("backoff", "retry", "refresh_schema", "skip", "wait_until_reset", "switch_model",
                  "retry_without_tool_choice", "conditional_request")
+#: When blind personas (and askers without advice) started retrying a failed
+#: provider once instead of giving up. Provider-failure comparisons start here.
+PROVIDER_CONTROL_SINCE = "2026-09-18T05:30:00"
+#: An explorer keeps trying an action until the network has enough evidence
+#: to rule on it. Matches the server's min_recovery_attempts; below it a
+#: single 1/1 is not a recommendation and the askers inherit nothing.
+EXPLORE_UNTIL_ATTEMPTS = 5
+
+
+def explore(candidates: list[str], evidence: list[dict]) -> str | None:
+    """The action an explorer tries next: one nobody has tried, else the one
+    below the evidence floor that has worked best so far (least tried on a
+    tie), else None -- everything has been ruled on. The first version
+    tried each action once and stopped, so switch_model sat at 1 of 1 for
+    a day and no asker ever inherited it."""
+    by = {a.get("action"): a for a in evidence if isinstance(a, dict)}
+    untried = [a for a in candidates if a not in by]
+    if untried:
+        return untried[0]
+    open_ = [a for a in candidates if int(by[a].get("attempts") or 0) < EXPLORE_UNTIL_ATTEMPTS]
+    if not open_:
+        return None
+    return max(open_, key=lambda a: (int(by[a].get("successes") or 0) / max(int(by[a].get("attempts") or 0), 1),
+                                     -int(by[a].get("attempts") or 0)))
 
 # ---------------------------------------------------------------------------
 # personas
@@ -237,12 +262,15 @@ def persona_index(position: int) -> int:
 
 #: What an agent can do about a tool call failing, beyond the default.
 #: Explorers try these in order, skipping what the network has evidence for.
+#: conditional_request is out (2026-09-18): GitHub answers a conditional GET
+#: with 403, not 304, once the IP is over its limit -- probed by hand, and
+#: 0 of 2 in the lab. It prevents a limit; it does not recover from one.
 TOOL_ACTIONS = {
-    "rate_limit": ["backoff", "wait_until_reset", "conditional_request"],
+    "rate_limit": ["backoff", "wait_until_reset"],
     # GitHub's secondary limit answers a plain 403 Forbidden, which the
     # classifier files as auth_error; from an unauthenticated agent it is a
     # limit all the same
-    "auth_error": ["wait_until_reset", "conditional_request"],
+    "auth_error": ["wait_until_reset"],
     "server_error": ["retry", "backoff"],
     "timeout": ["retry"],
     "connection_error": ["retry"],
@@ -596,10 +624,9 @@ class Run:
                     if r.get("decaying"):
                         rec["recommended"] += " (decaying)"
                 elif self.reporter in EXPLORER_PERSONAS:
-                    tried = {a.get("action") for a in advice.get("recovery_actions") or []}
-                    untried = [a for a in TOOL_ACTIONS.get(et, []) if a not in tried]
-                    if untried:
-                        action = untried[0]
+                    chosen = explore(TOOL_ACTIONS.get(et, []), advice.get("recovery_actions") or [])
+                    if chosen:
+                        action = chosen
                         rec["explored"] = action
             if action == "skip":
                 # the network says nothing tried recently has worked: an asker
@@ -652,44 +679,56 @@ class Run:
     def recover_provider(self, p: dict, exc: BaseException, chat, state: dict):
         """One recovery attempt after a model provider failed, or None.
 
-        Blind: give up (the first day's behaviour, kept as the control).
-        Ask: follow the network's recommendation if it is one of the actions
-        this loop knows; `skip` and no advice both mean give up.
-        Explore: if the network recommends, follow it; otherwise try the
-        first action in PROVIDER_ACTIONS that nobody has evidence for yet,
-        and report the outcome either way. Explorers are how the evidence
-        askers inherit gets made.
+        Blind, and an asker the network has nothing for: one plain retry
+        after three seconds -- the control, what an agent without the
+        network does (since PROVIDER_CONTROL_SINCE; before that they gave
+        up at once). Ask: follow the network's recommendation if it is one
+        of the actions this loop knows; `skip` means give up. Explore: if
+        the network recommends, follow it; otherwise try the action the
+        network still lacks evidence for (see explore()) and report the
+        outcome either way. Explorers are how the evidence askers inherit
+        gets made.
+
+        A provider is marked out of daily quota only when a model switch
+        also hit a wall, or there was no model left to switch to. A blind
+        retry into the same wall says nothing about the provider's other
+        models, and marking on it would skip the askers too; a switch that
+        worked means the provider still serves. The personas keep running
+        -- the difference between the cohorts under a real quota is the
+        point, and a 429 costs a second.
         """
         host = p["host"]
         et, code = classify(exc)
         rec = {"service": host, "operation": "chat.completions", "error_type": et, "error_code": code,
                "asked": False, "recommended": None, "attempts": 1, "recovered": False}
         self.failures.append(rec)
-        if et == "rate_limit" and _daily_quota(exc):
-            self.provider_dead_today = True
-        if not self.asks:
-            return None
-        rec["asked"] = True
-        advice = self.ask(host, "chat.completions", et, code) or {}
-        fingerprint = advice.get("fingerprint")
-        recommended = (advice.get("recommendation") or {}).get("action")
+        quota = et == "rate_limit" and _daily_quota(exc)
+        fingerprint = None
         action = None
-        if recommended:
-            rec["recommended"] = recommended
-            if recommended == "skip":
-                rec["skipped"] = True
-                return None
-            if recommended in KNOWN_ACTIONS:
+        if self.asks:
+            rec["asked"] = True
+            advice = self.ask(host, "chat.completions", et, code) or {}
+            fingerprint = advice.get("fingerprint")
+            recommended = (advice.get("recommendation") or {}).get("action")
+            if recommended:
+                rec["recommended"] = recommended
+            if recommended and recommended != "skip" and recommended in KNOWN_ACTIONS:
                 action = recommended
-        if action is None and self.reporter in EXPLORER_PERSONAS:
-            tried = {a.get("action") for a in advice.get("recovery_actions") or []}
-            untried = [a for a in PROVIDER_ACTIONS.get(et, []) if a not in tried]
-            action = untried[0] if untried else None
-            rec["explored"] = action
+            if action is None and self.reporter in EXPLORER_PERSONAS:
+                # a skip verdict is built from what has been tried; an
+                # explorer's job is what has not, so it explores past a skip
+                # and honours it only once every candidate has been ruled on
+                action = explore(PROVIDER_ACTIONS.get(et, []), advice.get("recovery_actions") or [])
+                rec["explored"] = action
+            if action is None and recommended == "skip":
+                rec["skipped"] = True
+                if quota:
+                    self.provider_dead_today = True
+                return None
         if action is None:
-            return None
+            action = "retry"   # the control
         # -- apply the action ---------------------------------------------
-        if action == "backoff":
+        if action in ("backoff", "retry"):
             self._sleep(3)
         elif action == "wait_until_reset":
             headers = getattr(exc, "headers", None)
@@ -703,6 +742,8 @@ class Run:
         elif action == "switch_model":
             alts = [m for m in p.get("alt_models", []) if m != state["model"]]
             if not alts:
+                if quota:
+                    self.provider_dead_today = True
                 return None
             state["model"] = alts[0]
             self.model = f"{self.model}->{alts[0]}"
@@ -712,8 +753,13 @@ class Run:
         self.model_calls += 1
         try:
             resp = chat()
-        except Exception:  # noqa: BLE001
+        except Exception as again:  # noqa: BLE001
             self.report_recovery(host, "chat.completions", action, False, fingerprint)
+            # only a failed *switch* proves the provider has nothing left; a
+            # blind retry into the same wall says nothing about its other
+            # models, and marking on it would skip the askers too
+            if action == "switch_model" and (quota or (classify(again)[0] == "rate_limit" and _daily_quota(again))):
+                self.provider_dead_today = True
             return None
         rec["recovered"] = True
         self.report_recovery(host, "chat.completions", action, True, fingerprint)
@@ -1088,6 +1134,42 @@ def write_report(state: dict) -> None:
             rows.append({"metric": "seconds waiting on rate limits, per run", "unit": "s", "ask": a["wait_seconds_per_run"],
                          "blind": b["wait_seconds_per_run"], "better": _better(a["wait_seconds_per_run"], b["wait_seconds_per_run"])})
         versus.append({"group": key, "label": label, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": rows})
+    # Model providers under their real quotas: the model-driven personas
+    # (not builders, not explorers) since blind started retrying once. A
+    # provider 429 is the most common real failure the fleet meets, and the
+    # one where a right answer (switch model, wait the stated seconds) turns
+    # a failed task into a finished one.
+    prov: dict[str, dict] = {}
+    for r in runs:
+        if r["at"] < PROVIDER_CONTROL_SINCE or not r.get("provider") or not r.get("metrics"):
+            continue
+        if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS:
+            continue
+        side = "ask" if r["asks"] else "blind"
+        c = prov.setdefault(side, {"runs": 0, "completed": 0, "failures": 0, "recovered": 0, "tokens": 0, "seconds": 0.0,
+                                   "skipped_for_quota": 0})
+        c["runs"] += 1; c["completed"] += int(bool(r["metrics"].get("completed")))
+        c["tokens"] += r["metrics"].get("tokens_prompt", 0) + r["metrics"].get("tokens_completion", 0)
+        c["seconds"] += float(r.get("seconds") or 0)
+        for f in r["failures"]:
+            if f["operation"] == "chat.completions":
+                c["failures"] += 1; c["recovered"] += int(f["recovered"])
+    if "ask" in prov and "blind" in prov:
+        a, b = prov["ask"], prov["blind"]
+        cr = lambda c: c["completed"] / c["runs"] if c["runs"] else None   # noqa: E731
+        rr = lambda c: c["recovered"] / c["failures"] if c["failures"] else None   # noqa: E731
+        tpc = lambda c: round(c["tokens"] / c["completed"]) if c["completed"] else None   # noqa: E731
+        spr = lambda c: round(c["seconds"] / c["runs"], 1) if c["runs"] else None   # noqa: E731
+        versus.append({"group": "provider", "label": "Model providers under real quotas (groq, Gemini, OpenRouter, Ollama)",
+                       "since": PROVIDER_CONTROL_SINCE, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": [
+            {"metric": "tasks completed", "unit": "%", "ask": _pct(cr(a)), "blind": _pct(cr(b)),
+             "better": _better(cr(a), cr(b), lower_is_better=False)},
+            {"metric": "provider failures met", "unit": "", "ask": a["failures"], "blind": b["failures"], "better": "tie"},
+            {"metric": "provider failures recovered", "unit": "%", "ask": _pct(rr(a)), "blind": _pct(rr(b)),
+             "better": _better(rr(a), rr(b), lower_is_better=False)},
+            {"metric": "tokens per completed task", "unit": "", "ask": tpc(a), "blind": tpc(b), "better": _better(tpc(a), tpc(b))},
+            {"metric": "seconds per run", "unit": "s", "ask": spr(a), "blind": spr(b), "better": _better(spr(a), spr(b))},
+        ]})
     for row in real_targets:
         row["attempts_per_failure"] = round(row["attempts"] / row["failures"], 2) if row["failures"] else None
         row["seconds"] = round(row["seconds"], 1)

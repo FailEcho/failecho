@@ -1,10 +1,12 @@
 """What the fleet does when a model provider fails: the experiment's control
 and treatment, in code.
 
-Blind personas give up (the first day's behaviour). Askers follow the
-network's recommendation, including `skip`. Explorers try the first action
-nobody has evidence for and report what happened, which is how the evidence
-askers inherit gets made.
+Blind personas, and askers the network has nothing for, retry once after a
+short pause -- the control, what an agent without the network does (since
+2026-09-18 05:30; on the first day they gave up at once). Askers follow the
+network's recommendation, including `skip`. Explorers try what the network
+still lacks evidence for and report what happened, which is how the
+evidence askers inherit gets made.
 """
 
 from __future__ import annotations
@@ -46,13 +48,22 @@ def run_for(reporter: str, asks: bool, advice: dict | None) -> tuple[F.Run, list
     return run, reported
 
 
-def test_blind_gives_up_on_a_provider_failure(monkeypatch):
-    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+def test_blind_retries_once_and_reports_the_outcome(monkeypatch):
+    """The control is one plain retry after a pause, not giving up: an agent
+    without the network retries. Giving up flattered the ask side."""
+    slept = []
+    monkeypatch.setattr(F.time, "sleep", lambda s: slept.append(s))
     run, reported = run_for("fleet-decor-blind-a", False, None)
-    chat = Chat()
+    chat = Chat(fail_times=0)   # the first failure already happened; the retry lands
+    resp = run.recover_provider(F.PROVIDERS["groq"], http_error(429), chat, {"model": "m", "tools": True})
+    assert resp is not None and chat.calls == 1 and slept == [3] and reported == [("retry", True)]
+    f = run.failures[-1]
+    assert f["asked"] is False and f["attempts"] == 2 and f["recovered"] and f["recommended"] is None
+
+    run, reported = run_for("fleet-decor-blind-a", False, None)
+    chat = Chat(fail_times=5)
     assert run.recover_provider(F.PROVIDERS["groq"], http_error(429), chat, {"model": "m", "tools": True}) is None
-    assert chat.calls == 0 and reported == []
-    assert run.failures[-1]["asked"] is False and run.failures[-1]["attempts"] == 1
+    assert chat.calls == 1 and reported == [("retry", False)] and run.failures[-1]["recovered"] is False
 
 
 def test_an_asker_follows_a_recommendation_and_reports_the_outcome(monkeypatch):
@@ -73,11 +84,13 @@ def test_an_asker_honours_skip():
     assert chat.calls == 0 and reported == [] and run.failures[-1]["skipped"] is True
 
 
-def test_an_asker_with_no_advice_gives_up_like_blind():
+def test_an_asker_with_no_advice_retries_once_like_blind(monkeypatch):
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
     run, reported = run_for("fleet-decor-ask-a", True, {"fingerprint": "fp", "recommendation": None, "recovery_actions": []})
     chat = Chat(fail_times=0)
-    assert run.recover_provider(F.PROVIDERS["groq"], http_error(429), chat, {"model": "m", "tools": True}) is None
-    assert chat.calls == 0 and run.failures[-1]["asked"] is True
+    assert run.recover_provider(F.PROVIDERS["groq"], http_error(429), chat, {"model": "m", "tools": True}) is not None
+    assert chat.calls == 1 and run.failures[-1]["asked"] is True and reported == [("retry", True)]
+    assert "explored" not in run.failures[-1], "only explorers explore; an asker's edge is inherited, not invented"
 
 
 def test_an_explorer_tries_the_first_untried_action_and_reports_it(monkeypatch):
@@ -91,6 +104,45 @@ def test_an_explorer_tries_the_first_untried_action_and_reports_it(monkeypatch):
     resp = run.recover_provider(F.PROVIDERS["groq"], http_error(429), chat, {"model": "m", "tools": True})
     assert resp is not None and reported == [("backoff", True)] and slept == [3]
     assert run.failures[-1]["explored"] == "backoff"
+
+
+def test_an_explorer_keeps_trying_an_action_until_the_network_can_rule(monkeypatch):
+    """switch_model sat at 1 of 1 for a day: the explorer tried each action
+    once and stopped, and one attempt is below the server's floor of five,
+    so no asker ever inherited it. Below the floor the explorer goes back to
+    the action that has worked best; at the floor it stops."""
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    evidence = [{"action": "wait_until_reset", "attempts": 1, "successes": 0},
+                {"action": "backoff", "attempts": 1, "successes": 0},
+                {"action": "switch_model", "attempts": 1, "successes": 1}]
+    assert F.explore(F.PROVIDER_ACTIONS["rate_limit"], evidence) == "switch_model"
+    evidence[2]["attempts"] = 5
+    assert F.explore(F.PROVIDER_ACTIONS["rate_limit"], evidence) == "wait_until_reset", "least tried among the rest"
+    for e in evidence:
+        e["attempts"] = 5
+    assert F.explore(F.PROVIDER_ACTIONS["rate_limit"], evidence) is None
+    assert F.explore(F.PROVIDER_ACTIONS["rate_limit"], []) == "wait_until_reset"
+
+    run, reported = run_for("fleet-explore-a", True, {"fingerprint": "fp", "recommendation": None, "recovery_actions": [
+        {"action": "wait_until_reset", "attempts": 1, "successes": 0}, {"action": "backoff", "attempts": 1, "successes": 0},
+        {"action": "switch_model", "attempts": 1, "successes": 1}]})
+    state = {"model": "openai/gpt-oss-20b", "tools": True}
+    assert run.recover_provider(F.PROVIDERS["groq"], http_error(429), Chat(0), state) is not None
+    assert run.failures[-1]["explored"] == "switch_model" and state["model"] == "openai/gpt-oss-120b"
+
+
+def test_an_explorer_explores_past_a_skip_verdict_and_honours_it_only_when_nothing_is_left(monkeypatch):
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    advice = {"fingerprint": "fp", "recommendation": {"action": "skip"}, "recovery_actions": [
+        {"action": "retry", "attempts": 9, "successes": 0}]}
+    run, reported = run_for("fleet-explore-a", True, advice)
+    assert run.recover_provider(F.PROVIDERS["groq"], http_error(429), Chat(0), {"model": "m", "tools": True}) is not None
+    assert run.failures[-1]["explored"] == "wait_until_reset" and "skipped" not in run.failures[-1]
+    advice["recovery_actions"] = [{"action": a, "attempts": 5, "successes": 0} for a in F.PROVIDER_ACTIONS["rate_limit"]]
+    run, reported = run_for("fleet-explore-a", True, advice)
+    chat = Chat(0)
+    assert run.recover_provider(F.PROVIDERS["groq"], http_error(429), chat, {"model": "m", "tools": True}) is None
+    assert chat.calls == 0 and run.failures[-1]["skipped"] is True
 
 
 def test_wait_until_reset_reads_the_header_and_caps_the_wait(monkeypatch):
@@ -496,16 +548,67 @@ def test_the_versus_table_is_built_from_the_same_ledger(tmp_path, monkeypatch):
     assert "tasks completed" not in rows, "the test endpoints have no task to complete"
 
 
-def test_a_dead_provider_is_noted_by_the_run():
-    run = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
-    run.ask = lambda *a, **k: {"recommendation": None, "recovery_actions": []}
-    e = http_error(429); e.failecho_body = "tokens per day (TPD): Limit 200000"
-    assert run.recover_provider(F.PROVIDERS["groq"], e, Chat(0), {"model": "m", "tools": True}) is None
-    assert run.provider_dead_today is True
-    run2 = F.Run("fleet-decor-blind-a", "decorator", "groq", False)
+def test_the_versus_table_has_a_provider_group_since_the_control_changed(tmp_path, monkeypatch):
+    """Model-driven personas under their providers' real quotas, counted only
+    from the moment blind started retrying once; builders and explorers stay
+    out. A 429 the asker got past (switch_model) is a finished task the
+    blind run did not get."""
+    import json
+
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    def run(reporter, asks, at, done, recovered, provider="groq"):
+        return {"at": at, "reporter": reporter, "path": "decorator", "provider": provider, "asks": asks, "tool_calls": 2,
+                "model_calls": 2, "seconds": 4.0, "failures": [
+                    {"service": "api.groq.com", "operation": "chat.completions", "error_type": "rate_limit", "error_code": "429",
+                     "asked": asks, "recommended": "switch_model" if asks else None, "attempts": 2, "recovered": recovered}],
+                "metrics": {"tokens_prompt": 100, "tokens_completion": 20, "asks": int(asks), "ask_seconds": 0, "wait_seconds": 3,
+                            "completed": done, "calls_first_try": 1, "calls_recovered": 0, "calls_failed": 0}}
+    after = "2026-09-18T06:00:00+00:00"
+    state = {"runs": [run("fleet-decor-ask-a", True, after, True, True), run("fleet-decor-blind-a", False, after, False, False),
+                      run("fleet-decor-ask-a", True, "2026-09-17T06:00:00+00:00", True, True),   # before: not counted
+                      run("fleet-explore-a", True, after, True, True),                          # explorer: not counted
+                      run("fleet-build-ask", True, after, True, True)]}                         # builder: not counted
+    F.write_report(state)
+    versus = json.loads((tmp_path / "fleet.json").read_text())["versus"]
+    prov = [g for g in versus if g["group"] == "provider"][0]
+    assert prov["since"] == F.PROVIDER_CONTROL_SINCE and prov["runs_ask"] == 1 and prov["runs_blind"] == 1
+    rows = {r["metric"]: r for r in prov["rows"]}
+    assert rows["tasks completed"] == {"metric": "tasks completed", "unit": "%", "ask": 100.0, "blind": 0.0, "better": "ask"}
+    assert rows["provider failures recovered"]["ask"] == 100.0 and rows["provider failures recovered"]["blind"] == 0.0
+    assert rows["provider failures met"]["ask"] == 1 and rows["provider failures met"]["better"] == "tie"
+
+
+def test_a_provider_is_marked_dead_only_when_a_model_switch_also_fails(monkeypatch):
+    """A blind retry into the same daily wall says nothing about the
+    provider's other models, and marking on it would skip the askers too --
+    the cohort that can get past it. Only a failed switch, or nothing left
+    to switch to, marks the provider."""
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    tpd = lambda: (lambda e: (setattr(e, "failecho_body", "tokens per day (TPD): Limit 200000"), e)[1])(http_error(429))   # noqa: E731
+
+    blind = F.Run("fleet-decor-blind-a", "decorator", "groq", False)
+    assert blind.recover_provider(F.PROVIDERS["groq"], tpd(), Chat(5), {"model": "m", "tools": True}) is None
+    assert blind.provider_dead_today is False, "a blind retry into the wall does not mark the provider"
+
+    asker = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
+    asker.ask = lambda *a, **k: {"recommendation": {"action": "switch_model"}, "recovery_actions": []}
+    asker.report_recovery = lambda *a, **k: None
+    state = {"model": "openai/gpt-oss-20b", "tools": True}
+    assert asker.recover_provider(F.PROVIDERS["groq"], tpd(), Chat(0), state) is not None
+    assert asker.provider_dead_today is False, "a switch that worked means the provider still serves"
+
+    stuck = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
+    stuck.ask = asker.ask
+    stuck.report_recovery = lambda *a, **k: None
+    assert stuck.recover_provider(F.PROVIDERS["groq"], tpd(), Chat(5), {"model": "openai/gpt-oss-20b", "tools": True}) is None
+    assert stuck.provider_dead_today is True, "the switch hit a wall too"
+
+    tpm = F.Run("fleet-decor-blind-a", "decorator", "groq", False)
     e2 = http_error(429); e2.failecho_body = "tokens per minute (TPM): Limit 8000"
-    run2.recover_provider(F.PROVIDERS["groq"], e2, Chat(0), {"model": "m", "tools": True})
-    assert run2.provider_dead_today is False
+    tpm.recover_provider(F.PROVIDERS["groq"], e2, Chat(0), {"model": "m", "tools": True})
+    assert tpm.provider_dead_today is False
 
 
 def test_the_scheduler_skips_a_dead_providers_personas(tmp_path, monkeypatch):

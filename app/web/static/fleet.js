@@ -32,7 +32,8 @@
     (d.versus || []).forEach(function (g) {
       var h = document.createElement("tr"); h.className = "group";
       var th = document.createElement("th"); th.colSpan = 3;
-      th.textContent = g.label + " (" + g.runs_ask + " / " + g.runs_blind + " runs)"; h.appendChild(th); vb.appendChild(h);
+      th.textContent = g.label + " (" + g.runs_ask + " / " + g.runs_blind + " runs" +
+        (g.since ? ", since " + g.since.slice(0, 16).replace("T", " ") + " UTC" : "") + ")"; h.appendChild(th); vb.appendChild(h);
       g.rows.forEach(function (r) {
         function cell(v, side) {
           var c = td(v == null ? "-" : (r.unit === "%" ? v + "%" : v), "num" + (r.better === side ? " win" : ""));

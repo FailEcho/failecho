@@ -70,6 +70,14 @@ version held the mark until midnight UTC; the providers' days are not ours
 at 00:13, Gemini's free tier resets at midnight Pacific), and that cost
 groq's personas most of a day. Since 2026-09-18 03:00.
 
+## Versus group `provider` (since 2026-09-18 05:30)
+
+Model-driven personas (not builders, not explorers), runs since blind
+started retrying a failed provider once. Rows: tasks completed, provider
+failures met (should be near-equal between cohorts; if not, the sample is
+skewed), provider failures recovered, tokens per completed task, seconds
+per run. `since` is carried in the group so a reader sees the window.
+
 ## What to compare, and what not to
 
 Ask vs blind twins share workloads, providers and one IP address. Compare

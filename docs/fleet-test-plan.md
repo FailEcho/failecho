@@ -220,6 +220,45 @@ our favour. From 06:30 the twins trade places every cycle, and the
 real-services table counts only runs from then on. The numbers before it
 stay in the state file and in this note.
 
+## Change during the run: provider failures become the comparison, 2026-09-18 05:30 UTC
+
+Two days in, the real targets' failures are hard limits nobody recovers
+from -- GitHub's 60 an hour, Stack Exchange's 300 a day -- so the skip
+verdict saves seconds and retries but cannot move "tasks completed". The
+one real, recoverable failure the fleet meets all day is its model
+providers' 429s: a per-minute window that resets in seconds, and a daily
+quota another model on the same provider is not under. The lab had
+`switch_model` at 1 of 1 for a day, because an explorer tried each action
+once and stopped, and one attempt is under the server's floor of five.
+
+Three changes, all on the fleet side, nothing on the product:
+
+- **The control retries.** Blind personas, and askers the network has
+  nothing for, retry a failed provider once after three seconds -- what an
+  agent without the network does. Until now they gave up at once, which
+  flattered the ask side. Askers still follow a recommendation; their edge
+  is inherited, not invented.
+- **Explorers explore until the network can rule.** Below five attempts an
+  explorer goes back to the action that has worked best; it explores past
+  a `skip` verdict and honours it only when every candidate has been ruled
+  on.
+- **A provider is marked out of quota only by a failed switch.** A blind
+  retry into the same wall says nothing about the provider's other models,
+  and marking on it skipped the askers too. The personas keep running; a
+  429 costs a second, and the difference between the cohorts under a real
+  quota is the point.
+
+`conditional_request` is dropped from the explorers' list: GitHub answers a
+conditional GET with 403, not 304, once the IP is over its limit (probed by
+hand; 0 of 2 in the lab). It prevents a limit, it does not recover from
+one.
+
+The scoreboard gains a fourth Ask/Blind group, "model providers under real
+quotas", counted only from 05:30 on and only for the model-driven personas
+(builders and explorers stay out). The three existing groups are
+unchanged; their blind runs before 05:30 gave up on a provider failure and
+from 05:30 retry once, which can only move them toward blind.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one
