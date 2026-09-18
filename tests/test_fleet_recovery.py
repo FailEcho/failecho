@@ -824,3 +824,18 @@ def test_two_lanes_round_robin_their_own_personas_and_share_one_state(tmp_path, 
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["next_vm"] == 2 and state["next_light"] == 1 and state["runs_today"] == 3 and len(state["runs"]) == 3
     assert (tmp_path / "state.lock").exists()
+
+
+def test_the_etag_cache_keeps_only_small_answers(tmp_path, monkeypatch):
+    """By 18 Sep each persona's ETag file was 21 MB of cached npm bodies,
+    parsed on every run in a lane capped at 400 MB."""
+    import json
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    run = F.Run("fleet-decor-ask-a", "decorator", "groq", True)
+    run.etags.update({f"https://x/{i}": {"etag": "e", "body": {"v": i}} for i in range(80)})
+    run.etags["https://registry.npmjs.org/express"] = {"etag": "big", "body": {"x": "y" * (F.ETAG_BODY_MAX + 1)}}
+    run.save_etags()
+    saved = json.loads((tmp_path / "etags-fleet-decor-ask-a.json").read_text())
+    assert len(saved) == 50 and "https://registry.npmjs.org/express" not in saved
+    assert (tmp_path / "etags-fleet-decor-ask-a.json").stat().st_size < 10_000

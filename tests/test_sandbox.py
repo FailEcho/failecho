@@ -663,3 +663,19 @@ def test_the_http_libraries_a_program_imports_are_all_read():
     assert imported_http_libs(code) == ["http.client", "httpx", "requests", "urllib"]
     assert imported_http_libs("print('no imports')") == []
     assert imported_http_libs("import subprocess; subprocess.run(['curl', 'x'])") == ["subprocess"]
+
+
+def test_a_wedged_guest_is_a_timed_out_result_not_a_crash(monkeypatch):
+    """18 Sep 15:xx: an OpenCode guest stopped answering and the vsock read
+    raised TimeoutError through the fleet's main()."""
+    import failecho_sandbox as S
+
+    sb = S.Sandbox.__new__(S.Sandbox)
+
+    class P:
+        def poll(self): return None
+    sb.proc = P()
+    monkeypatch.setattr(S.Sandbox, "_exchange", lambda self, req, timeout: (_ for _ in ()).throw(TimeoutError("timed out")))
+    r = sb.run(["true"], timeout=5)
+    assert r.timed_out if hasattr(r, "timed_out") else r["timed_out"]
+    assert r["exit"] == 124 and "did not answer" in r["stderr"] and not r.ok

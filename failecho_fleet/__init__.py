@@ -59,6 +59,8 @@ MAX_RUNS_PER_DAY = int(os.environ.get("FLEET_MAX_RUNS_PER_DAY") or 600)
 #: it is truly dead, against a day of skipped slots when its window rolls
 #: over on a clock that is not ours.
 QUOTA_PROBE_SECONDS = int(os.environ.get("FLEET_QUOTA_PROBE_SECONDS") or 7200)
+#: Largest cached answer, serialised, an ETag entry may keep (see save_etags).
+ETAG_BODY_MAX = 32 * 1024
 #: An OpenCode run's wall-clock budget. A six-step task takes ~150 s on
 #: NVIDIA; the eighteen-step one hit 280. The fleet slot waits for it.
 OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 240)
@@ -598,12 +600,17 @@ class Run:
         ETAGS.set(self.etags)
 
     def save_etags(self) -> None:
+        """Keep the last 50 ETags whose cached answer is small. The cache held
+        whole response bodies, and an npm package document is megabytes: by
+        18 Sep the files were 21 MB each, read and parsed on every run in a
+        lane capped at 400 MB. conditional_request left the explorers' list
+        that morning; the small cache is kept for anyone recommending it."""
         try:
             os.makedirs(STATE_DIR, exist_ok=True)
-            items = list(self.etags.items())[-200:]
+            keep = [(u, e) for u, e in self.etags.items() if len(json.dumps(e.get("body"), default=str)) <= ETAG_BODY_MAX]
             with open(self._etag_path, "w", encoding="utf-8") as fh:
-                json.dump(dict(items), fh)
-        except OSError:
+                json.dump(dict(keep[-50:]), fh)
+        except (OSError, TypeError, ValueError, AttributeError):
             pass
 
     # -- asking and reporting through the three paths ------------------------

@@ -227,7 +227,14 @@ class Sandbox:
             raise SandboxError("sandbox is not running")
         req = {"argv": list(argv), "files": files or {}, "timeout": int(timeout), "env": env or {},
                "as_root": bool(as_root)}
-        return Result(self._exchange(req, timeout=timeout + 15))
+        try:
+            return Result(self._exchange(req, timeout=timeout + 15))
+        except (TimeoutError, socket.timeout):
+            # the guest enforces `timeout` itself; no answer 15 s past it
+            # means the guest is wedged (18 Sep 15:xx, an OpenCode run in a
+            # 768 MB guest). A timed-out result, not a crash of the caller.
+            return Result({"exit": 124, "stdout": "", "stderr": "sandbox: the guest did not answer in time",
+                           "seconds": float(timeout + 15), "timed_out": True})
 
     def python(self, code: str, timeout: int = 60, env: dict[str, str] | None = None,
                autoreport: bool = False) -> Result:
