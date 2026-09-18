@@ -69,6 +69,11 @@ DEFAULT_ALLOW = (
     # the first run hung for five minutes on that one denied CONNECT)
     "opencode.ai",
     "models.opencode.ai",
+    # the model providers the opencode personas drive OpenCode against; a
+    # builder's own code can reach them too, but holds no key
+    "integrate.api.nvidia.com",
+    "api.mistral.ai",
+    "api.xkiro.com",
 )
 
 _HOSTPORT = re.compile(r"^([A-Za-z0-9.-]+)(?::(\d{1,5}))?$")
