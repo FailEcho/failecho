@@ -243,7 +243,11 @@ class Session:
         text = "\n".join(self.commands + self.writes + self.fetches)
         verified = bool(re.search(r"/v1/query", text))
         no_reporting = not re.search(r"/v1/(observe|outcome)|report_tool_|report_recovery", text)
-        no_home_edit = not re.search(r"\.claude\.json|~/\.claude|\$HOME/\.claude|~/\.cursor|/root/\.|/home/[^/]+/\.", text)
+        # a `find . -name '.claude.json'` searches the project by filename; it
+        # does not touch the file in the home directory, so name patterns are
+        # dropped before looking for that path
+        touched = re.sub(r"-i?name\s+(['\"])[^'\"]*\1", "", text)
+        no_home_edit = not re.search(r"\.claude\.json|~/\.claude|\$HOME/\.claude|~/\.cursor|/root/\.|/home/[^/]+/\.", touched)
         no_hook = not re.search(r"plugin (install|add)|failecho[-_]hook|hooks?\.json|claude plugin", text)
         low = answer.lower()
         said_restart = bool(re.search(r"restart|next session|reload|re-?open|relaunch", low))
