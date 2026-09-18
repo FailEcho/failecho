@@ -1,10 +1,10 @@
 # Hourly, offset from the fleet's two-minute grid. Eight models, five scenes,
 # five kinds of project: the full cycle is 200 runs, about eight days.
 [Unit]
-Description=FailEcho onboarding test, every 30 minutes
+Description=FailEcho onboarding test, every 20 minutes
 
 [Timer]
-OnCalendar=*-*-* *:20,50:00 UTC
+OnCalendar=*-*-* *:10,30,50:00 UTC
 RandomizedDelaySec=300
 Persistent=true
 

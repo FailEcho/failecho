@@ -77,6 +77,8 @@ LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/")
 REPORTER = "fleet-onboard"
 MAX_MODEL_CALLS = 14
 DAILY_CAP_PER_PROVIDER = int(os.environ.get("ONBOARD_DAILY_CAP") or 60)
+#: The fleet's state file, for its per-provider counts of the day.
+FLEET_STATE_PATH = os.path.join(os.environ.get("STATE_DIRECTORY", "/var/lib/failecho-fleet").split(":")[0], "state.json")
 
 #: Rotated in order, one per run. Every model the fleet has verified makes
 #: real tool calls; the point is the spread from a 2.6B free model to a 31B.
@@ -519,7 +521,14 @@ def main(argv: list[str] | None = None) -> int:
     project = argv[argv.index("--project") + 1] if "--project" in argv else list(PROJECTS)[pr_i]
     # never above the provider's own free tier (PROVIDERS carries the documented number)
     cap = min(DAILY_CAP_PER_PROVIDER, PROVIDERS.get(provider, {}).get("daily_cap", DAILY_CAP_PER_PROVIDER))
-    if state["calls_today"].get(provider, 0) >= cap:
+    # the provider's tier is one budget for the fleet and this test together
+    fleet_state = _load(FLEET_STATE_PATH, {})
+    fleet_calls = (fleet_state.get("provider_calls_today") or {}).get(provider, 0) if fleet_state.get("provider_day") == today else 0
+    fleet_tokens = (fleet_state.get("provider_tokens_today") or {}).get(provider, 0) if fleet_state.get("provider_day") == today else 0
+    tier = PROVIDERS.get(provider, {})
+    over_tier = (fleet_calls + state["calls_today"].get(provider, 0) >= tier.get("daily_cap", 10**9)
+                 or fleet_tokens >= tier.get("daily_token_cap", 10**12))
+    if state["calls_today"].get(provider, 0) >= cap or over_tier:
         log(f"onboard: {provider} daily cap reached; skipping {model}")
         state["next"] = idx + 1
         _dump(STATE_PATH, state)

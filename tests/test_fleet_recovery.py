@@ -727,14 +727,15 @@ def test_provider_caps_stay_within_the_documented_free_tiers():
     X-RateLimit-Limit: 50", groq 1000 requests a day for gpt-oss-20b."""
     assert F.PROVIDERS["gemini"]["daily_cap"] <= 20 * (1 + len(F.PROVIDERS["gemini"]["alt_models"]))
     assert F.PROVIDERS["openrouter"]["daily_cap"] <= 50
-    assert F.PROVIDERS["groq"]["daily_cap"] <= 1000
+    # groq: 1,000 requests a day per model, three models in rotation
+    assert F.PROVIDERS["groq"]["daily_cap"] <= 1000 * (1 + len(F.PROVIDERS["groq"]["alt_models"]))
     # NVIDIA documents 40 requests a minute and shows no daily pool; stay
     # under an hour's worth of that rate per day
     assert F.PROVIDERS["nvidia"]["daily_cap"] <= 40 * 60
-    # Mistral's headers for this key: ministral-8b 188 a minute; 400 a day is well inside it
-    assert F.PROVIDERS["mistral"]["daily_cap"] <= 188 * 60 * 24 // 100
-    # xKiro states 1,000,000 tokens a day for a Telegram-verified account; 600 calls at ~1k tokens is inside it
-    assert F.PROVIDERS["xkiro"]["daily_cap"] * 1000 <= 1_000_000
+    # xKiro's tier is tokens: 1,000,000 a day for a Telegram-verified account
+    assert F.PROVIDERS["xkiro"]["daily_token_cap"] <= 1_000_000
+    # Mistral's headers: 188 a minute for ministral-8b
+    assert F.PROVIDERS["mistral"]["daily_cap"] <= 188 * 60
 
 
 def test_the_nvidia_personas_are_twins_and_the_onboarding_rotation_stays_coprime():
@@ -876,3 +877,41 @@ def test_a_provider_at_our_daily_cap_is_skipped_and_cap_skips_are_not_runs(tmp_p
     F.write_report({"runs": [capped, legacy]})
     report = json.loads((tmp_path / "fleet.json").read_text())
     assert report["totals"]["runs"] == 0 and not report["costs"]
+
+
+def test_a_provider_over_its_daily_token_tier_is_skipped(tmp_path, monkeypatch):
+    """xKiro's tier is 1,000,000 tokens a day; on 18 Sep 450 calls had spent
+    1.01M by 20:30 while the call cap said 600."""
+    import datetime as dt
+    import json
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(F, "assert_lab_only", lambda: None)
+    monkeypatch.setattr(F.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(F.FailEcho, "flush", lambda self, timeout=5.0: True)
+    today = dt.date.today().isoformat()
+    light = F.lane_personas("light")
+    start = next(i for i, j in enumerate(light) if F.PERSONAS[j][2] == "xkiro")
+    (tmp_path / "state.json").write_text(json.dumps({
+        "next_light": start, "runs": [], "day": today, "runs_today": 0, "provider_day": today,
+        "provider_calls_today": {"xkiro": 10}, "provider_tokens_today": {"xkiro": F.PROVIDERS["xkiro"]["daily_token_cap"]}}))
+    ran = []
+    monkeypatch.setattr(F.Run, "run_model", lambda self, *a, **k: ran.append(self.reporter) or "ok")
+    monkeypatch.setattr(F.Run, "run_cron", lambda self, calls: ran.append(self.reporter) or "cron")
+    assert F.main(["--lane", "light"]) == 0
+    assert ran and F.PERSONAS[[p[0] for p in F.PERSONAS].index(ran[0])][2] != "xkiro"
+
+    # and a run's tokens are added to its provider's day
+    def model(self, *a, **k):
+        self.tokens_prompt, self.tokens_completion, self.model_calls = 900, 100, 2
+        return "ok"
+    monkeypatch.setattr(F.Run, "run_model", model)
+    groq = next(i for i, j in enumerate(light) if F.PERSONAS[j][2] == "groq")
+    state = json.loads((tmp_path / "state.json").read_text()); state["next_light"] = groq
+    (tmp_path / "state.json").write_text(json.dumps(state))
+    F.main(["--lane", "light"])
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["provider_tokens_today"]["groq"] == 1000 and state["provider_calls_today"]["groq"] == 2

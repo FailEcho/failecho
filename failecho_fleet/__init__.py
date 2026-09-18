@@ -53,7 +53,7 @@ STATE_DIR = ((os.environ.get("STATE_DIRECTORY") or "").split(":")[0]
 REPORT_PATH = os.environ.get("FLEET_REPORT_PATH") or os.path.join(STATE_DIR, "fleet.json")
 LAB_DB = os.environ.get("FLEET_LAB_DB") or ""
 PRODUCTION_HOSTS = ("failecho.com", "www.failecho.com")
-MAX_RUNS_PER_DAY = int(os.environ.get("FLEET_MAX_RUNS_PER_DAY") or 600)
+MAX_RUNS_PER_DAY = int(os.environ.get("FLEET_MAX_RUNS_PER_DAY") or 3000)
 #: How long a provider marked out of daily quota is left alone before one
 #: persona probes it again. Two hours: a wasted call every two hours while
 #: it is truly dead, against a day of skipped slots when its window rolls
@@ -70,7 +70,9 @@ LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or N
 
 PROVIDERS = {
     "groq": {"host": "api.groq.com", "url": "https://api.groq.com/openai/v1/chat/completions",
-             "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 700,
+             # groq documents 1,000 requests a day *per model*; three models rotate
+             # here, so 3,000 is the tier (its per-model token budget binds first)
+             "key": os.environ.get("GROQ_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 3000,
              "alt_models": ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]},
     "gemini": {"host": "generativelanguage.googleapis.com",
                "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
@@ -99,19 +101,20 @@ PROVIDERS = {
     # Documented free tier: 40 requests a minute. The account page shows
     # only that ("Your API Rate Limit: Up to 40 rpm", checked by the user
     # 18 Sep 20:40) and no credit balance, so there is no daily pool to run
-    # out of. Cap 1,200 a day (was 400, reached by 16:30 once OpenCode ran). Both models
+    # out of. Cap 2,400 a day, an hour's worth of that rate (was 400,
+    # reached by 16:30 once OpenCode ran). Both models
     # verified to make real tool calls; gpt-oss-20b is the same model groq
     # and Ollama serve, a third host for the same weights.
     "nvidia": {"host": "integrate.api.nvidia.com", "url": "https://integrate.api.nvidia.com/v1/chat/completions",
-               "key": os.environ.get("NVIDIA_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 1200,
+               "key": os.environ.get("NVIDIA_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 2400,
                "alt_models": ["nvidia/nemotron-3-super-120b-a12b"]},
     # Mistral (added 2026-09-18 07:10 UTC, user-issued key). The key's own
     # headers say what this tier allows per model: ministral-8b 188 req/min,
     # ministral-14b 30, codestral 125; mistral-small, -medium and magistral
     # answer 429 with a limit of 0, so they are not on this tier. Tool calls
-    # verified on ministral-8b. Cap 400 a day, far inside those minutes.
+    # verified on ministral-8b. Cap 2,400 a day, well inside those minutes.
     "mistral": {"host": "api.mistral.ai", "url": "https://api.mistral.ai/v1/chat/completions",
-                "key": os.environ.get("MISTRAL_API_KEY"), "models": ["ministral-8b-latest"], "daily_cap": 400,
+                "key": os.environ.get("MISTRAL_API_KEY"), "models": ["ministral-8b-latest"], "daily_cap": 2400,
                 "alt_models": ["ministral-14b-latest", "codestral-latest"]},
     # xKiro (added 2026-09-18 08:00 UTC, user-issued key): a routing gateway
     # whose site states its free tier as 500,000 tokens a day, 1,000,000
@@ -120,7 +123,11 @@ PROVIDERS = {
     # fleet's prompt sizes (~1k tokens on the qwen chat template) stays
     # inside the verified tier.
     "xkiro": {"host": "api.xkiro.com", "url": "https://api.xkiro.com/v1/chat/completions",
-              "key": os.environ.get("XKIRO_API_KEY"), "models": ["qwen/qwen3.6-27b:free"], "daily_cap": 600,
+              # the tier is tokens, not calls: 1,000,000 a day verified. A call here
+              # averaged 2,246 tokens on 18 Sep (builders), and 450 calls had
+              # already spent 1.01M by 20:30 -- the call cap alone let it run over.
+              "key": os.environ.get("XKIRO_API_KEY"), "models": ["qwen/qwen3.6-27b:free"], "daily_cap": 2000,
+              "daily_token_cap": 950_000,
               "alt_models": ["minimax/minimax-m2.7-highspeed:free", "qwen/qwen3.5-flash:free"]},
     "ollama": {"host": "ollama.com", "url": "https://ollama.com/v1/chat/completions",
                "key": os.environ.get("LLAMA_API_KEY"),
@@ -1515,7 +1522,10 @@ def main(argv: list[str] | None = None) -> int:
             # in 0 s, and were filed as failed tasks -- 45 of them for NVIDIA
             # in three hours, dragging the build and OpenCode rows.
             calls = state.get("provider_calls_today", {}) if state.get("provider_day") == today else {}
-            capped = {name for name, p in PROVIDERS.items() if calls.get(name, 0) >= p.get("daily_cap", 10**9)}
+            tokens = state.get("provider_tokens_today", {}) if state.get("provider_day") == today else {}
+            capped = {name for name, p in PROVIDERS.items()
+                      if calls.get(name, 0) >= p.get("daily_cap", 10**9)
+                      or tokens.get(name, 0) >= p.get("daily_token_cap", 10**12)}
             skipped = 0
             members = len(lane_personas(lane))
             idx = persona_index(state[cursor], lane)
@@ -1535,7 +1545,7 @@ def main(argv: list[str] | None = None) -> int:
             state[cursor] += 1
         state.setdefault("provider_calls_today", {})
         if state.get("provider_day") != today:
-            state["provider_day"], state["provider_calls_today"] = today, {}
+            state["provider_day"], state["provider_calls_today"], state["provider_tokens_today"] = today, {}, {}
         run_index = state["runs_today"]
         used_today = dict(state["provider_calls_today"])
         # the slot is taken: the other lane, or the next tick, moves on
@@ -1599,6 +1609,9 @@ def main(argv: list[str] | None = None) -> int:
         state.setdefault("provider_calls_today", {})
         if provider:
             state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
+            state.setdefault("provider_tokens_today", {})
+            state["provider_tokens_today"][provider] = (state["provider_tokens_today"].get(provider, 0)
+                                                        + run.tokens_prompt + run.tokens_completion)
         state.setdefault("provider_dead", {})
         if provider and run.provider_dead_today:
             state["provider_dead"][provider] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")

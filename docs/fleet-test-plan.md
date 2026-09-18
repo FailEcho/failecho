@@ -328,6 +328,21 @@ config points side-calls at the same free model and no paid request is
 ever made. The provider block is ready (`OC_PROVIDERS["zen"]`) and not in
 the rotation until the tier answers.
 
+## Change during the run: every cap at the provider's own tier, 2026-09-18 21:00 UTC
+
+User: "max everything, we need the research speed". Every provider cap
+now sits at the tier the provider itself states, and no higher: groq
+3,000 calls a day (1,000 per model, three models; its per-model token
+budget binds first), NVIDIA 2,400 (an hour of its 40 a minute; the
+account shows no daily pool), Mistral 2,400 (its headers: 188 a minute),
+Gemini 40 and OpenRouter 50 unchanged (already their tiers), Ollama 150
+unchanged (no published number). xKiro's tier is tokens, not calls --
+1,000,000 a day verified -- and 450 calls had spent 1.01M by 20:30 while
+the call cap said 600; it now has a 950,000-token daily cap, and every
+provider's tokens are counted per day. The onboarding test counts the
+fleet's calls against the same tier. The VM lane runs every minute,
+onboarding every 20 minutes, the daily run budget is 3,000.
+
 ## Check: the coverage counter, 2026-09-18 14:30 UTC
 
 Open since 17 Sep 22:14 ("the before-snapshot reads as empty"; not quoted

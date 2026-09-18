@@ -18,7 +18,7 @@ WorkingDirectory=/srv/failecho-lab/app
 EnvironmentFile=/etc/failecho-agent.env
 Environment="FAILECHO_ENDPOINT=http://127.0.0.1:8089"
 Environment="FLEET_LAB_DB=/srv/failecho-lab/data/lab.db"
-Environment="FLEET_MAX_RUNS_PER_DAY=2000"
+Environment="FLEET_MAX_RUNS_PER_DAY=3000"
 # what the sandbox guest reports to, through the fence; the public lab URL
 # because the guest cannot see this host's loopback
 Environment="FLEET_LAB_PUBLIC_URL=https://lab.failecho.com"
