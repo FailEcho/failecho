@@ -699,20 +699,19 @@ def test_provider_caps_stay_within_the_documented_free_tiers():
     assert F.PROVIDERS["groq"]["daily_cap"] <= 1000
     # NVIDIA documents 40 requests a minute; 400 a day is well inside it
     assert F.PROVIDERS["nvidia"]["daily_cap"] <= 40 * 60 * 24 // 100
+    # Mistral's headers for this key: ministral-8b 188 a minute; 400 a day is well inside it
+    assert F.PROVIDERS["mistral"]["daily_cap"] <= 188 * 60 * 24 // 100
 
 
 def test_the_nvidia_personas_are_twins_and_the_onboarding_rotation_stays_coprime():
-    """Added 2026-09-18: twins share a provider and differ only in asking;
-    the onboarding model count must stay coprime with the five scenes or a
-    model meets the same scene forever."""
-    import math
-
+    """Added 2026-09-18: twins share a provider and differ only in asking."""
     from failecho_fleet import onboard
 
     by = {p[0]: p for p in F.PERSONAS}
-    for a, b in (("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n")):
-        assert by[a][1:3] == by[b][1:3] == (by[a][1], "nvidia") and by[a][3] and not by[b][3]
+    for a, b, prov in (("fleet-decor-ask-c", "fleet-decor-blind-c", "nvidia"), ("fleet-build-ask-n", "fleet-build-blind-n", "nvidia"),
+                       ("fleet-decor-ask-d", "fleet-decor-blind-d", "mistral")):
+        assert by[a][1:3] == by[b][1:3] == (by[a][1], prov) and by[a][3] and not by[b][3]
         assert (a, b) in F.TWINS
+    assert by["fleet-explore-e"][2] == "mistral" and "fleet-explore-e" in F.EXPLORER_PERSONAS
     assert "fleet-explore-d" in F.EXPLORER_PERSONAS and by["fleet-explore-d"][2] == "nvidia"
-    assert math.gcd(len(onboard.MODELS), len(onboard.SCENARIOS)) == 1
     assert ("nvidia", "nvidia/nemotron-3-super-120b-a12b") in onboard.MODELS

@@ -273,6 +273,23 @@ served by three hosts in the fleet -- groq, Ollama, NVIDIA -- so a failure
 that belongs to the weights and one that belongs to the host can be told
 apart. Twenty-eight personas; a full cycle is 56 minutes.
 
+## Change during the run: Mistral joins, 2026-09-18 07:10 UTC
+
+User-issued key. The key's own response headers say what its tier allows:
+`ministral-8b-latest` 188 requests a minute, `ministral-14b-latest` 30,
+`codestral-latest` 125; `mistral-small`, `mistral-medium` and `magistral`
+answer 429 with a limit of 0 and are not used. Tool calls verified on
+ministral-8b. Cap 400 a day. Decorator twins on PyPI/npm, an explorer on
+GitHub; the onboarding test takes ministral-14b as its tenth model, and
+its rotation is now mixed-radix (model fastest, then scene, then project)
+so the model count no longer has to be coprime with five. Thirty-one
+personas; a full cycle is 62 minutes.
+
+An OpenCode Zen key was also issued: its free models answer `403
+FreeTierError: OpenCode's free tier can only be used from within
+OpenCode`, and everything else on it is pay-per-use, so it is not in the
+fleet. No paid request was sent.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

@@ -243,8 +243,11 @@ def test_trying_the_cli_first_is_recorded_and_not_penalised():
 
 def test_the_rotation_covers_every_model_scenario_and_project():
     n_models, n_sc, n_pr = len(onboard.MODELS), len(onboard.SCENARIOS), len(onboard.PROJECTS)
-    seen = {(n % n_models, n % n_sc, (n // n_sc) % n_pr) for n in range(n_models * n_sc * n_pr)}
-    assert len(seen) == n_models * n_sc * n_pr, "the three cycles are not coprime; some pairs never meet"
+    seen = {onboard.rotation(n) for n in range(n_models * n_sc * n_pr)}
+    assert len(seen) == n_models * n_sc * n_pr, "some model never meets some scene on some project"
+    # and a model meets every scene before it repeats one
+    scenes = [onboard.rotation(n)[1] for n in range(0, n_models * n_sc, n_models)]
+    assert scenes == list(range(n_sc))
 
 
 def test_every_model_belongs_to_a_configured_provider():

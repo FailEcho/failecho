@@ -96,6 +96,14 @@ PROVIDERS = {
     "nvidia": {"host": "integrate.api.nvidia.com", "url": "https://integrate.api.nvidia.com/v1/chat/completions",
                "key": os.environ.get("NVIDIA_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 400,
                "alt_models": ["nvidia/nemotron-3-super-120b-a12b"]},
+    # Mistral (added 2026-09-18 07:10 UTC, user-issued key). The key's own
+    # headers say what this tier allows per model: ministral-8b 188 req/min,
+    # ministral-14b 30, codestral 125; mistral-small, -medium and magistral
+    # answer 429 with a limit of 0, so they are not on this tier. Tool calls
+    # verified on ministral-8b. Cap 400 a day, far inside those minutes.
+    "mistral": {"host": "api.mistral.ai", "url": "https://api.mistral.ai/v1/chat/completions",
+                "key": os.environ.get("MISTRAL_API_KEY"), "models": ["ministral-8b-latest"], "daily_cap": 400,
+                "alt_models": ["ministral-14b-latest", "codestral-latest"]},
     "ollama": {"host": "ollama.com", "url": "https://ollama.com/v1/chat/completions",
                "key": os.environ.get("LLAMA_API_KEY"),
                "models": ["gpt-oss:20b", "nemotron-3-nano:30b", "gemma4:31b"], "daily_cap": 150,
@@ -244,9 +252,13 @@ PERSONAS = [
     ("fleet-build-ask-n",  "builder",   "nvidia", True,  BUILDER_TASKS),
     ("fleet-build-blind-n","builder",   "nvidia", False, BUILDER_TASKS),
     ("fleet-explore-d",    "decorator", "nvidia", True,  MIXED),
+    # Mistral (2026-09-18 07:10 UTC): decorator twins and an explorer.
+    ("fleet-decor-ask-d",  "decorator", "mistral", True,  PYPI_NPM),
+    ("fleet-decor-blind-d","decorator", "mistral", False, PYPI_NPM),
+    ("fleet-explore-e",    "decorator", "mistral", True,  GITHUB),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n"}
-EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c", "fleet-explore-d"}
+EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c", "fleet-explore-d", "fleet-explore-e"}
 
 #: Ask/blind twins by reporter. The round-robin ran every ask twin before
 #: its blind twin, two minutes apart, and on GitHub's hourly budget the twin
@@ -259,7 +271,8 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-mcp-ask", "fleet-mcp-blind"), ("fleet-cron-a", "fleet-cron-b"),
          ("fleet-test-ask", "fleet-test-blind"), ("fleet-gh-ask", "fleet-gh-blind"),
          ("fleet-build-ask", "fleet-build-blind"), ("fleet-limits-ask", "fleet-limits-blind"),
-         ("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n")]
+         ("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n"),
+         ("fleet-decor-ask-d", "fleet-decor-blind-d")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 

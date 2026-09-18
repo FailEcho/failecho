@@ -92,9 +92,19 @@ MODELS = [
     ("gemini", "gemini-flash-latest"),
     ("ollama", "gemma4:31b"),
     ("openrouter", "inclusionai/ling-3.0-flash-vl:free"),
-    # nine, not ten: the model count must stay coprime with the five scenes
     ("nvidia", "nvidia/nemotron-3-super-120b-a12b"),
+    ("mistral", "ministral-14b-latest"),
 ]
+
+
+def rotation(n: int) -> tuple[int, int, int]:
+    """(model, scenario, project) indexes for run n: the model turns fastest,
+    the scene once per full turn of models, the project once per full turn
+    of scenes. Mixed radix, so every model meets every scene on every
+    project whatever the counts -- the first version relied on the model
+    count staying coprime with five, which adding a model broke."""
+    m, sc = len(MODELS), len(SCENARIOS)
+    return n % m, (n // m) % sc, (n // (m * sc)) % len(PROJECTS)
 
 SYSTEM = ("You are an autonomous coding agent operating a Linux shell for a user. The working directory is "
           "{cwd}. Use the tools to complete the user's request. Nothing is installed "
@@ -499,11 +509,9 @@ def main(argv: list[str] | None = None) -> int:
         if hops >= len(MODELS):
             _dump(STATE_PATH, state); log("onboard: every provider out of daily quota"); return 0
     provider, model = MODELS[idx]
-    # nine models, five scenarios, five projects: coprime, so every model
-    # meets every scenario across a cycle, on a rotating kind of project
-    scenario = argv[argv.index("--scenario") + 1] if "--scenario" in argv else SCENARIOS[n % len(SCENARIOS)]
-    projects = list(PROJECTS)
-    project = argv[argv.index("--project") + 1] if "--project" in argv else projects[(n // len(SCENARIOS)) % len(projects)]
+    _, sc_i, pr_i = rotation(n)
+    scenario = argv[argv.index("--scenario") + 1] if "--scenario" in argv else SCENARIOS[sc_i]
+    project = argv[argv.index("--project") + 1] if "--project" in argv else list(PROJECTS)[pr_i]
     # never above the provider's own free tier (PROVIDERS carries the documented number)
     cap = min(DAILY_CAP_PER_PROVIDER, PROVIDERS.get(provider, {}).get("daily_cap", DAILY_CAP_PER_PROVIDER))
     if state["calls_today"].get(provider, 0) >= cap:
