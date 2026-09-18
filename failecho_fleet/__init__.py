@@ -87,6 +87,15 @@ PROVIDERS = {
     # ends and where the fleet stops. gpt-oss:20b here is the same model as
     # Groq's gpt-oss-20b -- the one returning "parsing failed" 400s -- so the
     # fleet will show whether that failure belongs to the model or the host.
+    # NVIDIA's API catalog (added 2026-09-18 06:30 UTC, user-issued key).
+    # Documented free tier: 40 requests a minute; a starting pool of about
+    # 1,000 credits is described in places and said to be gone in others, so
+    # the balance on build.nvidia.com is the number to watch. Both models
+    # verified to make real tool calls; gpt-oss-20b is the same model groq
+    # and Ollama serve, a third host for the same weights.
+    "nvidia": {"host": "integrate.api.nvidia.com", "url": "https://integrate.api.nvidia.com/v1/chat/completions",
+               "key": os.environ.get("NVIDIA_API_KEY"), "models": ["openai/gpt-oss-20b"], "daily_cap": 400,
+               "alt_models": ["nvidia/nemotron-3-super-120b-a12b"]},
     "ollama": {"host": "ollama.com", "url": "https://ollama.com/v1/chat/completions",
                "key": os.environ.get("LLAMA_API_KEY"),
                "models": ["gpt-oss:20b", "nemotron-3-nano:30b", "gemma4:31b"], "daily_cap": 150,
@@ -227,9 +236,17 @@ PERSONAS = [
     ("fleet-limits-ask",   "decorator", None,     True,  LIMIT_CALLS),
     ("fleet-limits-blind", "decorator", None,     False, LIMIT_CALLS),
     ("fleet-explore-c",    "decorator", None,     True,  GH_HEAVY + LIMIT_CALLS),
+    # NVIDIA (2026-09-18 06:30 UTC): a second provider with a usable tier,
+    # so the provider comparison does not rest on groq alone. Decorator
+    # twins, builder twins, and an explorer to make the evidence.
+    ("fleet-decor-ask-c",  "decorator", "nvidia", True,  MIXED),
+    ("fleet-decor-blind-c","decorator", "nvidia", False, MIXED),
+    ("fleet-build-ask-n",  "builder",   "nvidia", True,  BUILDER_TASKS),
+    ("fleet-build-blind-n","builder",   "nvidia", False, BUILDER_TASKS),
+    ("fleet-explore-d",    "decorator", "nvidia", True,  MIXED),
 ]
-BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind"}
-EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c"}
+BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n"}
+EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c", "fleet-explore-d"}
 
 #: Ask/blind twins by reporter. The round-robin ran every ask twin before
 #: its blind twin, two minutes apart, and on GitHub's hourly budget the twin
@@ -241,7 +258,8 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-auto-ask-a", "fleet-auto-blind-a"), ("fleet-auto-ask-b", "fleet-auto-blind-b"),
          ("fleet-mcp-ask", "fleet-mcp-blind"), ("fleet-cron-a", "fleet-cron-b"),
          ("fleet-test-ask", "fleet-test-blind"), ("fleet-gh-ask", "fleet-gh-blind"),
-         ("fleet-build-ask", "fleet-build-blind"), ("fleet-limits-ask", "fleet-limits-blind")]
+         ("fleet-build-ask", "fleet-build-blind"), ("fleet-limits-ask", "fleet-limits-blind"),
+         ("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 

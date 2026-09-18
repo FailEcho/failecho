@@ -259,6 +259,20 @@ quotas", counted only from 05:30 on and only for the model-driven personas
 unchanged; their blind runs before 05:30 gave up on a provider failure and
 from 05:30 retry once, which can only move them toward blind.
 
+## Change during the run: NVIDIA joins, 2026-09-18 06:30 UTC
+
+The user issued an NVIDIA API-catalog key (and a Cerebras one, which
+answers "Payment required" for both models its account lists, so it is not
+used). NVIDIA's documented free tier is 40 requests a minute; the fleet's
+cap is 400 a day. `openai/gpt-oss-20b` and
+`nvidia/nemotron-3-super-120b-a12b` both make real tool calls, checked by
+hand before this. Five personas: decorator twins on a mixed workload,
+builder twins, and an explorer; the onboarding test gains the nemotron as
+its ninth model (nine stays coprime with five scenes). gpt-oss-20b is now
+served by three hosts in the fleet -- groq, Ollama, NVIDIA -- so a failure
+that belongs to the weights and one that belongs to the host can be told
+apart. Twenty-eight personas; a full cycle is 56 minutes.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

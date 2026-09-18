@@ -273,9 +273,11 @@ def test_the_builder_twins_share_a_provider_and_differ_only_in_asking():
     import failecho_fleet as F
 
     rows = {r[0]: r for r in F.PERSONAS if r[1] == "builder"}
-    assert set(rows) == {"fleet-build-ask", "fleet-build-blind"} == F.BUILD_PERSONAS
-    a, b = rows["fleet-build-ask"], rows["fleet-build-blind"]
-    assert a[2] == b[2] and a[4] is b[4] and a[3] is True and b[3] is False
+    assert set(rows) == {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n"} == F.BUILD_PERSONAS
+    for ask, blind in (("fleet-build-ask", "fleet-build-blind"), ("fleet-build-ask-n", "fleet-build-blind-n")):
+        a, b = rows[ask], rows[blind]
+        assert a[2] == b[2] and a[4] is b[4] and a[3] is True and b[3] is False
+    assert rows["fleet-build-ask"][2] == "groq" and rows["fleet-build-ask-n"][2] == "nvidia"
 
 
 def test_the_first_sixteen_personas_did_not_change():

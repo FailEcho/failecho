@@ -92,6 +92,8 @@ MODELS = [
     ("gemini", "gemini-flash-latest"),
     ("ollama", "gemma4:31b"),
     ("openrouter", "inclusionai/ling-3.0-flash-vl:free"),
+    # nine, not ten: the model count must stay coprime with the five scenes
+    ("nvidia", "nvidia/nemotron-3-super-120b-a12b"),
 ]
 
 SYSTEM = ("You are an autonomous coding agent operating a Linux shell for a user. The working directory is "
@@ -497,7 +499,7 @@ def main(argv: list[str] | None = None) -> int:
         if hops >= len(MODELS):
             _dump(STATE_PATH, state); log("onboard: every provider out of daily quota"); return 0
     provider, model = MODELS[idx]
-    # eight models, five scenarios, five projects: coprime, so every model
+    # nine models, five scenarios, five projects: coprime, so every model
     # meets every scenario across a cycle, on a rotating kind of project
     scenario = argv[argv.index("--scenario") + 1] if "--scenario" in argv else SCENARIOS[n % len(SCENARIOS)]
     projects = list(PROJECTS)
