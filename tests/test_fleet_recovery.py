@@ -583,3 +583,14 @@ def test_a_dead_mark_expires_and_the_next_persona_probes(tmp_path, monkeypatch):
     assert F.main([]) == 0
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["provider_dead"]["groq"] != stale and "T" in state["provider_dead"]["groq"]
+
+
+def test_provider_caps_stay_within_the_documented_free_tiers():
+    """Provider caps never above documented free tiers (loop rule). The
+    numbers are what the providers themselves answered on 18 Sep 2026:
+    Gemini "GenerateRequestsPerDayPerProjectPerModel-FreeTier ... quotaValue
+    20" (two models in rotation), OpenRouter "free-models-per-day ...
+    X-RateLimit-Limit: 50", groq 1000 requests a day for gpt-oss-20b."""
+    assert F.PROVIDERS["gemini"]["daily_cap"] <= 20 * (1 + len(F.PROVIDERS["gemini"]["alt_models"]))
+    assert F.PROVIDERS["openrouter"]["daily_cap"] <= 50
+    assert F.PROVIDERS["groq"]["daily_cap"] <= 1000

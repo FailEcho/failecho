@@ -502,7 +502,9 @@ def main(argv: list[str] | None = None) -> int:
     scenario = argv[argv.index("--scenario") + 1] if "--scenario" in argv else SCENARIOS[n % len(SCENARIOS)]
     projects = list(PROJECTS)
     project = argv[argv.index("--project") + 1] if "--project" in argv else projects[(n // len(SCENARIOS)) % len(projects)]
-    if state["calls_today"].get(provider, 0) >= DAILY_CAP_PER_PROVIDER:
+    # never above the provider's own free tier (PROVIDERS carries the documented number)
+    cap = min(DAILY_CAP_PER_PROVIDER, PROVIDERS.get(provider, {}).get("daily_cap", DAILY_CAP_PER_PROVIDER))
+    if state["calls_today"].get(provider, 0) >= cap:
         log(f"onboard: {provider} daily cap reached; skipping {model}")
         state["next"] = idx + 1
         _dump(STATE_PATH, state)

@@ -66,7 +66,10 @@ PROVIDERS = {
              "alt_models": ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]},
     "gemini": {"host": "generativelanguage.googleapis.com",
                "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-               "key": os.environ.get("GEMINI_API_KEY"), "models": ["gemini-flash-latest"], "daily_cap": 400,
+               # the free tier's own answer on 18 Sep 2026:
+               # GenerateRequestsPerDayPerProjectPerModel-FreeTier, quotaValue 20,
+               # for gemini-3.8-flash. Two models, so 40 is the tier, not above it.
+               "key": os.environ.get("GEMINI_API_KEY"), "models": ["gemini-flash-latest"], "daily_cap": 40,
                "alt_models": ["gemini-flash-lite-latest"]},
     # Free-tier key, zero spend, no limit set -- checked before this was added.
     # Three free models verified to make real tool calls; rotated per run so
@@ -77,7 +80,8 @@ PROVIDERS = {
                    "models": ["nex-agi/nex-n2.5-mini:free", "liquid/lfm-2.5-2.6b:free",
                               "inclusionai/ling-3.0-flash-vl:free"],
                    "headers": {"HTTP-Referer": "https://failecho.com", "X-Title": "FailEcho fleet lab"},
-                   "daily_cap": 120, "alt_models": ["liquid/lfm-2.5-2.6b:free", "nex-agi/nex-n2.5-mini:free"]},
+                   # "free-models-per-day ... X-RateLimit-Limit: 50" without credits (18 Sep 2026)
+                   "daily_cap": 50, "alt_models": ["liquid/lfm-2.5-2.6b:free", "nex-agi/nex-n2.5-mini:free"]},
     # Ollama's cloud, free tier: three models verified for tool calls, two
     # others answered 402 "requires a subscription", which is where the tier
     # ends and where the fleet stops. gpt-oss:20b here is the same model as
