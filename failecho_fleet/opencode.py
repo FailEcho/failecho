@@ -99,7 +99,10 @@ def opencode_config(provider: str, model: str, lab_mcp_url: str | None, reporter
         # default (gpt-5.4-nano on Zen: "Insufficient account funds")
         "small_model": full,
         "provider": {oc["id"]: block},
-        "permission": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
+        # external_directory: a script writing to /tmp was auto-rejected
+        # mid-task (18 Sep 13:24, blind twin) -- the harness failing the
+        # task, not the agent; the guest is throwaway
+        "permission": {"edit": "allow", "bash": "allow", "webfetch": "allow", "external_directory": "allow"},
         "share": "disabled",
         "autoupdate": False,
     }

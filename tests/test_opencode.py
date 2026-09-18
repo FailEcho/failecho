@@ -43,6 +43,7 @@ def test_the_ask_config_carries_the_mcp_server_and_the_blind_one_does_not():
         assert cfg["provider"]["nvidia"]["options"] == {"apiKey": "{env:NVIDIA_API_KEY}", "baseURL": "https://integrate.api.nvidia.com/v1"}
         assert cfg["provider"]["nvidia"]["npm"] == "@ai-sdk/openai-compatible"
         assert cfg["share"] == "disabled" and cfg["autoupdate"] is False
+        assert cfg["permission"]["external_directory"] == "allow", "a /tmp write must not be auto-rejected mid-task"
     zen = OC.opencode_config("zen", "nemotron-3-ultra-free", None, "x")
     assert zen["model"] == "opencode/nemotron-3-ultra-free" and "npm" not in zen["provider"]["opencode"]
     assert "{env:ZEN_API_KEY}" in json.dumps(zen)

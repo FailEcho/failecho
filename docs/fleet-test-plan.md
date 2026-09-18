@@ -328,6 +328,21 @@ config points side-calls at the same free model and no paid request is
 ever made. The provider block is ready (`OC_PROVIDERS["zen"]`) and not in
 the rotation until the tier answers.
 
+## Check: the OpenCode ask twin is wired, it chooses not to ask, 2026-09-18 14:15 UTC
+
+Seven OpenCode runs by 14:01, none of the ask twin's with a FailEcho tool
+call. Checked by hand in the same VM, config and AGENTS.md: `opencode mcp
+list` shows `failecho connected`, and the model lists all four
+`failecho_*` tools among its own. So the comparison is valid; the ask
+twin has FailEcho and does not reach for it. Its failures happen inside
+Python scripts it writes and runs (a reset connection printed by the
+script), which it does not read as "a tool failed". That is a finding
+about how a real agent uses the product, not a wiring bug, and the
+paragraph is left as it is until the hourly trigger (six ask runs that
+met a failure with no FailEcho call) says otherwise. One harness fix: a
+script writing to /tmp was auto-rejected mid-task
+(`external_directory`), so that permission is now allowed on both twins.
+
 ## Change during the run: two lanes, faster onboarding, a second explorer, 2026-09-18 13:30 UTC
 
 User asked how to speed the process. Three changes, none to what is
