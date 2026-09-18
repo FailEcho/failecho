@@ -328,6 +328,19 @@ config points side-calls at the same free model and no paid request is
 ever made. The provider block is ready (`OC_PROVIDERS["zen"]`) and not in
 the rotation until the tier answers.
 
+## Check: the coverage counter, 2026-09-18 14:30 UTC
+
+Open since 17 Sep 22:14 ("the before-snapshot reads as empty"; not quoted
+since). Tested by hand in a builder VM with a program making three known
+calls to two hosts: connections 3 (pypi.org 2, registry.npmjs.org 1),
+observed 3 with the wrapper on, observed 0 with it off. The fleet's own
+entries since the morning agree (one GitHub call, one connection, one
+observed). The 22:14 entry equalled the proxy's running totals because
+the proxy had restarted and its counters began at zero; a restart
+mid-run can still undercount a run, never overcount it. The counter is
+right and can be quoted. One real bug found on the way: the import
+reader saw only the first name on an `import a, b` line; fixed.
+
 ## Check: the OpenCode ask twin is wired, it chooses not to ask, 2026-09-18 14:15 UTC
 
 Seven OpenCode runs by 14:01, none of the ask twin's with a FailEcho tool

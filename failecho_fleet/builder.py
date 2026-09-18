@@ -216,6 +216,27 @@ def _proxy_connections() -> dict | None:
         return None
 
 
+_HTTP_LIBS = ("requests", "httpx", "urllib", "http.client", "aiohttp", "subprocess", "pycurl", "socket")
+
+
+def imported_http_libs(code: str) -> list[str]:
+    """The HTTP paths a program imports, by module name only. Reads
+    `import a, b.c` and `from a.b import c` lines; the first version only saw
+    the first name on an `import` line, so `import urllib.request, json,
+    requests` reported urllib alone (found by hand, 18 Sep)."""
+    names: set[str] = set()
+    for line in code.splitlines():
+        line = line.split("#", 1)[0].strip()
+        m = re.match(r"from\s+([\w.]+)\s+import\b", line)
+        if m:
+            names.add(m.group(1))
+            continue
+        m = re.match(r"import\s+(.+)", line)
+        if m:
+            names.update(part.split(" as ")[0].strip() for part in m.group(1).split(","))
+    return sorted(lib for lib in _HTTP_LIBS if any(n == lib or n.startswith(lib + ".") for n in names))
+
+
 class Builder:
     """The VM side of a builder run: one sandbox for the whole run, a venv
     made on first use, and the local/shared ledger."""
@@ -338,8 +359,7 @@ class Builder:
             # which HTTP paths the program imports -- so a miss names the
             # client the wrapper does not patch (our own generated code, and
             # only the import names, is what gets recorded)
-            libs = sorted(l for l in ("requests", "httpx", "urllib", "http.client", "aiohttp", "subprocess", "pycurl", "socket")
-                          if re.search(rf"^\s*(import|from)\s+{re.escape(l)}\b", code, re.M))
+            libs = imported_http_libs(code)
             # hosts, so a program that opened 145 connections for 5 observed
             # calls (seen 2026-09-17 21:28) can be explained rather than guessed at
             self.coverage.append({"connections": connections, "observed": observed,

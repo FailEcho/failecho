@@ -650,3 +650,15 @@ def test_a_run_with_traffic_and_no_observed_calls_is_a_miss(tmp_path, monkeypatc
     b.run_python("import subprocess; subprocess.run(['curl', 'https://api.github.com'])")
     assert b.coverage == [{"connections": 3, "observed": 0, "missed": True, "libs": ["subprocess"], "hosts": {"api.github.com": 3}}]
     assert b.summary()["coverage"] == b.coverage
+
+
+def test_the_http_libraries_a_program_imports_are_all_read():
+    """Coverage names the client the wrapper missed from the program's own
+    imports. Checked by hand on 18 Sep: 3 known calls came back as
+    connections 3, observed 3 -- but `import urllib.request, json, requests`
+    named urllib alone."""
+    from failecho_fleet.builder import imported_http_libs
+
+    code = "import urllib.request, json, requests\nfrom httpx import Client\nimport http.client as hc  # x\nimport socketserver\n"
+    assert imported_http_libs(code) == ["http.client", "httpx", "requests", "urllib"]
+    assert imported_http_libs("print('no imports')") == []
