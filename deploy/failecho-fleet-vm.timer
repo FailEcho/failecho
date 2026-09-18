@@ -1,0 +1,13 @@
+# The VM lane: one builder or OpenCode persona every two minutes; a run that
+# takes longer holds the slot (systemd starts no second instance) and the
+# light lane keeps going meanwhile. Since 2026-09-18 13:30 UTC.
+[Unit]
+Description=FailEcho fleet test, VM lane, one persona every 2 minutes
+
+[Timer]
+OnCalendar=*:0/2
+RandomizedDelaySec=15
+Persistent=false
+
+[Install]
+WantedBy=timers.target

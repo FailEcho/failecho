@@ -24,7 +24,9 @@ days.
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
+import fcntl
 import datetime as dt
 import json
 import os
@@ -280,6 +282,9 @@ PERSONAS = [
     # without (blind). Same task, same model, same project otherwise.
     ("fleet-oc-ask-n",     "opencode",  "nvidia", True,  OC_TASKS),
     ("fleet-oc-blind-n",   "opencode",  "nvidia", False, OC_TASKS),
+    # a second explorer on groq (2026-09-18 13:30 UTC): the server rules on an
+    # action at five attempts, and one explorer made about one an hour
+    ("fleet-explore-a2",   "decorator", "groq",   True,  GITHUB),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
@@ -289,7 +294,7 @@ OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 OPENCODE_MODELS = {"nvidia": "nvidia/nemotron-3-super-120b-a12b", "mistral": "codestral-latest",
                    "xkiro": "qwen/qwen3.6-27b:free", "zen": "nemotron-3-ultra-free"}
 EXPLORER_PERSONAS = {"fleet-explore-a", "fleet-explore-b", "fleet-explore-c", "fleet-explore-d", "fleet-explore-e",
-                     "fleet-explore-f"}
+                     "fleet-explore-f", "fleet-explore-a2"}
 
 #: Ask/blind twins by reporter. The round-robin ran every ask twin before
 #: its blind twin, two minutes apart, and on GitHub's hourly budget the twin
@@ -308,11 +313,29 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 
-def persona_index(position: int) -> int:
-    """Which persona runs at this position of the round-robin: on odd cycles
-    the twins trade places, so neither side always runs second."""
-    n = len(PERSONAS)
-    idx, cycle = position % n, position // n
+#: Two lanes, two timers (since 2026-09-18 13:30 UTC). A builder or an
+#: OpenCode run holds the slot for 30-240 s; a cron or model persona for
+#: 2-10 s. In one queue the 31 light personas waited behind the 8 VM ones
+#: and a full cycle was 76 minutes. Each lane round-robins its own list;
+#: twins share a path, so they are always in the same lane.
+LANES = ("light", "vm")
+
+
+def lane_of(persona: tuple) -> str:
+    return "vm" if persona[1] in ("builder", "opencode") else "light"
+
+
+def lane_personas(lane: str | None) -> list[int]:
+    """Indexes into PERSONAS this lane runs; None is the old single queue."""
+    return [i for i, p in enumerate(PERSONAS) if lane is None or lane_of(p) == lane]
+
+
+def persona_index(position: int, lane: str | None = None) -> int:
+    """Which persona runs at this position of the lane's round-robin: on odd
+    cycles the twins trade places, so neither side always runs second."""
+    members = lane_personas(lane)
+    n = len(members)
+    idx, cycle = members[position % n], position // n
     if cycle % 2 == 0:
         return idx
     names = [p[0] for p in PERSONAS]
@@ -1079,6 +1102,19 @@ def _quota_probe_due(marked: str) -> bool:
     return (dt.datetime.now(dt.timezone.utc) - when).total_seconds() >= QUOTA_PROBE_SECONDS
 
 
+@contextlib.contextmanager
+def _state_lock():
+    """Two lanes share one state file. The lock is held while choosing a
+    persona and while filing a run's record, never during the run."""
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(os.path.join(STATE_DIR, "state.lock"), "w") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
+
+
 def _state() -> dict:
     os.makedirs(STATE_DIR, exist_ok=True)
     try:
@@ -1425,69 +1461,73 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     argv = sys.argv[1:] if argv is None else argv
     assert_lab_only()
-    state = _state()
+    lane = argv[argv.index("--lane") + 1] if "--lane" in argv else None
+    if lane is not None and lane not in LANES:
+        raise SystemExit(f"fleet: unknown lane {lane!r}; one of {LANES}")
+    cursor = "next" if lane is None else f"next_{lane}"
     today = dt.date.today().isoformat()
-    if state.get("day") != today:
-        state["day"], state["runs_today"], state["skipped_for_quota_today"] = today, 0, 0
-    if state["runs_today"] >= MAX_RUNS_PER_DAY:
-        log("daily budget spent"); return 0
 
-    dead = {k: v for k, v in state.get("provider_dead", {}).items() if not _quota_probe_due(v)}
-    state["provider_dead"] = dead
-    if "--persona" in argv:
-        idx = int(argv[argv.index("--persona") + 1])
-    else:
-        # A provider whose daily quota is gone answers nothing for hours; its
-        # personas are skipped, not run, and the slot goes to the next live
-        # one. The skip is recorded so the day's counts stay explicable. The
-        # day boundary is the provider's, not ours (groq was alive again by
-        # 02:49 UTC on 18 Sep after "used 199178 of 200000" at 00:13; Gemini
-        # resets at midnight Pacific), so a dead mark expires after
-        # QUOTA_PROBE_SECONDS and the next persona on that provider is the
-        # probe: it either runs, or re-marks the provider for another spell.
-        skipped = 0
-        idx = persona_index(state["next"])
-        while PERSONAS[idx][2] in dead and skipped < len(PERSONAS):
-            log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone; next probe after "
-                f"{QUOTA_PROBE_SECONDS // 60} min")
-            state["next"] += 1
-            state["skipped_for_quota_today"] = state.get("skipped_for_quota_today", 0) + 1
-            skipped += 1
-            idx = persona_index(state["next"])
-        if skipped >= len(PERSONAS):
-            _save(state)
-            log("every provider is out of daily quota; nothing to run this tick"); return 0
+    # -- choose, under the lock ------------------------------------------
+    with _state_lock():
+        state = _state()
+        if state.get("day") != today:
+            state["day"], state["runs_today"], state["skipped_for_quota_today"] = today, 0, 0
+        if state["runs_today"] >= MAX_RUNS_PER_DAY:
+            log("daily budget spent"); return 0
+        dead = {k: v for k, v in state.get("provider_dead", {}).items() if not _quota_probe_due(v)}
+        state["provider_dead"] = dead
+        state.setdefault(cursor, 0)
+        if "--persona" in argv:
+            idx = int(argv[argv.index("--persona") + 1])
+        else:
+            # A provider whose daily quota is gone answers nothing for hours; its
+            # personas are skipped, not run, and the slot goes to the next live
+            # one. The skip is recorded so the day's counts stay explicable. The
+            # day boundary is the provider's, not ours (groq was alive again by
+            # 02:49 UTC on 18 Sep after "used 199178 of 200000" at 00:13; Gemini
+            # resets at midnight Pacific), so a dead mark expires after
+            # QUOTA_PROBE_SECONDS and the next persona on that provider is the
+            # probe: it either runs, or re-marks the provider for another spell.
+            skipped = 0
+            members = len(lane_personas(lane))
+            idx = persona_index(state[cursor], lane)
+            while PERSONAS[idx][2] in dead and skipped < members:
+                log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone; next probe after "
+                    f"{QUOTA_PROBE_SECONDS // 60} min")
+                state[cursor] += 1
+                state["skipped_for_quota_today"] = state.get("skipped_for_quota_today", 0) + 1
+                skipped += 1
+                idx = persona_index(state[cursor], lane)
+            if skipped >= members:
+                _save(state)
+                log("every provider is out of daily quota; nothing to run this tick"); return 0
+            state[cursor] += 1
+        state.setdefault("provider_calls_today", {})
+        if state.get("provider_day") != today:
+            state["provider_day"], state["provider_calls_today"] = today, {}
+        run_index = state["runs_today"]
+        used_today = dict(state["provider_calls_today"])
+        # the slot is taken: the other lane, or the next tick, moves on
+        state["runs_today"] += 1
+        _save(state)
+
     reporter, path, provider, asks, workload = PERSONAS[idx]
     run = Run(reporter, path, provider, asks)
     started = time.monotonic()
-    state.setdefault("provider_calls_today", {})
-    if state.get("provider_day") != today:
-        state["provider_day"], state["provider_calls_today"] = today, {}
+    task = None
     if provider is None:
         answer = run.run_cron(workload)
     elif path == "builder":
-        task = workload[(state["runs_today"] // len(PERSONAS)) % len(workload)]
-        answer = run.run_build(task, run_index=state["runs_today"],
-                               used_today=state["provider_calls_today"].get(provider, 0))
-        state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
+        task = workload[(run_index // len(PERSONAS)) % len(workload)]
+        answer = run.run_build(task, run_index=run_index, used_today=used_today.get(provider, 0))
     elif path == "opencode":
-        task = workload[(state["runs_today"] // len(PERSONAS)) % len(workload)]
-        answer = run.run_opencode(task, run_index=state["runs_today"],
-                                  used_today=state["provider_calls_today"].get(provider, 0))
-        state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
+        task = workload[(run_index // len(PERSONAS)) % len(workload)]
+        answer = run.run_opencode(task, run_index=run_index, used_today=used_today.get(provider, 0))
     else:
-        task = workload[(state["runs_today"] // len(PERSONAS)) % len(workload)]
-        answer = run.run_model(task, run_index=state["runs_today"],
-                               used_today=state["provider_calls_today"].get(provider, 0))
-        state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
+        task = workload[(run_index // len(PERSONAS)) % len(workload)]
+        answer = run.run_model(task, run_index=run_index, used_today=used_today.get(provider, 0))
     run.fe.flush(timeout=20)
     run.save_etags()
-    if provider and run.provider_dead_today:
-        state["provider_dead"][provider] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
-        log(f"  {provider}: daily quota gone; its personas are skipped for {QUOTA_PROBE_SECONDS // 60} min")
-    elif provider and provider in state["provider_dead"]:
-        del state["provider_dead"][provider]
-        log(f"  {provider}: quota is back")
     # Did the run do its job? A model run: a real answer, not a parenthesised
     # failure. A cron run: every call eventually succeeded. A builder: the
     # task came out done. The one number a user of an agent cares about.
@@ -1519,12 +1559,24 @@ def main(argv: list[str] | None = None) -> int:
                                                                 "error", "tool_names", "result_head", "timed_out")}
         record["task"] = task[0][:160]
         record["answer"] = answer[:200]
-    state["runs"].append(record)
-    state["runs"] = state["runs"][-5000:]
-    state["next"] = state["next"] + 1 if "--persona" not in argv else idx + 1
-    state["runs_today"] += 1
-    _save(state)
-    write_report(state)
+
+    # -- file, under the lock, on a fresh copy: the other lane may have written
+    with _state_lock():
+        state = _state()
+        state.setdefault("provider_calls_today", {})
+        if provider:
+            state["provider_calls_today"][provider] = state["provider_calls_today"].get(provider, 0) + run.model_calls
+        state.setdefault("provider_dead", {})
+        if provider and run.provider_dead_today:
+            state["provider_dead"][provider] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+            log(f"  {provider}: daily quota gone; its personas are skipped for {QUOTA_PROBE_SECONDS // 60} min")
+        elif provider and provider in state["provider_dead"]:
+            del state["provider_dead"][provider]
+            log(f"  {provider}: quota is back")
+        state.setdefault("runs", []).append(record)
+        state["runs"] = state["runs"][-5000:]
+        _save(state)
+        write_report(state)
 
     log(f"{reporter} [{path}/{provider or 'none'}/{'ask' if asks else 'blind'}] "
         f"{run.tool_calls} tool calls, {run.model_calls} model calls, {len(run.failures)} failures, "

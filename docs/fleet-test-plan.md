@@ -328,6 +328,26 @@ config points side-calls at the same free model and no paid request is
 ever made. The provider block is ready (`OC_PROVIDERS["zen"]`) and not in
 the rotation until the tier answers.
 
+## Change during the run: two lanes, faster onboarding, a second explorer, 2026-09-18 13:30 UTC
+
+User asked how to speed the process. Three changes, none to what is
+measured:
+
+- **Two lanes.** A builder or OpenCode run holds a slot for 30-240 s; a
+  cron or model persona for 2-10 s. In one queue the 31 light personas
+  waited behind the 8 VM ones and a full cycle was 76 minutes. Now the
+  light lane runs one persona a minute (`failecho-fleet.timer`), the VM
+  lane one every two minutes (`failecho-fleet-vm.timer`); each lane
+  round-robins its own list with its own cursor, twins share a path so
+  they never split, and the state file is locked while a persona is
+  chosen and while its record is filed, never during the run. The light
+  cycle is ~32 minutes, the VM cycle ~16.
+- **Onboarding every 30 minutes** instead of 60: each of the 11 models
+  meets each of the 5 scenes every ~1.1 days instead of 2.3.
+- **A second explorer on groq** (`fleet-explore-a2`, GitHub workload):
+  the server rules on an action at five attempts, and one explorer made
+  about one an hour.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

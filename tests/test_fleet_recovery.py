@@ -787,3 +787,40 @@ def test_the_advice_table_and_the_timeline_are_built_from_the_ledger(tmp_path, m
     assert h["period"] == "2026-09-18 00-12" and h["ask_runs"] == 1 and h["blind_runs"] == 1
     assert h["ask_failures"] == 8 and h["ask_advised"] == 6 and h["advised_share"] == 0.75
     assert h["ask_completed_rate"] == 1.0 and h["blind_completed_rate"] == 0.0
+
+
+def test_two_lanes_round_robin_their_own_personas_and_share_one_state(tmp_path, monkeypatch):
+    """A builder or OpenCode run holds a slot for minutes; in one queue the
+    light personas waited behind them. Each lane has its own cursor; twins
+    share a path so they never split across lanes; the state file is locked
+    while a persona is chosen and while its record is filed."""
+    import json
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(F, "assert_lab_only", lambda: None)
+    monkeypatch.setattr(F.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(F.FailEcho, "flush", lambda self, timeout=5.0: True)
+    for a, b in F.TWINS:
+        by = {p[0]: p for p in F.PERSONAS}
+        assert F.lane_of(by[a]) == F.lane_of(by[b])
+    vm = [F.PERSONAS[i][0] for i in F.lane_personas("vm")]
+    light = [F.PERSONAS[i][0] for i in F.lane_personas("light")]
+    assert set(vm) == F.BUILD_PERSONAS | F.OPENCODE_PERSONAS and not (set(vm) & set(light))
+    assert len(vm) + len(light) == len(F.PERSONAS)
+    # the vm lane's odd cycle swaps twins inside the lane
+    assert F.PERSONAS[F.persona_index(0, "vm")][0] == vm[0]
+    assert F.PERSONAS[F.persona_index(len(vm), "vm")][0] == dict(F.TWINS)[vm[0]]
+
+    ran = []
+    monkeypatch.setattr(F.Run, "run_model", lambda self, *a, **k: ran.append(self.reporter) or "ok")
+    monkeypatch.setattr(F.Run, "run_cron", lambda self, calls: ran.append(self.reporter) or "cron")
+    monkeypatch.setattr(F.Run, "run_build", lambda self, *a, **k: ran.append(self.reporter) or "(no provider key)")
+    monkeypatch.setattr(F.Run, "run_opencode", lambda self, *a, **k: ran.append(self.reporter) or "(no provider key)")
+    assert F.main(["--lane", "vm"]) == 0 and F.main(["--lane", "light"]) == 0 and F.main(["--lane", "vm"]) == 0
+    assert ran[0] in vm and ran[1] in light and ran[2] in vm and ran[2] != ran[0]
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["next_vm"] == 2 and state["next_light"] == 1 and state["runs_today"] == 3 and len(state["runs"]) == 3
+    assert (tmp_path / "state.lock").exists()

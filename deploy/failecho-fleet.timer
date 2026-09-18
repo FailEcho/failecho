@@ -1,11 +1,12 @@
-# One persona every two minutes (three until 2026-09-16 15:40 UTC), round the clock, for the length of the
-# test. Stop with: systemctl stop failecho-fleet.timer
+# The light lane: one cron or model persona every minute (every two until
+# 2026-09-18 13:30 UTC, when the VM personas moved to their own lane; three
+# until 2026-09-16 15:40 UTC). Stop with: systemctl stop failecho-fleet.timer
 [Unit]
-Description=FailEcho fleet test, one persona every 2 minutes
+Description=FailEcho fleet test, light lane, one persona a minute
 
 [Timer]
-OnCalendar=*:0/2
-RandomizedDelaySec=30
+OnCalendar=*:0/1
+RandomizedDelaySec=15
 Persistent=false
 
 [Install]

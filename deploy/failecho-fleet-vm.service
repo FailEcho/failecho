@@ -1,7 +1,7 @@
 # One persona, one run, then exit. Chosen round-robin by the module from its
 # state file. The timer is the loop.
 [Unit]
-Description=FailEcho fleet test (one persona run)
+Description=FailEcho fleet test, VM lane (one builder or OpenCode run)
 After=network-online.target failecho-lab.service failecho-sandbox-proxy.service
 Wants=network-online.target failecho-sandbox-proxy.service
 # Wants, not Requires: a lab restart (every re-pin) must not kill a run
@@ -24,11 +24,12 @@ Environment="FLEET_MAX_RUNS_PER_DAY=2000"
 Environment="FLEET_LAB_PUBLIC_URL=https://lab.failecho.com"
 Environment="FAILECHO_SANDBOX_RUN=/run/failecho-sandbox"
 Environment="FAILECHO_SANDBOX_SCRATCH=/var/lib/failecho-sandbox-scratch"
-ExecStart=/srv/failecho/.venv/bin/python -m failecho_fleet --lane light
+ExecStart=/srv/failecho/.venv/bin/python -m failecho_fleet --lane vm
 TimeoutStartSec=420
 # a builder run holds one 384 MiB microVM; every other persona is ~40 MB
-# the light lane boots no VM
-MemoryMax=400M
+# the VM lane: a builder's 384 MB guest or OpenCode's 768 MB one (a bun
+# binary is killed in 384); the guest's resident pages count against this unit
+MemoryMax=1100M
 StateDirectory=failecho-fleet failecho-sandbox-scratch
 RuntimeDirectory=failecho-sandbox
 RuntimeDirectoryPreserve=yes
