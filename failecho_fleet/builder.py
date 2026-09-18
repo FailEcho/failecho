@@ -225,8 +225,8 @@ def imported_http_libs(code: str) -> list[str]:
     the first name on an `import` line, so `import urllib.request, json,
     requests` reported urllib alone (found by hand, 18 Sep)."""
     names: set[str] = set()
-    for line in code.splitlines():
-        line = line.split("#", 1)[0].strip()
+    statements = (st.strip() for line in code.splitlines() for st in line.split("#", 1)[0].split(";"))
+    for line in statements:
         m = re.match(r"from\s+([\w.]+)\s+import\b", line)
         if m:
             names.add(m.group(1))

@@ -662,3 +662,4 @@ def test_the_http_libraries_a_program_imports_are_all_read():
     code = "import urllib.request, json, requests\nfrom httpx import Client\nimport http.client as hc  # x\nimport socketserver\n"
     assert imported_http_libs(code) == ["http.client", "httpx", "requests", "urllib"]
     assert imported_http_libs("print('no imports')") == []
+    assert imported_http_libs("import subprocess; subprocess.run(['curl', 'x'])") == ["subprocess"]
