@@ -105,11 +105,13 @@ PROVIDERS = {
                 "key": os.environ.get("MISTRAL_API_KEY"), "models": ["ministral-8b-latest"], "daily_cap": 400,
                 "alt_models": ["ministral-14b-latest", "codestral-latest"]},
     # xKiro (added 2026-09-18 08:00 UTC, user-issued key): a routing gateway
-    # whose site states its free tier as 500,000 tokens a day. Tool calls
-    # verified on all three models. 300 calls a day at the fleet's prompt
-    # sizes (~1k tokens on the qwen chat template) stays well inside that.
+    # whose site states its free tier as 500,000 tokens a day, 1,000,000
+    # once the account is verified on Telegram (the user did, 08:15 UTC).
+    # Tool calls verified on all three models. 600 calls a day at the
+    # fleet's prompt sizes (~1k tokens on the qwen chat template) stays
+    # inside the verified tier.
     "xkiro": {"host": "api.xkiro.com", "url": "https://api.xkiro.com/v1/chat/completions",
-              "key": os.environ.get("XKIRO_API_KEY"), "models": ["qwen/qwen3.6-27b:free"], "daily_cap": 300,
+              "key": os.environ.get("XKIRO_API_KEY"), "models": ["qwen/qwen3.6-27b:free"], "daily_cap": 600,
               "alt_models": ["minimax/minimax-m2.7-highspeed:free", "qwen/qwen3.5-flash:free"]},
     "ollama": {"host": "ollama.com", "url": "https://ollama.com/v1/chat/completions",
                "key": os.environ.get("LLAMA_API_KEY"),

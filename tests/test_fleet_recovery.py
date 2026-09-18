@@ -701,8 +701,8 @@ def test_provider_caps_stay_within_the_documented_free_tiers():
     assert F.PROVIDERS["nvidia"]["daily_cap"] <= 40 * 60 * 24 // 100
     # Mistral's headers for this key: ministral-8b 188 a minute; 400 a day is well inside it
     assert F.PROVIDERS["mistral"]["daily_cap"] <= 188 * 60 * 24 // 100
-    # xKiro states 500,000 tokens a day; 300 calls at ~1k tokens is well inside it
-    assert F.PROVIDERS["xkiro"]["daily_cap"] * 1000 <= 500_000
+    # xKiro states 1,000,000 tokens a day for a Telegram-verified account; 600 calls at ~1k tokens is inside it
+    assert F.PROVIDERS["xkiro"]["daily_cap"] * 1000 <= 1_000_000
 
 
 def test_the_nvidia_personas_are_twins_and_the_onboarding_rotation_stays_coprime():
