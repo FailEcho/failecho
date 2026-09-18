@@ -64,6 +64,11 @@ DEFAULT_ALLOW = (
     "developer.mozilla.org",
     "httpbingo.org",
     "lab.failecho.com",
+    # the opencode personas: OpenCode talks to Zen at opencode.ai and reads
+    # its model catalogue from models.opencode.ai at start-up (2026-09-18;
+    # the first run hung for five minutes on that one denied CONNECT)
+    "opencode.ai",
+    "models.opencode.ai",
 )
 
 _HOSTPORT = re.compile(r"^([A-Za-z0-9.-]+)(?::(\d{1,5}))?$")

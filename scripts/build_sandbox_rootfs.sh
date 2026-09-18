@@ -5,7 +5,7 @@
 # What it produces, under /var/lib/failecho-sandbox:
 #   vmlinux       the Firecracker CI kernel (6.1, x86_64), with its .config
 #   rootfs.ext4   Ubuntu noble minbase + python3, pip, uv, requests, httpx,
-#                 curl, git, and Node LTS from nodejs.org with npm and npx
+#                 curl, git, OpenCode, and Node LTS from nodejs.org with npm and npx
 #                 (Debian's npm does not configure inside debootstrap),
 #                 failecho-autoreport, an unprivileged `runner` user, and
 #                 our guest init at /usr/local/bin/sandbox-init
@@ -21,7 +21,11 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 CI=firecracker-ci/v1.15/x86_64
 KERNEL=vmlinux-6.1.155
 NODE_VERSION=v24.21.0
-SIZE_MB=700
+# OpenCode (opencode.ai), the agent the opencode personas drive; the linux
+# binary package from npm, pinned with its sha512 from the registry
+OPENCODE_VERSION=1.18.31
+OPENCODE_SHA512=sha512-gTJ5nGNq+KJblwmeusEdz8YFwvkV7a3xTOV9EKKEmsv0Lkbajq/oQO9jEC0sMiS66mjHDOrhLgIUxSVqfLBM8g==
+SIZE_MB=1000
 
 mkdir -p "$DEST"
 cd "$DEST"
@@ -61,6 +65,17 @@ fi
 grep " $NODE_TAR\$" SHASUMS256.txt | sha256sum -c - >/dev/null
 tar -xJf "$NODE_TAR" -C rootfs-build/usr/local --strip-components=1 --exclude='*/share/doc' --exclude='*/include'
 chroot rootfs-build /usr/local/bin/node --version
+
+# OpenCode: one static-ish binary from the npm platform package, checksummed.
+OC_TGZ="opencode-linux-x64-$OPENCODE_VERSION.tgz"
+if [ ! -s "$OC_TGZ" ]; then
+    curl -sSL -o "$OC_TGZ" "https://registry.npmjs.org/opencode-linux-x64/-/$OC_TGZ"
+fi
+[ "sha512-$(openssl dgst -sha512 -binary "$OC_TGZ" | base64 -w0)" = "$OPENCODE_SHA512" ] || { echo "opencode checksum mismatch"; exit 1; }
+tar -xzf "$OC_TGZ" -C rootfs-build/usr/local/bin --strip-components=2 package/bin/opencode
+chmod 755 rootfs-build/usr/local/bin/opencode
+# (not run in the chroot: the bun-built binary aborts without /proc and /dev;
+#  `python -m failecho_sandbox selftest` checks it inside a booted VM)
 
 install -m 755 "$REPO/failecho_sandbox/guest_init.py" rootfs-build/usr/local/bin/sandbox-init
 mkdir -p rootfs-build/work
