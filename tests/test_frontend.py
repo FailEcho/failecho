@@ -1423,6 +1423,13 @@ def test_llms_txt_states_a_default_setup(client):
     assert "Never do that to a file you did not create." in default
     assert "Do not install the hook or the plugin" in default
     assert "verify over REST instead" in default
+    # four onboarding runs by one model wrote the config, kept the other
+    # server, and then *offered* the verify command to the user instead of
+    # running it; the line now says run it, carries the request inline, and
+    # says setup is not done until its answer has been read
+    assert "run it, do not hand it" in default
+    assert "Setup is not done until this has been run" in default
+    assert "curl -sX POST" in default
     # do not ask an agent to list tools that cannot exist until a restart
     assert "cannot call its tools yet" in default
     assert "`INSUFFICIENT_DATA` with `known: false`" in default
