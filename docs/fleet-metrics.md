@@ -56,11 +56,19 @@ personas), `test / ask`, `test / blind` (httpbingo endpoints), `build / ask`,
 ## Quota
 
 A provider that answers a *daily* quota error (groq's TPD, Gemini's quota)
-is marked dead until midnight UTC; the scheduler skips its personas and runs
-the next live one in the same tick, and the onboarding test skips its
-models. `totals.providers_out_of_quota` and `totals.skipped_for_quota_today`
-say so on the scoreboard, so a quiet afternoon for one provider is
-explicable rather than a mystery. Since 2026-09-17 22:30.
+is marked dead; the scheduler skips its personas and runs the next live one
+in the same tick, and the onboarding test skips its models.
+`totals.providers_out_of_quota` and `totals.skipped_for_quota_today` say so
+on the scoreboard, so a quiet afternoon for one provider is explicable
+rather than a mystery. Since 2026-09-17 22:30.
+
+The mark expires after two hours (`FLEET_QUOTA_PROBE_SECONDS`), and the
+next persona on that provider is the probe: it either runs, which clears
+the mark, or dies on the same error, which sets it again. The first
+version held the mark until midnight UTC; the providers' days are not ours
+(groq answered again by 02:49 UTC on 18 Sep after "used 199178 of 200000"
+at 00:13, Gemini's free tier resets at midnight Pacific), and that cost
+groq's personas most of a day. Since 2026-09-18 03:00.
 
 ## What to compare, and what not to
 

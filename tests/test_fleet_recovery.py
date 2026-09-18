@@ -480,8 +480,9 @@ def test_the_scheduler_skips_a_dead_providers_personas(tmp_path, monkeypatch):
     names = [p[0] for p in F.PERSONAS]
     # position the round-robin on a groq persona, with groq dead today
     start = names.index("fleet-decor-ask-a")
+    marked = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     (tmp_path / "state.json").write_text(json.dumps({"next": start, "runs": [], "day": today, "runs_today": 0,
-                                                     "provider_dead": {"groq": today}}))
+                                                     "provider_dead": {"groq": marked}}))
     ran = []
     monkeypatch.setattr(F.Run, "run_model", lambda self, *a, **k: ran.append(self.reporter) or "(no provider key)")
     monkeypatch.setattr(F.Run, "run_cron", lambda self, calls: ran.append(self.reporter) or "cron")
@@ -493,3 +494,48 @@ def test_the_scheduler_skips_a_dead_providers_personas(tmp_path, monkeypatch):
     assert state["skipped_for_quota_today"] >= 1 and state["next"] > start + 1
     report = json.loads((tmp_path / "fleet.json").read_text())
     assert report["totals"]["providers_out_of_quota"] == ["groq"]
+
+
+def test_a_dead_mark_expires_and_the_next_persona_probes(tmp_path, monkeypatch):
+    """The provider's day is not ours: groq answered again at 02:49 UTC on
+    18 Sep after reporting 199178 of 200000 daily tokens used at 00:13, and
+    Gemini's free tier resets at midnight Pacific. A mark older than
+    QUOTA_PROBE_SECONDS lets one persona through; a run that comes back
+    alive clears the mark, a run that dies again refreshes it."""
+    import datetime as dt
+    import json
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(F, "assert_lab_only", lambda: None)
+    monkeypatch.setattr(F.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(F.FailEcho, "flush", lambda self, timeout=5.0: True)
+    today = dt.date.today().isoformat()
+    names = [p[0] for p in F.PERSONAS]
+    start = names.index("fleet-decor-ask-a")
+    stale = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=F.QUOTA_PROBE_SECONDS + 1)).isoformat(timespec="seconds")
+    (tmp_path / "state.json").write_text(json.dumps({"next": start, "runs": [], "day": today, "runs_today": 0,
+                                                     "provider_dead": {"groq": stale}}))
+    ran = []
+    monkeypatch.setattr(F.Run, "run_model", lambda self, *a, **k: ran.append(self.reporter) or "(no provider key)")
+    assert F.main([]) == 0
+    assert ran == ["fleet-decor-ask-a"], "the stale mark should have let the groq persona probe"
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert "groq" not in state["provider_dead"], "a run that did not die re-opens the provider"
+
+    # the pre-18-Sep format, a bare date, is an expired mark too
+    assert F._quota_probe_due(today)
+    assert not F._quota_probe_due(dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))
+
+    # and a probe that dies again refreshes the mark with a timestamp
+    def dies(self, *a, **k):
+        self.provider_dead_today = True
+        return "(provider failed: rate_limit)"
+    (tmp_path / "state.json").write_text(json.dumps({"next": start, "runs": [], "day": today, "runs_today": 0,
+                                                     "provider_dead": {"groq": stale}}))
+    monkeypatch.setattr(F.Run, "run_model", dies)
+    assert F.main([]) == 0
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["provider_dead"]["groq"] != stale and "T" in state["provider_dead"]["groq"]

@@ -51,6 +51,11 @@ REPORT_PATH = os.environ.get("FLEET_REPORT_PATH") or os.path.join(STATE_DIR, "fl
 LAB_DB = os.environ.get("FLEET_LAB_DB") or ""
 PRODUCTION_HOSTS = ("failecho.com", "www.failecho.com")
 MAX_RUNS_PER_DAY = int(os.environ.get("FLEET_MAX_RUNS_PER_DAY") or 600)
+#: How long a provider marked out of daily quota is left alone before one
+#: persona probes it again. Two hours: a wasted call every two hours while
+#: it is truly dead, against a day of skipped slots when its window rolls
+#: over on a clock that is not ours.
+QUOTA_PROBE_SECONDS = int(os.environ.get("FLEET_QUOTA_PROBE_SECONDS") or 7200)
 #: What the sandbox guest is told to report to. Unset means the in-guest
 #: wrapper stays off; there is deliberately no default.
 LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None
@@ -460,7 +465,7 @@ class Run:
         self.last_skip: tuple[str, str] | None = None
         self.model_retries_after_skip = 0
         #: Set when the provider says its *daily* budget is gone. The scheduler
-        #: then skips this provider's personas until midnight UTC instead of
+        #: then skips this provider's personas for QUOTA_PROBE_SECONDS instead of
         #: spending two-minute slots on 429s (a third of an afternoon's slots,
         #: on the first day).
         self.provider_dead_today = False
@@ -906,6 +911,18 @@ class Run:
 # ---------------------------------------------------------------------------
 
 
+def _quota_probe_due(marked: str) -> bool:
+    """True when a dead-provider mark is old enough to probe. A bare date
+    (the pre-18-Sep format) counts as marked at that day's midnight UTC."""
+    try:
+        when = dt.datetime.fromisoformat(marked)
+    except (TypeError, ValueError):
+        return True
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=dt.timezone.utc)
+    return (dt.datetime.now(dt.timezone.utc) - when).total_seconds() >= QUOTA_PROBE_SECONDS
+
+
 def _state() -> dict:
     os.makedirs(STATE_DIR, exist_ok=True)
     try:
@@ -1142,19 +1159,24 @@ def main(argv: list[str] | None = None) -> int:
     if state["runs_today"] >= MAX_RUNS_PER_DAY:
         log("daily budget spent"); return 0
 
-    dead = state.get("provider_dead", {})
-    dead = {k: v for k, v in dead.items() if v == today}
+    dead = {k: v for k, v in state.get("provider_dead", {}).items() if not _quota_probe_due(v)}
     state["provider_dead"] = dead
     if "--persona" in argv:
         idx = int(argv[argv.index("--persona") + 1])
     else:
-        # A provider whose daily quota is gone answers nothing until midnight
-        # UTC; its personas are skipped, not run, and the slot goes to the next
-        # live one. The skip is recorded so the day's counts stay explicable.
+        # A provider whose daily quota is gone answers nothing for hours; its
+        # personas are skipped, not run, and the slot goes to the next live
+        # one. The skip is recorded so the day's counts stay explicable. The
+        # day boundary is the provider's, not ours (groq was alive again by
+        # 02:49 UTC on 18 Sep after "used 199178 of 200000" at 00:13; Gemini
+        # resets at midnight Pacific), so a dead mark expires after
+        # QUOTA_PROBE_SECONDS and the next persona on that provider is the
+        # probe: it either runs, or re-marks the provider for another spell.
         skipped = 0
         idx = persona_index(state["next"])
         while PERSONAS[idx][2] in dead and skipped < len(PERSONAS):
-            log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone until midnight UTC")
+            log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone; next probe after "
+                f"{QUOTA_PROBE_SECONDS // 60} min")
             state["next"] += 1
             state["skipped_for_quota_today"] = state.get("skipped_for_quota_today", 0) + 1
             skipped += 1
@@ -1183,8 +1205,11 @@ def main(argv: list[str] | None = None) -> int:
     run.fe.flush(timeout=20)
     run.save_etags()
     if provider and run.provider_dead_today:
-        state["provider_dead"][provider] = today
-        log(f"  {provider}: daily quota gone; its personas are skipped until midnight UTC")
+        state["provider_dead"][provider] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        log(f"  {provider}: daily quota gone; its personas are skipped for {QUOTA_PROBE_SECONDS // 60} min")
+    elif provider and provider in state["provider_dead"]:
+        del state["provider_dead"][provider]
+        log(f"  {provider}: quota is back")
     # Did the run do its job? A model run: a real answer, not a parenthesised
     # failure. A cron run: every call eventually succeeded. A builder: the
     # task came out done. The one number a user of an agent cares about.

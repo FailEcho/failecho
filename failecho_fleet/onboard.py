@@ -67,7 +67,7 @@ from failecho_autoreport import FailEcho, classify
 
 from failecho_sandbox import Sandbox, SandboxError, available
 
-from . import LAB_ENDPOINT, PROVIDERS, UA, assert_lab_only, log
+from . import LAB_ENDPOINT, PROVIDERS, QUOTA_PROBE_SECONDS, UA, _quota_probe_due, assert_lab_only, log
 
 STATE_DIR = ((os.environ.get("STATE_DIRECTORY") or "").split(":")[0]
              or os.environ.get("FLEET_STATE_DIR") or "/tmp/failecho-fleet")
@@ -481,7 +481,9 @@ def main(argv: list[str] | None = None) -> int:
     if state.get("day") != today:
         state["day"], state["calls_today"] = today, {}
     n = state["next"]
-    dead = {k: v for k, v in state.get("provider_dead", {}).items() if v == today}
+    # the provider's day is not ours: a mark expires after QUOTA_PROBE_SECONDS
+    # and the next model on that provider is the probe (see failecho_fleet)
+    dead = {k: v for k, v in state.get("provider_dead", {}).items() if not _quota_probe_due(v)}
     state["provider_dead"] = dead
     if "--model" in argv:
         idx = int(argv[argv.index("--model") + 1])
@@ -489,7 +491,7 @@ def main(argv: list[str] | None = None) -> int:
         idx = n % len(MODELS)
         hops = 0
         while MODELS[idx][0] in dead and hops < len(MODELS):
-            log(f"onboard: skip {MODELS[idx][1]}, {MODELS[idx][0]} daily quota gone until midnight UTC")
+            log(f"onboard: skip {MODELS[idx][1]}, {MODELS[idx][0]} daily quota gone; probe after {QUOTA_PROBE_SECONDS // 60} min")
             n += 1; state["next"] = n; hops += 1
             idx = n % len(MODELS)
         if hops >= len(MODELS):
@@ -510,8 +512,10 @@ def main(argv: list[str] | None = None) -> int:
     fe.flush(timeout=15)
     state["calls_today"][provider] = state["calls_today"].get(provider, 0) + record["model_calls"]
     if record.get("provider_dead_today"):
-        state["provider_dead"][provider] = today
-        log(f"onboard: {provider} daily quota gone; skipped until midnight UTC")
+        state["provider_dead"][provider] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        log(f"onboard: {provider} daily quota gone; skipped for {QUOTA_PROBE_SECONDS // 60} min")
+    elif provider in state["provider_dead"]:
+        del state["provider_dead"][provider]
     state["runs"].append(record)
     state["runs"] = state["runs"][-400:]
     state["next"] = idx + 1
