@@ -8,12 +8,18 @@ project; the ask twin has FailEcho's MCP server in its ``opencode.json``
 and one paragraph in ``AGENTS.md`` saying what it is for, the blind twin
 has neither. Everything else is OpenCode's own behaviour.
 
+OpenCode is pointed at the fleet's own providers (NVIDIA, Mistral, xKiro)
+as OpenAI-compatible endpoints, and at OpenCode Zen's free models when
+that tier answers (on 18 Sep it answered "Rate limit exceeded" to every
+free model before the first request, and its paid default for titles
+"Insufficient account funds"; no paid request is ever made).
+
 What is measured: whether the task's artefact was produced and passes its
 check, seconds, tokens as OpenCode reports them, tool calls, and how many
 of those were FailEcho tools. Nothing here reports on the agent's behalf:
 the agent asks (or does not), and the network sees only what it sends.
 
-The guest is throwaway and fenced; the Zen key reaches opencode.ai only.
+The guest is throwaway and fenced; a provider key reaches that provider only.
 """
 
 from __future__ import annotations
@@ -68,11 +74,31 @@ it says whether other agents hit the same failure and what recovery worked, or
 """
 
 
-def opencode_config(model: str, zen_env: str, lab_mcp_url: str | None, reporter: str) -> dict:
+#: OpenCode provider blocks, by fleet provider name. Zen is OpenCode's own
+#: provider; the others are OpenAI-compatible endpoints OpenCode is pointed
+#: at, with the key read from the guest's environment for that one run.
+OC_PROVIDERS = {
+    "zen": {"id": "opencode", "env": "ZEN_API_KEY", "base_url": None},
+    "nvidia": {"id": "nvidia", "env": "NVIDIA_API_KEY", "base_url": "https://integrate.api.nvidia.com/v1"},
+    "mistral": {"id": "mistral", "env": "MISTRAL_API_KEY", "base_url": "https://api.mistral.ai/v1"},
+    "xkiro": {"id": "xkiro", "env": "XKIRO_API_KEY", "base_url": "https://api.xkiro.com/v1"},
+}
+
+
+def opencode_config(provider: str, model: str, lab_mcp_url: str | None, reporter: str) -> dict:
+    oc = OC_PROVIDERS[provider]
+    block: dict = {"options": {"apiKey": "{env:" + oc["env"] + "}"}}
+    if oc["base_url"]:
+        block.update(npm="@ai-sdk/openai-compatible", name=provider, models={model: {"name": model, "tool_call": True}})
+        block["options"]["baseURL"] = oc["base_url"]
+    full = f"{oc['id']}/{model}"
     cfg: dict = {
         "$schema": "https://opencode.ai/config.json",
-        "model": f"opencode/{model}",
-        "provider": {"opencode": {"options": {"apiKey": "{env:" + zen_env + "}"}}},
+        "model": full,
+        # the title/summary side-calls too, or OpenCode reaches for a paid
+        # default (gpt-5.4-nano on Zen: "Insufficient account funds")
+        "small_model": full,
+        "provider": {oc["id"]: block},
         "permission": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
         "share": "disabled",
         "autoupdate": False,
@@ -119,7 +145,7 @@ class Events:
                 self.tool_names[name] = self.tool_names.get(name, 0) + 1
                 if "failecho" in name:
                     self.failecho_calls += 1
-            if t in ("step_finish", "step-finish", "finish"):
+            if depth == 0 and t == "step_finish":   # the part inside says "step-finish" too
                 self.steps += 1
             tok = node.get("tokens")
             if isinstance(tok, dict):
@@ -137,11 +163,16 @@ class Events:
                 self._walk(v, depth + 1)
 
 
-def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], model: str, zen_key: str,
+#: OpenCode (a bun binary) is killed inside a 384 MB guest; at 640 MB an
+#: eight-step task finished and was then killed on exit (137).
+OC_MEM_MIB = 768
+
+
+def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: str, model: str, key: str,
                  lab_public_url: str | None, timeout: int = 300) -> dict:
     """One headless OpenCode run in a fresh VM. Returns the ledger entry."""
-    out: dict = {"reporter": reporter, "asks": asks, "model": model, "task": task[0][:160], "completed": False,
-                 "tool_calls": 0, "failecho_calls": 0, "steps": 0, "tokens_in": 0, "tokens_out": 0,
+    out: dict = {"reporter": reporter, "asks": asks, "provider": provider, "model": model, "task": task[0][:160],
+                 "completed": False, "tool_calls": 0, "failecho_calls": 0, "steps": 0, "tokens_in": 0, "tokens_out": 0,
                  "seconds": 0.0, "answer": "", "error": None, "tool_names": {}, "exit": None}
     why = available()
     if why:
@@ -149,25 +180,34 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], model: str
         return out
     prompt, check = task
     lab_mcp = f"{lab_public_url}/mcp" if (asks and lab_public_url) else None
-    cfg = opencode_config(model, "ZEN_API_KEY", lab_mcp, reporter)
+    cfg = opencode_config(provider, model, lab_mcp, reporter)
     files = {"project/opencode.json": json.dumps(cfg, indent=2),
              "project/AGENTS.md": AGENTS_MD_FAILECHO if asks else AGENTS_MD}
-    env = {"ZEN_API_KEY": zen_key, "OPENCODE_DISABLE_AUTOUPDATE": "1", "CI": "1", "TERM": "dumb", "NO_COLOR": "1"}
-    cmd = ("cd /work/project && opencode run --format json --dir /work/project --model opencode/" + shlex.quote(model)
-           + " " + shlex.quote(prompt) + " 2>/work/opencode.err; echo EXIT=$?; echo '---RESULT---'; "
-             "cat result.json result.txt 2>/dev/null | head -c 2000; echo; echo '---ERR---'; tail -c 1500 /work/opencode.err")
+    env = {OC_PROVIDERS[provider]["env"]: key, "OPENCODE_DISABLE_AUTOUPDATE": "1", "CI": "1", "TERM": "dumb",
+           "NO_COLOR": "1"}
+    # `timeout` inside too: after a stream error OpenCode has been seen to
+    # sit rather than exit, and the harness timeout would lose the output
+    cmd = ("cd /work/project && timeout " + str(max(timeout - 20, 30)) + " opencode run --format json --dir /work/project "
+           + shlex.quote(prompt) + " 2>/work/opencode.err; echo EXIT=$?; echo '---RESULT---'; "
+             "cat result.json result.txt 2>/dev/null | head -c 2000; echo; echo '---ERR---'; "
+             "grep -v 'level=INFO' /work/opencode.err | tail -c 1500; echo '---MCP---'; grep -ci 'mcp' /work/opencode.err")
     try:
-        with Sandbox(scratch_mib=1536) as vm:
-            r = vm.run(["sh", "-c", cmd], files=files, timeout=timeout, env=env)
+        with Sandbox(mem_mib=OC_MEM_MIB, scratch_mib=1536) as vm:
+            # files land as root; the agent runs as the runner user
+            vm.run(["sh", "-c", "chown -R runner:runner /work/project"], files=files, timeout=15, as_root=True)
+            r = vm.run(["sh", "-c", cmd], timeout=timeout, env=env)
     except SandboxError as e:
         out["error"] = f"sandbox: {e}"[:200]
         return out
     ev = Events()
     body, _, rest = r.stdout.partition("---RESULT---")
     result, _, err = rest.partition("---ERR---")
+    err, _, mcp_lines = err.partition("---MCP---")
+    out["mcp_log_lines"] = int(mcp_lines.strip() or 0) if mcp_lines.strip().isdigit() else 0
     for line in body.splitlines():
         ev.feed(line)
     m = re.search(r"EXIT=(\d+)", body)
+    out["seconds"] = round(float(r.get("seconds") or 0), 1)
     out.update(exit=int(m.group(1)) if m else None, tool_calls=ev.tool_calls, failecho_calls=ev.failecho_calls,
                steps=ev.steps, tokens_in=ev.tokens_in, tokens_out=ev.tokens_out, tool_names=ev.tool_names,
                answer=("\n".join(ev.text))[-300:], timed_out=bool(getattr(r, "timed_out", False)))

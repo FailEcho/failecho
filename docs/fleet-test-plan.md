@@ -302,6 +302,32 @@ twins on GitHub, builder twins, an explorer on PyPI/npm; the onboarding
 test takes the qwen as its eleventh model. Thirty-six personas; a full
 cycle is 72 minutes. Three builder pairs now, on groq, NVIDIA and xKiro.
 
+## Change during the run: OpenCode personas, 2026-09-18 12:30 UTC
+
+User-directed. Every other persona is our own loop around a model; these
+two drive OpenCode (opencode.ai) itself, headless, inside the VM, on
+NVIDIA's nemotron-3-super as an OpenAI-compatible provider. The ask twin
+has FailEcho's MCP server in its `opencode.json` (with `X-Reporter-ID`)
+and one paragraph in `AGENTS.md` saying what it is for; the blind twin has
+neither. Same task, same model, same project; graded on the file the task
+asks for. OpenCode's own JSON events give steps, tokens, tool calls and
+whether it reached for a FailEcho tool. Nothing asks or reports on the
+agent's behalf.
+
+Checked by hand before this: OpenCode 1.18.31 in the guest image (pinned
+sha512), 768 MB guest (a bun binary is killed in 384), `models.opencode.ai`
+and the provider host through the fence, a six-step PyPI task done in
+156 s, an eighteen-step GitHub task that called
+`failecho_check_tool_failure` once after the API refused it. Budget 240 s
+a run; the fleet slot waits for it, so a cycle is longer by a few minutes.
+
+OpenCode Zen: the user's key. Its free models answered "Rate limit
+exceeded" to every request on 18 Sep before the first one went through,
+and its paid default for side-calls "Insufficient account funds"; the
+config points side-calls at the same free model and no paid request is
+ever made. The provider block is ready (`OC_PROVIDERS["zen"]`) and not in
+the rotation until the tier answers.
+
 ## What it costs
 
 Zero dollars: free tiers throughout. About 40MB of RAM at any moment, one

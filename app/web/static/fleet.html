@@ -118,6 +118,13 @@
     <th class="num">recovered</th><th class="num">skipped</th><th class="num">seconds lost</th>
   </tr></thead><tbody></tbody></table>
 
+  <h2>OpenCode: a real agent, with FailEcho and without</h2>
+  <p class="sub">Since 2026-09-18 12:30 UTC two personas drive <a href="https://opencode.ai">OpenCode</a> itself,
+  headless, inside the throwaway VM, on the same model (NVIDIA's nemotron-3-super): the ask twin has FailEcho's
+  MCP server in its <code>opencode.json</code> and one paragraph in <code>AGENTS.md</code> saying what it is for;
+  the blind twin has neither. Same task, same project, everything else is OpenCode's own behaviour. Nothing asks or
+  reports on the agent's behalf. Graded on the file the task asks for; its rows are in the table above.</p>
+
   <h2>What the advice is worth, by failure shape</h2>
   <p class="sub">Once a call has failed, what happened to the second attempt: when the network recommended it
   (<em>advised</em>), when the asker had nothing from the network and did what blind does (<em>no advice</em>),

@@ -385,8 +385,10 @@
     var pick = { test: ["seconds per run", "retry attempts per failure"],
                  real: ["tasks completed", "tokens per completed task"],
                  build: ["seconds per run", "tokens per completed task"],
-                 provider: ["tasks completed", "provider failures recovered"] };
-    var labels = { test: "flaky endpoints", real: "real APIs", build: "coding agents", provider: "model providers under quota" };
+                 provider: ["tasks completed", "provider failures recovered"],
+                 opencode: ["tasks completed", "model steps per run"] };
+    var labels = { test: "flaky endpoints", real: "real APIs", build: "coding agents", provider: "model providers under quota",
+                   opencode: "OpenCode (real agent)" };
     var body = table.querySelector("tbody"); body.innerHTML = "";
     d.versus.forEach(function (g) {
       (g.rows || []).forEach(function (r) {

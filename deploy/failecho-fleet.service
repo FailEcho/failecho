@@ -27,7 +27,9 @@ Environment="FAILECHO_SANDBOX_SCRATCH=/var/lib/failecho-sandbox-scratch"
 ExecStart=/srv/failecho/.venv/bin/python -m failecho_fleet
 TimeoutStartSec=420
 # a builder run holds one 384 MiB microVM; every other persona is ~40 MB
-MemoryMax=600M
+# the OpenCode personas boot a 768 MB guest (a bun binary is killed in 384);
+# the guest's resident pages count against this unit
+MemoryMax=1100M
 StateDirectory=failecho-fleet failecho-sandbox-scratch
 RuntimeDirectory=failecho-sandbox
 RuntimeDirectoryPreserve=yes
