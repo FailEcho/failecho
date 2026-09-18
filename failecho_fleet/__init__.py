@@ -935,6 +935,7 @@ class Run:
 
         chat = self.fe.watch(service=p["host"], operation="chat.completions", mutates=False)(chat)
 
+        tried: set[str] = set()
         with Builder(self.reporter, LAB_PUBLIC_URL, self.fe) as b:
             answer = "(model budget exhausted)"
             for _ in range(10):
@@ -958,12 +959,17 @@ class Run:
                             # call -- a fact about the agent's own account -- so
                             # both twins do it alike.
                             if _daily_quota(exc):
-                                self.provider_dead_today = True
-                                alts = [m for m in p.get("alt_models", []) if m != state["model"]]
+                                tried.add(state["model"])
+                                alts = [m for m in p.get("alt_models", []) if m not in tried]
                                 if alts:
                                     state["model"] = alts[0]
                                     self.model = f"{self.model}->{alts[0]}"
                                     continue
+                                # every model on the provider has hit its
+                                # day's wall: only then is the provider dead
+                                # (a successful switch used to mark it too,
+                                # and skipped its askers for two hours)
+                                self.provider_dead_today = True
                             self._sleep(25)
                             continue
                         self.failures.append({"service": p["host"], "operation": "chat.completions", "error_type": et,

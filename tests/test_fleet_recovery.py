@@ -458,6 +458,37 @@ def test_a_builder_switches_model_on_a_daily_quota(monkeypatch):
     answer = run.run_build("say done", run_index=0)
     assert answer == "done" and calls == ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
     assert run.model.endswith("->openai/gpt-oss-120b") and run.tokens_prompt == 5
+    assert run.provider_dead_today is False, "the switch worked; the provider still serves (18 Sep 08:39: a " \
+        "completed builder run marked groq dead and skipped its askers for two hours)"
+
+
+def test_a_builder_marks_the_provider_dead_only_when_every_model_hit_the_wall(monkeypatch):
+    import io
+    import json as _json
+
+    calls = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+
+        def __exit__(self, *a): return False
+
+    def urlopen(req, timeout):
+        body = _json.loads(req.data)
+        calls.append(body["model"])
+        e = http_error(429)
+        e.read = lambda: b'{"error":{"message":"Rate limit reached on tokens per day (TPD): Limit 200000"}}'
+        raise e
+
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    monkeypatch.setitem(F.PROVIDERS["groq"], "key", "k")
+    import failecho_fleet.builder as B
+    monkeypatch.setattr(B, "available", lambda: "no kvm in tests")
+    run = F.Run("fleet-build-blind", "builder", "groq", False)
+    answer = run.run_build("say done", run_index=0)
+    assert answer.startswith("(provider failed") and run.provider_dead_today is True
+    assert calls[:3] == ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"], "each model tried once"
 
 
 def test_a_builder_fetching_an_off_list_host_is_told_so_and_nothing_is_reported(monkeypatch):
