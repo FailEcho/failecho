@@ -934,3 +934,40 @@ def test_the_opencode_budget_fits_inside_the_guest_cap():
     from failecho_sandbox import guest_init
     assert F.OPENCODE_TIMEOUT - 20 + 10 < guest_init.MAX_TIMEOUT
     assert F.OPENCODE_TIMEOUT <= guest_init.MAX_TIMEOUT
+
+
+def test_the_wrapped_twins_get_advice_only_from_the_shipped_wrapper(monkeypatch):
+    """The fleet-wrap pair runs the path a user installs: the tool is wrapped
+    by failecho-autoreport, and nothing in the harness asks or retries. The
+    ask twin's model sees the wrapper's line in the tool error; the blind
+    twin sees the bare error. One call each, no second attempt."""
+    import json
+
+    answer = {"recommendation": {"action": "skip", "confidence": 0.8}, "recovery_actions": []}
+    monkeypatch.setattr(F.FailEcho, "check", lambda self, *a, **k: answer)
+    monkeypatch.setattr(F.FailEcho, "_post", lambda self, body: None)
+    for asks in (True, False):
+        run = F.Run("fleet-wrap-ask" if asks else "fleet-wrap-blind", "wrapped", "mistral", asks)
+        calls = []
+
+        def broken(**_):
+            calls.append(1)
+            raise RuntimeError("429 rate limit exceeded")
+
+        wrapped = run.fe.watch(service="api.github.com", operation="github_repo")(broken)
+        out, ok = run.call("github_repo", {}, fn=wrapped, service="api.github.com")
+        body = json.loads(out)
+        assert not ok and calls == [1], "the harness must not retry for the model"
+        assert body["error"] == "rate_limit"
+        if asks:
+            assert body["failecho"].startswith("FailEcho: skip") and run.failures[0]["asked"]
+        else:
+            assert "failecho" not in body and not run.failures[0]["asked"]
+
+
+def test_the_wrapped_pair_is_a_versus_group_of_its_own():
+    assert ("fleet-wrap-ask", "fleet-wrap-blind") in F.TWINS
+    assert F.WRAPPED_PERSONAS == {"fleet-wrap-ask", "fleet-wrap-blind"}
+    names = {p[0]: p for p in F.PERSONAS}
+    assert names["fleet-wrap-ask"][1:4] == ("wrapped", "mistral", True)
+    assert F.lane_of(names["fleet-wrap-ask"]) == "light"

@@ -299,10 +299,17 @@ PERSONAS = [
     # a second explorer on groq (2026-09-18 13:30 UTC): the server rules on an
     # action at five attempts, and one explorer made about one an hour
     ("fleet-explore-a2",   "decorator", "groq",   True,  GITHUB),
+    # The shipped path, as a user would run it (2026-09-19): tools wrapped by
+    # failecho-autoreport, advice on for one twin. Nothing in the harness
+    # asks or retries for either; the ask twin's model sees the wrapper's
+    # one-line advice in the tool error and decides for itself.
+    ("fleet-wrap-ask",     "wrapped",   "mistral", True,  MIXED),
+    ("fleet-wrap-blind",   "wrapped",   "mistral", False, MIXED),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
 OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
+WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
 #: The model OpenCode is pointed at, per provider: the strongest agentic one
 #: each tier serves with tool calls.
 OPENCODE_MODELS = {"nvidia": "nvidia/nemotron-3-super-120b-a12b", "mistral": "codestral-latest",
@@ -323,7 +330,8 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-build-ask", "fleet-build-blind"), ("fleet-limits-ask", "fleet-limits-blind"),
          ("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n"),
          ("fleet-decor-ask-d", "fleet-decor-blind-d"), ("fleet-decor-ask-e", "fleet-decor-blind-e"),
-         ("fleet-build-ask-x", "fleet-build-blind-x"), ("fleet-oc-ask-n", "fleet-oc-blind-n")]
+         ("fleet-build-ask-x", "fleet-build-blind-x"), ("fleet-oc-ask-n", "fleet-oc-blind-n"),
+         ("fleet-wrap-ask", "fleet-wrap-blind")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 
@@ -583,11 +591,13 @@ class Run:
         self.failures: list[dict] = []   # one per failure: shape, asked, recommended, attempts, recovered
         self.tools = {}
         for name, fn in TOOLS.items():
-            if path == "decorator":
+            if path in ("decorator", "wrapped"):
                 self.tools[name] = self.fe.watch(service=TOOL_SERVICE[name], operation=name,
                                                  mutates=TOOL_MUTATES.get(name, False))(fn)
             else:
                 self.tools[name] = fn  # auto and mcp report by other means
+        if path == "wrapped":
+            self.fe.advise = asks
         if path == "auto":
             from failecho_autoreport import auto
             auto._fe = self.fe
@@ -726,6 +736,8 @@ class Run:
             rec = {"service": service, "operation": name, "error_type": et, "error_code": code,
                    "asked": False, "recommended": None, "attempts": 1, "recovered": False, "seconds": 0.0}
             self.failures.append(rec)
+            if self.path == "wrapped":
+                return self._wrapped_error(exc, et, code, rec, started)
             fingerprint = None
             action = {"rate_limit": "backoff", "server_error": "retry", "timeout": "retry",
                       "connection_error": "retry"}.get(et)
@@ -791,6 +803,23 @@ class Run:
             self.report_recovery(service, name, action, True, fingerprint)
             return json.dumps({"result": out, "recovered": True}), True
 
+    def _wrapped_error(self, exc, et, code, rec, started) -> tuple[str, bool]:
+        """What a model sees when a wrapped tool fails: the error, and for
+        the advised twin the wrapper's one line. No retry here; the model
+        may call the tool again, which is what a real agent loop does."""
+        answer = getattr(exc, "failecho", None)
+        out = {"error": et, "code": code}
+        if answer is not None:
+            rec["asked"] = True
+            self.asks_made += 1
+            rec["recommended"] = ((answer.get("recommendation") or {}).get("action")
+                                  if isinstance(answer, dict) else None)
+            line = FailEcho.advice_text(answer)
+            if line:
+                out["failecho"] = line
+        rec["seconds"] = round(time.monotonic() - started, 2)
+        return json.dumps(out), False
+
     # -- a provider failing: ask, explore, or give up ---------------------------
 
     def recover_provider(self, p: dict, exc: BaseException, chat, state: dict):
@@ -822,7 +851,7 @@ class Run:
         quota = et == "rate_limit" and _daily_quota(exc)
         fingerprint = None
         action = None
-        if self.asks:
+        if self.asks and self.path != "wrapped":
             rec["asked"] = True
             advice = self.ask(host, "chat.completions", et, code) or {}
             fingerprint = advice.get("fingerprint")
@@ -1189,7 +1218,8 @@ def write_report(state: dict) -> None:
                                                    "asks": r["asks"], "runs": 0, "tool_calls": 0, "failures": 0, "last": ""})
         p["runs"] += 1; p["tool_calls"] += r["tool_calls"]; p["failures"] += len(r["failures"]); p["last"] = r["at"]
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
-                else "opencode" if r["reporter"] in OPENCODE_PERSONAS else "real")
+                else "opencode" if r["reporter"] in OPENCODE_PERSONAS
+                else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = cohorts.setdefault(key, blank())
         c["runs"] += 1
@@ -1217,7 +1247,7 @@ def write_report(state: dict) -> None:
     real: dict[tuple[str, str], dict] = {}
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
-                or r["reporter"] in OPENCODE_PERSONAS:
+                or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS:
             continue
         if r["at"] < FAIR_ORDER_SINCE:
             continue   # before the twins alternated order; see TWINS
@@ -1240,7 +1270,8 @@ def write_report(state: dict) -> None:
         if not m:
             continue
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
-                else "opencode" if r["reporter"] in OPENCODE_PERSONAS else "real")
+                else "opencode" if r["reporter"] in OPENCODE_PERSONAS
+                else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = costs.setdefault(key, {"cohort": key, "runs": 0, "completed": 0, "tokens": 0, "tokens_prompt": 0,
                                    "tokens_completion": 0, "model_calls": 0, "tool_calls": 0, "seconds": 0.0,
@@ -1268,7 +1299,8 @@ def write_report(state: dict) -> None:
         for k in ("seconds", "ask_seconds", "wait_seconds", "failure_seconds"):
             c[k] = round(c[k], 1)
     cost_rows = [costs[k] for k in ("real / ask", "real / blind", "test / ask", "test / blind",
-                                    "build / ask", "build / blind", "opencode / ask", "opencode / blind", "explore") if k in costs]
+                                    "build / ask", "build / blind", "opencode / ask", "opencode / blind",
+                                    "wrapped / ask", "wrapped / blind", "explore") if k in costs]
 
     # With FailEcho against without, the way a vendor benchmark table reads:
     # metrics as rows, the two sides as columns, the better side marked. Built
@@ -1288,7 +1320,8 @@ def write_report(state: dict) -> None:
     for key, label in (("test", "Flaky, broken and slow endpoints (httpbingo)"),
                        ("real", "Real APIs (PyPI, npm, GitHub, crates.io, Stack Exchange)"),
                        ("build", "Coding agents (write and run code in a VM)"),
-                       ("opencode", "OpenCode, a real agent product, with FailEcho's MCP server and without")):
+                       ("opencode", "OpenCode, a real agent product, with FailEcho's MCP server and without"),
+                       ("wrapped", "The shipped wrapper: advice in the tool error, the model decides (no harness help)")):
         a, b = costs.get(f"{key} / ask"), costs.get(f"{key} / blind")
         ca, cb = cohorts.get(f"{key} / ask"), cohorts.get(f"{key} / blind")
         if not a or not b:
@@ -1322,6 +1355,15 @@ def write_report(state: dict) -> None:
                          "better": _better(a["model_calls_per_run"], b["model_calls_per_run"])})
             rows.append({"metric": "FailEcho tool calls per run", "unit": "", "ask": a["asks_per_run"], "blind": b["asks_per_run"],
                          "better": "tie"})
+        if key == "wrapped":
+            # nothing retries for the model here, so attempts and skips are
+            # the harness's numbers and mean nothing; what the model did is
+            # in its tool calls, and whether it got the task done
+            rows = [r for r in rows if r["metric"] in ("tasks completed", "tokens per completed task", "seconds per run")]
+            rows.append({"metric": "tool calls per run", "unit": "", "ask": a["tool_calls_per_run"], "blind": b["tool_calls_per_run"],
+                         "better": _better(a["tool_calls_per_run"], b["tool_calls_per_run"])})
+            rows.append({"metric": "failures with advice attached", "unit": "", "ask": ca["asked"] if ca else 0,
+                         "blind": cb["asked"] if cb else 0, "better": "tie"})
         versus.append({"group": key, "label": label, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": rows})
     # Model providers under their real quotas: the model-driven personas
     # (not builders, not explorers) since blind started retrying once. A
@@ -1332,7 +1374,8 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["at"] < PROVIDER_CONTROL_SINCE or not r.get("provider") or not r.get("metrics"):
             continue
-        if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS or r["reporter"] in OPENCODE_PERSONAS:
+        if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS or r["reporter"] in OPENCODE_PERSONAS \
+                or r["reporter"] in WRAPPED_PERSONAS:
             continue
         side = "ask" if r["asks"] else "blind"
         c = prov.setdefault(side, {"runs": 0, "completed": 0, "failures": 0, "recovered": 0, "tokens": 0, "seconds": 0.0,
@@ -1403,7 +1446,7 @@ def write_report(state: dict) -> None:
     halves: dict[str, dict] = {}
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
-                or r["reporter"] in OPENCODE_PERSONAS:
+                or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS:
             continue
         if not r.get("metrics"):
             continue
