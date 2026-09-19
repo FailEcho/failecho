@@ -82,8 +82,32 @@ Three properties it has, each with a test rather than a promise:
 
 - **Never raises.** A reporting bug cannot become your application's exception.
 - **Never blocks.** Reports go to a worker thread; an unreachable FailEcho costs
-  the caller about 3 ms, not a timeout.
+  the caller about 3 ms, not a timeout. (Advice, below, is the opt-in exception.)
 - **Never changes behaviour.** Returns and re-raises exactly what your code did.
+
+## Advice for the agent that failed (opt-in)
+
+Reporting helps the next agent. With `advise=True` (or `FAILECHO_ADVISE=1`),
+a failure in a watched call is also followed by one read of the network --
+`/v1/query`, which stores nothing -- and the answer is attached to the
+exception before it goes on up:
+
+```python
+fe = FailEcho(advise=True)
+
+try:
+    create_issue("...")
+except Exception as exc:
+    exc.failecho          # the network's answer, a dict, or None
+    fe.advice_text(exc)   # one line, e.g. "FailEcho: try <action>, worked n/m ..."
+```
+
+Put that line in the tool error your model sees and the model has the
+evidence when it decides whether to retry, without having to think of
+asking. Nothing is acted on for you; the exception's type and message are
+unchanged (on Python 3.11+ the line is also added as a note). The read waits
+at most 1.5 seconds, on failures only -- the one place this package waits,
+which is why it is off by default.
 
 The `recovered()` line is the one worth bothering with. Failures alone give
 the network a failure *rate*; only an outcome records what fixed it, which is
@@ -92,7 +116,8 @@ explicit call.
 
 Zero dependencies. `FAILECHO_DISABLED=1` turns it off. Point `endpoint=` at
 your own server to send nothing to anyone else. The network at failecho.com
-is public and, as of this release, empty -- the front page says so. Works on
+is public and, as of this release, has no independent reporters yet -- the
+front page says so. Works on
 your own history alone from five recoveries.
 
 MIT. Source: https://github.com/FailEcho/failecho
