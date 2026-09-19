@@ -1051,3 +1051,12 @@ def test_the_prod_pair_reads_production_and_nothing_else(monkeypatch):
     assert F.PROD_READ_URL.endswith("/v1/query")
     assert F.Run("fleet-prod-ask", "decorator", "nvidia", True).fe.endpoint == "http://lab.local", \
         "reports go to the lab, never to production"
+
+
+def test_a_run_the_guest_killed_for_memory_is_not_a_failed_task():
+    ok = {"opencode": {"completed": True, "guest_oom_kills": 1}}
+    lost = {"opencode": {"completed": False, "guest_oom_kills": 1}}
+    plain = {"opencode": {"completed": False, "guest_oom_kills": 0}}
+    assert F._lost_to_guest_memory(lost)
+    assert not F._lost_to_guest_memory(ok), "a kill after the result cost nothing"
+    assert not F._lost_to_guest_memory(plain) and not F._lost_to_guest_memory({})

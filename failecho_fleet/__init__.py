@@ -1229,8 +1229,24 @@ def _is_run(r: dict) -> bool:
                 and not r.get("failures") and float(r.get("seconds") or 0) < 1.0)
 
 
+def _lost_to_guest_memory(r: dict) -> bool:
+    """An OpenCode run the guest kernel killed for memory before it produced
+    its result: the harness failing, not the agent. The twins with FailEcho
+    run one more process (an MCP client, or the proxy) in the same 768 MB,
+    and took 4 of 5 such kills on 19 Sep -- counting them as failed tasks
+    scored the harness against the product. Excluded from every rate and
+    counted on their own row, per side."""
+    o = r.get("opencode") or {}
+    return bool(o.get("guest_oom_kills")) and not o.get("completed")
+
+
 def write_report(state: dict) -> None:
-    runs = [r for r in state["runs"] if _is_run(r)]
+    lost_memory = {"ask": {}, "blind": {}}
+    for r in state["runs"]:
+        if _lost_to_guest_memory(r):
+            side = lost_memory["ask" if r.get("asks") else "blind"]
+            side[r["reporter"]] = side.get(r["reporter"], 0) + 1
+    runs = [r for r in state["runs"] if _is_run(r) and not _lost_to_guest_memory(r)]
     by_persona: dict[str, dict] = {}
     blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0, "skipped": 0,
                      "provider_failures": 0, "provider_recovered": 0, "explored": 0}
@@ -1383,6 +1399,8 @@ def write_report(state: dict) -> None:
             rows.append({"metric": "seconds waiting on rate limits, per run", "unit": "s", "ask": a["wait_seconds_per_run"],
                          "blind": b["wait_seconds_per_run"], "better": _better(a["wait_seconds_per_run"], b["wait_seconds_per_run"])})
         if key in ("opencode", "ocproxy"):
+            members = OPENCODE_PERSONAS if key == "opencode" else OCPROXY_PERSONAS
+            lost = {side: sum(n for rep, n in lost_memory[side].items() if rep in members) for side in ("ask", "blind")}
             # the agent's own failures are inside OpenCode; what is visible is the
             # artefact, the steps, the tokens, and whether it reached for FailEcho
             rows = [r for r in rows if r["metric"] in ("tasks completed", "tokens per completed task", "seconds per run")]
@@ -1390,6 +1408,8 @@ def write_report(state: dict) -> None:
                          "better": _better(a["model_calls_per_run"], b["model_calls_per_run"])})
             rows.append({"metric": "FailEcho tool calls per run" if key == "opencode" else "tool errors carrying advice, per run",
                          "unit": "", "ask": a["asks_per_run"], "blind": b["asks_per_run"], "better": "tie"})
+            rows.append({"metric": "runs lost to guest memory (not counted above)", "unit": "",
+                         "ask": lost["ask"], "blind": lost["blind"], "better": "tie"})
         if key == "wrapped":
             # nothing retries for the model here, so attempts and skips are
             # the harness's numbers and mean nothing; what the model did is
