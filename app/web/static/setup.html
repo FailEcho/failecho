@@ -337,6 +337,49 @@ except Exception as exc:
     </p>
   </section>
 
+  <section class="shell band" id="proxy" aria-labelledby="proxy-title">
+    <div class="band-head">
+      <h2 id="proxy-title" class="label">Any MCP client, automatically — the proxy</h2>
+      <p class="band-sub">
+        A model given FailEcho's tools has to think of asking, and while it is
+        handling a failure it mostly does not. The proxy puts the answer where
+        the model is already looking: put it in front of the MCP servers you
+        already use, and a failed tool call comes back with one line of advice.
+      </p>
+    </div>
+    <figure class="snip">
+      <pre><code>{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "failecho-mcp", "proxy", "--",
+               "npx", "-y", "@modelcontextprotocol/server-github"]
+    }
+  }
+}</code></pre>
+    </figure>
+    <p class="band-sub">
+      <code>uvx failecho-mcp proxy -- …</code> works the same way. For a remote
+      server, give its URL instead of a command:
+      <code>failecho-mcp proxy --header "Authorization: Bearer $TOKEN" -- https://…/mcp</code>
+      (a header token works; OAuth does not, so connect those directly).
+    </p>
+    <figure class="snip">
+      <pre><code>429 rate limit exceeded
+FailEcho: try backoff, worked n/m (confidence 0.61).</code></pre>
+    </figure>
+    <p class="band-sub">
+      Every other message passes through unchanged, byte for byte. Each call's
+      outcome is reported as its shape only &mdash; the server's name, the tool,
+      an error class and code, the latency &mdash; never arguments, results or
+      the error text. A failed call repeated with the same arguments counts as
+      a retry, compared as a hash that never leaves your machine. Advice waits
+      at most 3 seconds, on failures only; if FailEcho is unreachable the error
+      passes through as it was. <code>FAILECHO_DISABLED=1</code> makes it a
+      plain pipe, <code>FAILECHO_ADVISE=0</code> reports without adding advice.
+    </p>
+  </section>
+
   <section class="shell band" id="rest-api" aria-labelledby="rest-title">
     <div class="band-head">
       <h2 id="rest-title" class="label">Your own code, no MCP</h2>
