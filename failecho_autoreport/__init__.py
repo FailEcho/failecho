@@ -45,6 +45,24 @@ Environment:
                              first-party so they are never counted as adoption.
     FAILECHO_INFER_RECOVERY=0  `run` mode only: do not infer retry/backoff
                              outcomes from a failure followed by a success.
+    FAILECHO_ADVISE=1        on a failure, also ask the network what worked
+                             (see "Advice" below). Off by default.
+
+Advice. Reporting alone helps the next agent; it does nothing for this one.
+With advise on, a failure in a watched call is followed by one read of the
+network (`/v1/query`, which stores nothing) before the exception goes on up.
+The answer is attached, never acted on:
+
+    try:
+        create_issue(...)
+    except Exception as exc:
+        exc.failecho            # the network's answer, a dict, or None
+        fe.advice_text(exc)     # one line for a log or a model's tool error
+
+On Python 3.11+ the line is also added as an exception note, so it shows in
+tracebacks. The exception itself, its type and message, are unchanged. The
+read costs up to ADVICE_TIMEOUT_SECONDS, on failures only; that is the one
+place this module waits, which is why it is opt-in.
 """
 
 from __future__ import annotations
@@ -68,7 +86,7 @@ __all__ = ["FailEcho", "classify"]
 class _NoFingerprint(Exception):
     """An outcome arrived with no failure to attach it to."""
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 DEFAULT_ENDPOINT = "https://failecho.com"
 
@@ -79,6 +97,9 @@ MAX_QUEUE = 256
 
 #: Not the caller's timeout -- the worker's. The caller never waits at all.
 TIMEOUT_SECONDS = 5.0
+#: How long a failing call may wait for advice. Short: a slow network answer
+#: must cost less than the retry it is meant to inform.
+ADVICE_TIMEOUT_SECONDS = 1.5
 
 #: First match wins, and the order matters: "503 ... invalid upstream" is a
 #: server error rather than a validation one. Kept identical to the Claude Code
@@ -143,6 +164,7 @@ class FailEcho:
         send_errors: bool | None = None,
         timeout: float = TIMEOUT_SECONDS,
         operator_token: str | None = None,
+        advise: bool | None = None,
     ) -> None:
         self.endpoint = (endpoint or os.environ.get("FAILECHO_ENDPOINT")
                          or DEFAULT_ENDPOINT).rstrip("/")
@@ -159,6 +181,11 @@ class FailEcho:
             if send_errors is None else send_errors
         )
         self.timeout = timeout
+        self.advise = _truthy(os.environ.get("FAILECHO_ADVISE"), False) if advise is None else advise
+        #: The last answer per (service, operation), for callers that catch
+        #: the exception somewhere the attribute is out of reach.
+        self.last_advice: dict[tuple[str, str], dict] = {}
+        self.advised = 0
         # Only FailEcho's own agents set this. With it, the server stores the
         # report as first_party and keeps it out of the adoption counters. An
         # agent we run that forgets it is counted as a stranger adopting us,
@@ -216,6 +243,10 @@ class FailEcho:
                         result = await func(*args, **kwargs)
                     except BaseException as exc:
                         self.record_failure(service, name, exc, _elapsed(started), mutates)
+                        if self.advise and isinstance(exc, Exception):
+                            import asyncio
+                            await asyncio.get_running_loop().run_in_executor(
+                                None, self._attach_advice, service, name, exc)
                         raise
                     self.record_success(service, name, _elapsed(started), mutates)
                     return result
@@ -228,6 +259,8 @@ class FailEcho:
                     result = func(*args, **kwargs)
                 except BaseException as exc:
                     self.record_failure(service, name, exc, _elapsed(started), mutates)
+                    if self.advise and isinstance(exc, Exception):
+                        self._attach_advice(service, name, exc)
                     raise
                 self.record_success(service, name, _elapsed(started), mutates)
                 return result
@@ -284,6 +317,68 @@ class FailEcho:
                     self.wrapped += 1
                     break  # this convention is covered; do not wrap deeper
         return tools
+
+    # -- advice ------------------------------------------------------------
+
+    def check(self, service: str, operation: str, error_type: str | None = None,
+              error_code: str | None = None, timeout: float | None = None) -> dict | None:
+        """What the network knows about this failure: the `/v1/query`
+        answer, or None if it could not be had. A read; stores nothing.
+        Never raises."""
+        if not self.enabled:
+            return None
+        body = {"service": service, "operation": operation}
+        if error_type:
+            body["error_type"] = error_type
+        if error_code:
+            body["error_code"] = str(error_code)
+        request = urllib.request.Request(
+            f"{self.endpoint}/v1/query", data=json.dumps(body).encode(),
+            headers=self._headers(), method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout or ADVICE_TIMEOUT_SECONDS) as response:
+                answer = json.loads(response.read())
+        except Exception:
+            return None
+        return answer if isinstance(answer, dict) else None
+
+    def _attach_advice(self, service: str, operation: str, exc: BaseException) -> None:
+        try:
+            error_type, error_code = classify(exc)
+            answer = self.check(service, operation, error_type, error_code)
+            if answer is None:
+                return
+            self.advised += 1
+            self.last_advice[(service, operation)] = answer
+            try:
+                exc.failecho = answer
+            except Exception:
+                pass
+            line = self.advice_text(answer)
+            if line and hasattr(exc, "add_note"):
+                exc.add_note(line)
+        except Exception:
+            pass
+
+    @staticmethod
+    def advice_text(answer) -> str | None:
+        """One line from an answer (or an exception carrying one), for a log
+        or a model's tool error. None when the network has nothing to say."""
+        if isinstance(answer, BaseException):
+            answer = getattr(answer, "failecho", None)
+        if not isinstance(answer, dict):
+            return None
+        rec = answer.get("recommendation") or {}
+        action = rec.get("action")
+        tried = {a.get("action"): a for a in answer.get("recovery_actions") or [] if isinstance(a, dict)}
+        if action == "skip":
+            return "FailEcho: skip -- nothing other agents tried recently has fixed this failure."
+        if action:
+            a = tried.get(action) or {}
+            evidence = (f", worked {a['successes']}/{a['attempts']}"
+                        if "successes" in a and "attempts" in a else "")
+            return f"FailEcho: try {action}{evidence} (confidence {rec.get('confidence')})."
+        return None
 
     # -- recording ---------------------------------------------------------
 

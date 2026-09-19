@@ -394,4 +394,116 @@ def test_the_run_summary_counts_failures():
     client.record_success("api.github.com", "x")
     assert client.queued_failures == 2 and client.queued == 3
     from failecho_autoreport import __version__
-    assert __version__ == "0.1.3"
+    assert __version__ == "0.1.4"
+
+
+# -- advice: the read that helps this agent, not only the next one -----------
+
+
+class Advised(Recorder):
+    """Answers every check with a canned network reply, and counts them."""
+
+    def __init__(self, answer=None, **kwargs):
+        super().__init__(**kwargs)
+        self.answer = answer
+        self.checks: list[tuple] = []
+
+    def check(self, service, operation, error_type=None, error_code=None, timeout=None):
+        self.checks.append((service, operation, error_type, error_code))
+        return self.answer
+
+
+SWITCH = {"known": True, "recommendation": {"action": "switch_model", "confidence": 0.89},
+          "recovery_actions": [{"action": "switch_model", "successes": 62, "attempts": 64}]}
+
+
+def test_advice_is_off_unless_asked_for(monkeypatch):
+    monkeypatch.delenv("FAILECHO_ADVISE", raising=False)
+    client = Advised(SWITCH)
+
+    @client.watch(service="api.groq.com", operation="chat.completions")
+    def call():
+        raise RuntimeError("429 rate limit exceeded")
+
+    with pytest.raises(RuntimeError) as info:
+        call()
+    assert client.checks == [] and not hasattr(info.value, "failecho")
+
+
+def test_advice_is_attached_and_the_exception_is_otherwise_unchanged():
+    client = Advised(SWITCH, advise=True)
+
+    @client.watch(service="api.groq.com", operation="chat.completions")
+    def call():
+        raise RuntimeError("429 rate limit exceeded")
+
+    with pytest.raises(RuntimeError) as info:
+        call()
+    assert type(info.value) is RuntimeError and str(info.value) == "429 rate limit exceeded"
+    assert client.checks == [("api.groq.com", "chat.completions", "rate_limit", "429")]
+    assert info.value.failecho is SWITCH
+    assert client.last_advice[("api.groq.com", "chat.completions")] is SWITCH
+    line = FailEcho.advice_text(info.value)
+    assert line == "FailEcho: try switch_model, worked 62/64 (confidence 0.89)."
+    if hasattr(info.value, "__notes__"):
+        assert info.value.__notes__ == [line]
+    drained(client)
+    assert client.bodies[0]["outcome"] == "failure", "advice does not replace the report"
+
+
+def test_async_calls_are_advised_too():
+    client = Advised(SWITCH, advise=True)
+
+    @client.watch(service="api.groq.com", operation="chat.completions")
+    async def call():
+        raise RuntimeError("429 rate limit exceeded")
+
+    with pytest.raises(RuntimeError) as info:
+        asyncio.run(call())
+    assert info.value.failecho is SWITCH
+
+
+def test_no_answer_means_nothing_attached():
+    client = Advised(None, advise=True)
+
+    @client.watch(service="x.example", operation="op")
+    def call():
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError) as info:
+        call()
+    assert not hasattr(info.value, "failecho") and not getattr(info.value, "__notes__", None)
+
+
+def test_advice_text_says_skip_and_says_nothing_without_evidence():
+    assert FailEcho.advice_text({"recommendation": {"action": "skip", "confidence": 0.7}}).startswith("FailEcho: skip")
+    assert FailEcho.advice_text({"known": False, "recommendation": None}) is None
+    assert FailEcho.advice_text(RuntimeError("no answer attached")) is None
+
+
+def test_a_dead_endpoint_gives_no_advice_quickly_and_never_raises():
+    client = FailEcho(endpoint="http://127.0.0.1:9", advise=True)
+    started = time.monotonic()
+    assert client.check("x.example", "op", "timeout") is None
+    assert time.monotonic() - started < 2.0
+
+
+def test_the_check_is_a_read_of_the_query_endpoint(monkeypatch):
+    import io
+    import json
+
+    import failecho_autoreport as mod
+
+    seen = {}
+
+    def fake_urlopen(request, timeout):
+        seen.update(url=request.full_url, body=json.loads(request.data), timeout=timeout)
+        return io.BytesIO(json.dumps(SWITCH).encode())
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    client = FailEcho(endpoint="http://127.0.0.1:9")
+    assert client.check("api.groq.com", "chat.completions", "rate_limit", 429) == SWITCH
+    assert seen["url"].endswith("/v1/query")
+    assert seen["body"] == {"service": "api.groq.com", "operation": "chat.completions",
+                            "error_type": "rate_limit", "error_code": "429"}
+    assert seen["timeout"] == mod.ADVICE_TIMEOUT_SECONDS
