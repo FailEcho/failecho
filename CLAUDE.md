@@ -36,6 +36,12 @@ failecho.com at the socket layer, and `FAILECHO_ENDPOINT` defaults to a dead
 local port under test. Anything you build that reports must be inert until
 explicitly enabled, and the first place you run it is a throwaway server.
 
+A third time (2026-09-19 03:03): the MCP SDK's `stdio_client` starts a
+server with a minimal environment, not yours, so a `failecho-mcp proxy`
+spawned that way never saw the exported lab endpoint or token and reported
+8 rows to production as `source: agent`. Pass `env=` explicitly to anything
+a client library spawns.
+
 Test the hook against a local instance, or a throwaway server, and keep
 `https://failecho.com` for reads (`check_tool_failure` and `POST /v1/query`
 store nothing). If you do need to write to production from a shell, export
