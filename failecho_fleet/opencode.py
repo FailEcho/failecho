@@ -251,7 +251,11 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
            + shlex.quote(prompt) + " 2>/work/opencode.err; echo EXIT=$?; echo END=$(date +%s); "
              "echo RESULT_MTIME=$(stat -c %Y result.json result.txt 2>/dev/null | head -1); echo '---RESULT---'; "
              "cat result.json result.txt 2>/dev/null | head -c 2000; echo; echo '---ERR---'; "
-             "grep -v 'level=INFO' /work/opencode.err | tail -c 1500; echo '---MCP---'; grep -ci 'mcp' /work/opencode.err")
+             "grep -v 'level=INFO' /work/opencode.err | tail -c 1500; echo '---MCP---'; grep -ci 'mcp' /work/opencode.err; "
+             # what the MCP side said, and whether the guest kernel killed
+             # anything: the proxy pair's lost reports and 137s (19 Sep)
+             "echo '---MCPLOG---'; grep -i 'mcp\\|packages\\|proxy' /work/opencode.err | tail -c 1200; "
+             "echo '---OOM---'; if dmesg >/dev/null 2>&1; then dmesg | grep -ci 'killed process'; else echo na; fi")
     try:
         with Sandbox(mem_mib=OC_MEM_MIB, scratch_mib=1536) as vm:
             # files land as root; the agent runs as the runner user
@@ -264,7 +268,11 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
     body, _, rest = r.stdout.partition("---RESULT---")
     result, _, err = rest.partition("---ERR---")
     err, _, mcp_lines = err.partition("---MCP---")
+    mcp_lines, _, mcp_log = mcp_lines.partition("---MCPLOG---")
+    mcp_log, _, oom = mcp_log.partition("---OOM---")
     out["mcp_log_lines"] = int(mcp_lines.strip() or 0) if mcp_lines.strip().isdigit() else 0
+    out["mcp_log"] = mcp_log.strip()[-600:]
+    out["guest_oom_kills"] = int(oom.strip()) if oom.strip().isdigit() else None
     for line in body.splitlines():
         ev.feed(line)
     m = re.search(r"EXIT=(\d+)", body)
