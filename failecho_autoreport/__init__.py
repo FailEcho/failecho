@@ -86,7 +86,7 @@ __all__ = ["FailEcho", "classify"]
 class _NoFingerprint(Exception):
     """An outcome arrived with no failure to attach it to."""
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 DEFAULT_ENDPOINT = "https://failecho.com"
 
@@ -374,6 +374,34 @@ class FailEcho:
             answer = getattr(answer, "failecho", None)
         if not isinstance(answer, dict):
             return None
+        rec = answer.get("recommendation") or {}
+        action = rec.get("action")
+        tried = {a.get("action"): a for a in answer.get("recovery_actions") or [] if isinstance(a, dict)}
+        # The same error class on this service's other operations: the
+        # server pools it when the operation itself has nothing (19 Sep: a
+        # tool name the network had never seen, under api.github.com, with
+        # 2330 pooled backoff attempts, got no line at all).
+        pooled = {a.get("action"): a for a in (answer.get("service_evidence") or {}).get("recovery_actions") or []
+                  if isinstance(a, dict)}
+        if action == "skip":
+            return "FailEcho: skip -- nothing other agents tried recently has fixed this failure."
+        if action:
+            a = tried.get(action) or pooled.get(action) or {}
+            evidence = (f", worked {a['successes']}/{a['attempts']}"
+                        if "successes" in a and "attempts" in a else "")
+            conf = rec.get("confidence")
+            conf = f" (confidence {conf:.2f})" if isinstance(conf, (int, float)) else ""
+            return f"FailEcho: try {action}{evidence}{conf}."
+        # No recommendation, but evidence: say what others tried and how it
+        # went, and that it is not a recommendation. Withholding it left a
+        # model with nothing where the network knew backoff worked 128/251.
+        for lead, source in (("other agents tried", tried), ("on this service's other operations, agents tried", pooled)):
+            seen = [a for a in source.values() if "successes" in a and "attempts" in a and a["attempts"]]
+            if seen:
+                seen.sort(key=lambda a: -a["successes"] / a["attempts"])
+                parts = ", ".join(f"{a['action']} worked {a['successes']}/{a['attempts']}" for a in seen[:3])
+                return f"FailEcho: no clear fix yet; {lead} {parts}."
+        return None
         rec = answer.get("recommendation") or {}
         action = rec.get("action")
         tried = {a.get("action"): a for a in answer.get("recovery_actions") or [] if isinstance(a, dict)}

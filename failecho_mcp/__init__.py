@@ -34,7 +34,7 @@ from mcp.server.stdio import stdio_server
 from mcp.shared._httpx_utils import create_mcp_http_client
 from mcp.shared.exceptions import MCPError
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 #: The shared network. A client's default has to be the real network: a relay
 #: that defaulted to localhost would start an empty, private FailEcho in every

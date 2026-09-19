@@ -394,7 +394,7 @@ def test_the_run_summary_counts_failures():
     client.record_success("api.github.com", "x")
     assert client.queued_failures == 2 and client.queued == 3
     from failecho_autoreport import __version__
-    assert __version__ == "0.1.4"
+    assert __version__ == "0.1.5"
 
 
 # -- advice: the read that helps this agent, not only the next one -----------

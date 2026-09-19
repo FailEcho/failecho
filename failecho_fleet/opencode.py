@@ -122,7 +122,11 @@ def packages_mcp(proxied: bool, lab_public_url: str | None, reporter: str) -> di
     server = ["python3", "/work/fe/packages_mcp.py"]
     env = {"PYTHONPATH": "/work/fe"}
     if proxied:
-        server = ["python3", "/work/fe/proxy.py", "--", *server]
+        # each tool's API host, as a user would declare it, so a GitHub 403
+        # can draw on the evidence agents filed under api.github.com
+        upstream = ["--upstream", "github_*=api.github.com", "--upstream", "pypi_*=pypi.org",
+                    "--upstream", "npm_*=registry.npmjs.org", "--upstream", "crates_*=crates.io"]
+        server = ["python3", "/work/fe/proxy.py", *upstream, "--", *server]
         env.update(FAILECHO_ENDPOINT=lab_public_url or "", FAILECHO_REPORTER_ID=reporter)
     return {"type": "local", "command": server, "enabled": True, "environment": env}
 

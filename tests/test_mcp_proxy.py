@@ -42,7 +42,7 @@ ADVICE = {"known": True, "recommendation": {"action": "backoff", "confidence": 0
 class FakeNetwork:
     """A FailEcho that records what it is sent and answers every query."""
 
-    def __init__(self, delay: float = 0.0, answer: dict | None = ADVICE):
+    def __init__(self, delay: float = 0.0, answer: dict | None = ADVICE, by_service: dict | None = None):
         self.observed: list[dict] = []
         self.queries: list[dict] = []
         net = self
@@ -53,7 +53,10 @@ class FakeNetwork:
                 if self.path == "/v1/query":
                     net.queries.append(body)
                     time.sleep(delay)
-                    out = answer or {"known": False, "recommendation": None}
+                    if by_service is not None:
+                        out = by_service.get(body.get("service")) or {"known": False, "recommendation": None}
+                    else:
+                        out = answer or {"known": False, "recommendation": None}
                 else:
                     net.observed.append(body)
                     out = {"accepted": True, "fingerprint": "f" * 32}
@@ -78,11 +81,12 @@ class FakeNetwork:
 class Session:
     """The proxy as a client's subprocess, spoken to line by line."""
 
-    def __init__(self, endpoint: str, extra_env: dict | None = None, server: list[str] = FAKE):
+    def __init__(self, endpoint: str, extra_env: dict | None = None, server: list[str] = FAKE,
+                 proxy_args: list[str] | None = None):
         env = {**os.environ, "FAILECHO_ENDPOINT": endpoint, "FAILECHO_REPORTER_ID": "proxy-test",
                **(extra_env or {})}
         env.pop("FAILECHO_OPERATOR_TOKEN", None)
-        self.proc = subprocess.Popen([*PROXY, "--", *server],
+        self.proc = subprocess.Popen([*PROXY, *(proxy_args or []), "--", *server],
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      cwd=ROOT, env=env)
         self.lines: queue.Queue = queue.Queue()
@@ -492,6 +496,11 @@ def test_both_proxies_classify_and_advise_exactly_alike(impl):
                "ECONNREFUSED 127.0.0.1", "503 service unavailable", "upstream timeout", "-32602 Tool x not found",
                "MCP error -32602: Input validation error", "Error executing tool fails", "something odd"]
     answers = [
+        {"recommendation": None, "recovery_actions": [],
+         "service_evidence": {"recovery_actions": [{"action": "backoff", "successes": 104, "attempts": 2330},
+                                                   {"action": "wait_until_reset", "successes": 2, "attempts": 11}]}},
+        {"recommendation": {"action": "skip", "confidence": 0.5, "scope": "service"},
+         "service_evidence": {"recovery_actions": [{"action": "backoff", "successes": 1, "attempts": 90}]}},
         {"recommendation": {"action": "backoff", "confidence": 0.6139},
          "recovery_actions": [{"action": "backoff", "successes": 128, "attempts": 251}]},
         {"recommendation": {"action": "skip", "confidence": 0.7}},
@@ -506,3 +515,52 @@ def test_both_proxies_classify_and_advise_exactly_alike(impl):
     for text, (et, code) in zip(samples, node["c"]):
         assert classify(RuntimeError(text)) == (et, code), text
     assert node["a"] == [FailEcho.advice_text(a) for a in answers]
+
+
+# -- an MCP server that wraps an API: evidence under the API's host -----------------------------
+
+
+POOLED = {"known": False, "recommendation": None, "recovery_actions": [],
+          "service_evidence": {"recovery_actions": [{"action": "backoff", "successes": 104, "attempts": 2330}]}}
+
+
+def test_no_advice_under_the_server_name_asks_the_wrapped_host_and_says_so():
+    n = FakeNetwork(by_service={"api.example.com": POOLED})
+    try:
+        s = Session(n.url, proxy_args=["--upstream", "fai*=api.example.com"])
+        s.init()
+        s.send({"jsonrpc": "2.0", "id": 80, "method": "tools/call", "params": {"name": "fails", "arguments": {}}})
+        r = json.loads(s.recv())["result"]
+        assert r["content"][-1]["text"] == ("FailEcho (evidence from api.example.com): no clear fix yet; on this "
+                                            "service's other operations, agents tried backoff worked 104/2330.")
+        s.close()
+        assert [q["service"] for q in n.queries] == ["fake-server", "api.example.com"]
+        assert {o["service"] for o in n.observed if "outcome" in o} == {"fake-server"}, "reports keep the server's name"
+    finally:
+        n.close()
+
+
+def test_advice_under_the_server_name_wins_and_the_host_is_not_asked():
+    n = FakeNetwork(by_service={"fake-server": ADVICE, "api.example.com": POOLED})
+    try:
+        s = Session(n.url, proxy_args=["--upstream", "api.example.com"])
+        s.init()
+        s.send({"jsonrpc": "2.0", "id": 81, "method": "tools/call", "params": {"name": "fails", "arguments": {}}})
+        assert json.loads(s.recv())["result"]["content"][-1]["text"].startswith("FailEcho: try backoff")
+        s.close()
+        assert [q["service"] for q in n.queries] == ["fake-server"]
+    finally:
+        n.close()
+
+
+def test_a_tool_no_pattern_covers_is_not_sent_to_any_host():
+    n = FakeNetwork(by_service={"api.example.com": POOLED})
+    try:
+        s = Session(n.url, proxy_args=["--upstream", "github_*=api.example.com"])
+        s.init()
+        s.send({"jsonrpc": "2.0", "id": 82, "method": "tools/call", "params": {"name": "fails", "arguments": {}}})
+        assert len(json.loads(s.recv())["result"]["content"]) == 1
+        s.close()
+        assert [q["service"] for q in n.queries] == ["fake-server"]
+    finally:
+        n.close()

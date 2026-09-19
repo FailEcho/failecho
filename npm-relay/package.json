@@ -1,6 +1,6 @@
 {
   "name": "failecho-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Stdio MCP server that relays to the FailEcho network: check what other agents hit before retrying a failed tool.",
   "mcpName": "com.failecho/failecho",
   "bin": {

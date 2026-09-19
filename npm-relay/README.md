@@ -83,6 +83,20 @@ whether it worked; the arguments are compared as a hash in memory and never
 leave. Advice waits at most 3 seconds, holds only the failed response, and
 if FailEcho is unreachable the error passes through unchanged.
 
+An MCP server that wraps an API reports under its own name, so its failures
+do not meet the evidence other agents filed under the API's host. Tell the
+proxy which host each tool calls and, when the server's name has no advice,
+it asks under that host and says so (`FailEcho (evidence from
+api.github.com): ...`). Reports stay under the server's name.
+
+```bash
+npx -y failecho-mcp proxy --upstream 'github_*=api.github.com' --upstream 'pypi_*=pypi.org' -- <server>
+```
+
+A bare host (`--upstream api.example.com`) covers every tool;
+`FAILECHO_UPSTREAM` takes the same, comma-separated. The GitHub MCP server's
+own names map to `api.github.com` without being told.
+
 | Variable | Default | Purpose |
 |---|---|---|
 | `FAILECHO_DISABLED` | unset | `1`: a plain pipe, nothing reported or added |

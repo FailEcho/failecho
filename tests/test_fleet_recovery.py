@@ -1013,7 +1013,8 @@ def test_the_proxy_pair_differs_only_by_the_proxy(monkeypatch):
         assert files["project/AGENTS.md"] == oc.AGENTS_MD
         assert "fe/packages_mcp.py" in files
         if asks:
-            assert cmd[:3] == ["python3", "/work/fe/proxy.py", "--"] and cmd[3:] == ["python3", "/work/fe/packages_mcp.py"]
+            assert cmd[:2] == ["python3", "/work/fe/proxy.py"] and cmd[-3:] == ["--", "python3", "/work/fe/packages_mcp.py"]
+            assert "github_*=api.github.com" in cmd
             assert cfg["mcp"]["packages"]["environment"]["FAILECHO_ENDPOINT"] == "https://lab.example"
             assert "fe/proxy.py" in files and "fe/failecho_autoreport/__init__.py" in files
         else:

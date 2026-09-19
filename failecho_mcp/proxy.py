@@ -24,6 +24,15 @@ own name (``serverInfo.name``), the tool name, an error class, a code, the
 latency. Never arguments, never results, never the error text -- that is read
 here, locally, to pick the error class, and dropped.
 
+An MCP server that wraps an API reports under its own name, so a GitHub
+server's 403 never meets the evidence agents filed under ``api.github.com``.
+Reports stay under the server's name; when that name has no advice, the
+proxy asks once more under the API host the tool wraps and says so in the
+line -- ``FailEcho (evidence from api.github.com): ...``. The host comes from
+``--upstream 'github_*=api.github.com'`` (or ``--upstream api.github.com``
+for every tool, or FAILECHO_UPSTREAM, comma-separated), or, for the GitHub
+MCP server's own names, from a built-in table.
+
 Recovery is inferred the way ``failecho_autoreport run`` infers it: a call
 that failed transiently (rate limit, server error, timeout, connection) and
 is made again with the same arguments inside two minutes was a retry, and
@@ -48,10 +57,12 @@ Environment:
     FAILECHO_SERVICE      the service name, if the server reports none
     FAILECHO_ENDPOINT     default https://failecho.com
     FAILECHO_REPORTER_ID  stable id, so this machine counts as one reporter
+    FAILECHO_UPSTREAM     API hosts the server's tools wrap, as --upstream
 """
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -72,6 +83,28 @@ ADVICE_TIMEOUT_SECONDS = 3.0
 #: A repeat of a transiently failed call inside this window is a retry.
 INFER_WINDOW = 120.0
 TRANSIENT = frozenset({"rate_limit", "server_error", "timeout", "connection_error"})
+#: MCP servers that wrap exactly one API host, by the name they report. A
+#: list, not a guess: every entry is a server whose tools all call that host.
+DEFAULT_UPSTREAMS = {
+    "github-mcp-server": "api.github.com",
+    "github": "api.github.com",
+    "mcp-server-github": "api.github.com",
+}
+
+
+def parse_upstreams(specs: list[str]) -> list[tuple[str, str]]:
+    """'github_*=api.github.com' -> ('github_*', 'api.github.com'); a bare
+    host applies to every tool."""
+    out = []
+    for spec in specs:
+        for part in spec.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            pattern, _, host = part.rpartition("=") if "=" in part else ("*", "", part)
+            if host.strip():
+                out.append((pattern.strip() or "*", host.strip().lower()))
+    return out
 
 
 class _ToolError(Exception):
@@ -257,9 +290,10 @@ class Proxy:
     def __init__(self, argv: list[str], fe: FailEcho | None = None, *,
                  advise: bool | None = None, service: str | None = None,
                  client_in: IO[bytes] | None = None, client_out: IO[bytes] | None = None,
-                 headers: dict[str, str] | None = None) -> None:
+                 headers: dict[str, str] | None = None, upstreams: list[tuple[str, str]] | None = None) -> None:
         self.argv = argv
         self.headers = headers or {}
+        self.upstreams = list(upstreams or []) + parse_upstreams([os.environ.get("FAILECHO_UPSTREAM", "")])
         disabled = os.environ.get("FAILECHO_DISABLED", "").strip().lower() in ("1", "true", "yes", "on")
         self.fe = None if disabled else (fe or FailEcho())
         if advise is None:
@@ -395,13 +429,28 @@ class Proxy:
                         self._retryable.pop(min(self._retryable, key=lambda k: self._retryable[k][0]))
                     self._retryable[key] = (now, et, code)
 
+    def upstream_for(self, service: str, tool: str) -> str | None:
+        """The API host this tool wraps, if known: an explicit --upstream
+        pattern first, then the built-in table by server name."""
+        for pattern, host in self.upstreams:
+            if fnmatch.fnmatchcase(tool, pattern):
+                return host
+        return DEFAULT_UPSTREAMS.get((service or "").lower())
+
     def _advise_and_write(self, raw: bytes, msg: dict, service: str, tool: str, exc: Exception) -> None:
         out = raw
         try:
             from failecho_autoreport import classify
             et, code = classify(exc)
+            started = time.monotonic()
             answer = self.fe.check(service, tool, et, code, timeout=ADVICE_TIMEOUT_SECONDS)
             line = FailEcho.advice_text(answer) if answer else None
+            host = None if line else self.upstream_for(service, tool)
+            left = ADVICE_TIMEOUT_SECONDS - (time.monotonic() - started)
+            if host and host != service and left > 0.2:
+                upstream = FailEcho.advice_text(self.fe.check(host, tool, et, code, timeout=left))
+                if upstream:
+                    line = upstream.replace("FailEcho: ", f"FailEcho (evidence from {host}): ", 1)
             if line:
                 out = (json.dumps(annotate(msg, line), separators=(",", ":")) + "\n").encode()
                 self.annotated += 1
@@ -454,17 +503,21 @@ def _fallback_name(argv: list[str]) -> str:
     return os.path.basename(argv[0])
 
 
-USAGE = ("usage: failecho-mcp proxy [--header 'Name: value' ...] -- <server command> [args...]\n"
+USAGE = ("usage: failecho-mcp proxy [--header 'Name: value' ...] [--upstream 'tool_*=api.host'] -- <server command> [args...]\n"
          "       failecho-mcp proxy [--header 'Name: value' ...] -- https://host/mcp")
 
 
 def main(argv: list[str]) -> int:
     """``failecho-mcp proxy [--header 'Name: value'] -- <command...> | <url>``"""
     headers: dict[str, str] = {}
+    upstream_specs: list[str] = []
     while argv and argv[0] != "--":
         if argv[0] == "--header" and len(argv) > 1 and ":" in argv[1]:
             name, value = argv[1].split(":", 1)
             headers[name.strip()] = value.strip()
+            argv = argv[2:]
+        elif argv[0] == "--upstream" and len(argv) > 1:
+            upstream_specs.append(argv[1])
             argv = argv[2:]
         else:
             break
@@ -473,7 +526,7 @@ def main(argv: list[str]) -> int:
     if not argv:
         print(USAGE, file=sys.stderr)
         return 2
-    code = Proxy(argv, headers=headers).run()
+    code = Proxy(argv, headers=headers, upstreams=parse_upstreams(upstream_specs)).run()
     if code < 0:   # the server died of a signal: report it the way a shell does
         code = 128 - code
     # The client-side reader is still blocked on stdin when the server has
