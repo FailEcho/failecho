@@ -11,6 +11,9 @@ import sys
 import time
 
 
+SEEN = set()
+
+
 def send(msg):
     sys.stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
     sys.stdout.flush()
@@ -61,6 +64,15 @@ def main():
                 send({"jsonrpc": "2.0", "id": mid, "result": {
                     "content": [{"type": "text", "text": "429 rate limit exceeded secret-error-token"}],
                     "isError": True}})
+            elif name == "flaky":
+                # 503 on the first call with these arguments, fine after that
+                key = json.dumps(params.get("arguments") or {}, sort_keys=True)
+                if key not in SEEN:
+                    SEEN.add(key)
+                    send({"jsonrpc": "2.0", "id": mid, "result": {
+                        "content": [{"type": "text", "text": "503 service unavailable"}], "isError": True}})
+                else:
+                    send({"jsonrpc": "2.0", "id": mid, "result": {"content": [{"type": "text", "text": "ok"}]}})
             elif name == "rpc_error":
                 send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32603, "message": "upstream timeout"}})
             elif name == "slow":

@@ -318,3 +318,47 @@ def test_client_closing_stdin_shuts_the_server_down(net):
     s = Session(net.url)
     s.init()
     assert s.close() == 0
+
+
+# -- recovery, inferred from a repeated call ----------------------------------------------------
+
+
+def test_a_repeat_that_works_after_a_transient_failure_is_reported_as_a_retry(net):
+    s = Session(net.url)
+    s.init()
+    call = {"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "flaky", "arguments": {"q": "secret-arg-token"}}}
+    s.send({**call, "id": 70}); assert json.loads(s.recv())["result"].get("isError") is True
+    s.send({**call, "id": 71}); assert "isError" not in json.loads(s.recv())["result"]
+    s.close()
+    outcomes = [o for o in net.observed if "action" in o]
+    assert len(outcomes) == 1
+    o = outcomes[0]
+    # an outcome is filed on the failure's fingerprint, which the server
+    # returned for the report; nothing else about the call goes with it
+    assert (o["fingerprint"], o["action"], o["successful"]) == ("f" * 32, "retry", True)
+    failure = next(x for x in net.observed if x.get("operation") == "flaky" and x.get("outcome") == "failure")
+    assert (failure["error_type"], failure["error_code"]) == ("server_error", "503")
+    assert "secret-arg-token" not in json.dumps(net.observed + net.queries)
+
+
+def test_different_arguments_are_a_different_call_not_a_retry(net):
+    s = Session(net.url)
+    s.init()
+    s.send({"jsonrpc": "2.0", "id": 72, "method": "tools/call", "params": {"name": "flaky", "arguments": {"q": 1}}})
+    s.recv()
+    s.send({"jsonrpc": "2.0", "id": 73, "method": "tools/call", "params": {"name": "flaky", "arguments": {"q": 2}}})
+    s.recv()
+    s.close()
+    assert [o for o in net.observed if "action" in o] == []
+
+
+def test_a_repeat_that_fails_again_is_a_retry_that_did_not_work(net):
+    s = Session(net.url)
+    s.init()
+    for i in range(2):
+        s.send({"jsonrpc": "2.0", "id": 74 + i, "method": "tools/call", "params": {"name": "rpc_error", "arguments": {}}})
+        s.recv()
+    s.close()
+    # "upstream timeout" is transient, so the second failure is a retry that did not work
+    outcomes = [o for o in net.observed if "action" in o]
+    assert [(o["action"], o["successful"]) for o in outcomes] == [("retry", False)]

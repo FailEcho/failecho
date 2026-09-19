@@ -19,6 +19,14 @@ own name (``serverInfo.name``), the tool name, an error class, a code, the
 latency. Never arguments, never results, never the error text -- that is read
 here, locally, to pick the error class, and dropped.
 
+Recovery is inferred the way ``failecho_autoreport run`` infers it: a call
+that failed transiently (rate limit, server error, timeout, connection) and
+is made again with the same arguments inside two minutes was a retry, and
+whether the second call worked is reported as that retry's outcome. The
+arguments are compared as a hash held in memory here; they never leave.
+Without outcomes the network can say a tool is failing but never what
+fixes it, and advice is exactly that second half.
+
 What it must never do, each with a test:
 
 * change a message it is not annotating (resources, prompts, notifications,
@@ -39,6 +47,7 @@ Environment:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import signal
@@ -52,6 +61,9 @@ from failecho_autoreport import FailEcho
 
 #: The longest a failed response is held for advice. The autoreport budget.
 ADVICE_TIMEOUT_SECONDS = 3.0
+#: A repeat of a transiently failed call inside this window is a retry.
+INFER_WINDOW = 120.0
+TRANSIENT = frozenset({"rate_limit", "server_error", "timeout", "connection_error"})
 
 
 class _ToolError(Exception):
@@ -102,8 +114,12 @@ class Proxy:
         self.client_out = client_out or sys.stdout.buffer
         self._out_lock = threading.Lock()
         self._lock = threading.Lock()
-        #: request id (as JSON) -> (tool name, started); initialize ids -> None
-        self._pending: dict[str, tuple[str, float] | None] = {}
+        #: request id (as JSON) -> (tool name, started, arguments hash);
+        #: initialize ids -> None
+        self._pending: dict[str, tuple[str, float, str] | None] = {}
+        #: (tool, arguments hash) -> (failed at, error_type, error_code) for
+        #: transient failures a repeat of the same call may recover from
+        self._retryable: dict[tuple[str, str], tuple[float, str, str | None]] = {}
         self._advising: list[threading.Thread] = []
         self.proc: subprocess.Popen | None = None
         self.annotated = 0
@@ -142,10 +158,13 @@ class Proxy:
                 continue
             key = json.dumps(m["id"])
             if m["method"] == "tools/call":
-                name = (m.get("params") or {}).get("name")
+                params = m.get("params") or {}
+                name = params.get("name")
                 if isinstance(name, str):
+                    args = json.dumps(params.get("arguments") or {}, sort_keys=True, default=str)
+                    digest = hashlib.sha256(args.encode()).hexdigest()
                     with self._lock:
-                        self._pending[key] = (name, time.monotonic())
+                        self._pending[key] = (name, time.monotonic(), digest)
             elif m["method"] == "initialize":
                 with self._lock:
                     self._pending[key] = None
@@ -183,21 +202,42 @@ class Proxy:
             if not self.service and isinstance(info.get("name"), str):
                 self.service = info["name"]
             return None
-        tool, started = entry
+        tool, started, digest = entry
         service = self.service or (os.path.basename(self.argv[0]) if self.argv else "mcp")
         latency = int((time.monotonic() - started) * 1000)
         text = _error_text(msg)
         if text is None:
             self.fe.record_success(service, tool, latency)
+            self._infer(service, tool, digest, None)
             return None
         exc = _ToolError(text)
         self.fe.record_failure(service, tool, exc, latency)
+        self._infer(service, tool, digest, exc)
         if not self.advise:
             return None
         t = threading.Thread(target=self._advise_and_write, args=(raw, msg, service, tool, exc), daemon=True)
         self._advising.append(t)
         t.start()
         return True
+
+    def _infer(self, service: str, tool: str, digest: str, failure: Exception | None) -> None:
+        """File the outcome of a repeated call, then remember this one if a
+        later repeat could recover from it."""
+        from failecho_autoreport import classify
+        now = time.monotonic()
+        key = (tool, digest)
+        with self._lock:
+            previous = self._retryable.pop(key, None)
+        if previous is not None and now - previous[0] <= INFER_WINDOW:
+            self.fe.recovered(service, tool, "retry", failure is None,
+                              error_type=previous[1], error_code=previous[2])
+        if failure is not None:
+            et, code = classify(failure)
+            if et in TRANSIENT:
+                with self._lock:
+                    if len(self._retryable) >= 256:
+                        self._retryable.pop(min(self._retryable, key=lambda k: self._retryable[k][0]))
+                    self._retryable[key] = (now, et, code)
 
     def _advise_and_write(self, raw: bytes, msg: dict, service: str, tool: str, exc: Exception) -> None:
         out = raw
@@ -256,3 +296,7 @@ def main(argv: list[str]) -> int:
         sys.stderr.flush()
     finally:
         os._exit(code)
+
+
+if __name__ == "__main__":   # run as a file, without the MCP SDK installed
+    main(sys.argv[1:])
