@@ -474,6 +474,8 @@ def main(argv: list[str]) -> int:
         print(USAGE, file=sys.stderr)
         return 2
     code = Proxy(argv, headers=headers).run()
+    if code < 0:   # the server died of a signal: report it the way a shell does
+        code = 128 - code
     # The client-side reader is still blocked on stdin when the server has
     # gone; a normal interpreter exit then aborts on that stream's lock
     # (SIGABRT instead of the server's exit code). Flush and leave directly.

@@ -1693,7 +1693,7 @@ def main(argv: list[str] | None = None) -> int:
     if any(m in answer for m in _NOT_A_RUN):
         record["answer"] = answer[:200]
     if run.opencode is not None:
-        record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "advice_seen", "steps", "exit",
+        record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "advice_seen", "idle_after_result", "steps", "exit",
                                                                 "error", "tool_names", "result_head", "timed_out")}
         record["task"] = task[0][:160]
         record["answer"] = answer[:200]

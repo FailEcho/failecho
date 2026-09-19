@@ -248,7 +248,8 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
     # -k: OpenCode has ignored the TERM before, and then the guest's own
     # kill took every event with it (14 of 41 runs a twin, 18-19 Sep)
     cmd = ("cd /work/project && timeout -k 10 " + str(max(timeout - 20, 30)) + " opencode run --format json --dir /work/project "
-           + shlex.quote(prompt) + " 2>/work/opencode.err; echo EXIT=$?; echo '---RESULT---'; "
+           + shlex.quote(prompt) + " 2>/work/opencode.err; echo EXIT=$?; echo END=$(date +%s); "
+             "echo RESULT_MTIME=$(stat -c %Y result.json result.txt 2>/dev/null | head -1); echo '---RESULT---'; "
              "cat result.json result.txt 2>/dev/null | head -c 2000; echo; echo '---ERR---'; "
              "grep -v 'level=INFO' /work/opencode.err | tail -c 1500; echo '---MCP---'; grep -ci 'mcp' /work/opencode.err")
     try:
@@ -268,6 +269,10 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
         ev.feed(line)
     m = re.search(r"EXIT=(\d+)", body)
     out["seconds"] = round(float(r.get("seconds") or 0), 1)
+    # How long OpenCode kept running after it wrote its result: separates a
+    # process that would not exit from a model that was still working.
+    end, mtime = re.search(r"END=(\d+)", body), re.search(r"RESULT_MTIME=(\d+)", body)
+    out["idle_after_result"] = int(end.group(1)) - int(mtime.group(1)) if end and mtime else None
     out.update(exit=int(m.group(1)) if m else None, tool_calls=ev.tool_calls, failecho_calls=ev.failecho_calls,
                advice_seen=ev.advice_seen,
                steps=ev.steps, tokens_in=ev.tokens_in, tokens_out=ev.tokens_out, tool_names=ev.tool_names,

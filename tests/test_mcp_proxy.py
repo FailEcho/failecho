@@ -320,6 +320,14 @@ def test_the_servers_exit_code_is_the_proxys(net):
     assert s.proc.wait(timeout=15) == 3
 
 
+def test_a_server_killed_by_a_signal_exits_the_way_a_shell_reports_it(net):
+    import signal
+    s = Session(net.url)
+    s.init()
+    s.proc.send_signal(signal.SIGTERM)
+    assert s.proc.wait(timeout=15) == 128 + signal.SIGTERM
+
+
 def test_a_command_that_does_not_exist_says_so():
     p = subprocess.run([*PROXY, "--", "no-such-mcp-server-xyz"],
                        capture_output=True, timeout=30, cwd=ROOT,
