@@ -7,6 +7,11 @@ and a stdio MCP server the client would otherwise start itself:
 
     failecho-mcp proxy -- npx -y @modelcontextprotocol/server-github
 
+or, for a remote server, speaks Streamable HTTP to it on the client's behalf
+(the client still starts a local stdio process -- this one):
+
+    failecho-mcp proxy --header "Authorization: Bearer $TOKEN" -- https://mcp.example.com/mcp
+
 and passes every message through untouched, in both directions, byte for
 byte, with one exception: the response to a ``tools/call`` that failed. That
 one gets a single line of the network's advice appended -- a text item on a
@@ -53,8 +58,11 @@ import os
 import signal
 import subprocess
 import sys
+import queue
 import threading
 import time
+import urllib.error
+import urllib.request
 from typing import IO
 
 from failecho_autoreport import FailEcho
@@ -97,13 +105,161 @@ def annotate(message: dict, line: str) -> dict:
     return out
 
 
+class HttpUpstream:
+    """A remote Streamable HTTP MCP server, shaped like a subprocess.
+
+    ``stdin.write`` takes the client's lines; each JSON-RPC message is POSTed
+    on its own thread, so a slow call holds up nothing else. What comes back
+    -- a JSON body, or an SSE stream of messages -- is queued, one message
+    per line, for ``stdout.readline``. The session id the server issues on
+    initialize is sent on every later request, and the session is deleted
+    on close. An HTTP failure on a request becomes a JSON-RPC error on that
+    request's id, so the client is never left waiting for an answer that
+    will not come.
+
+    Not handled: a server-initiated stream opened with GET (messages the
+    server sends outside any request), and OAuth. A server that needs OAuth
+    wants the client's own login flow; use a header token or connect to it
+    directly.
+    """
+
+    def __init__(self, url: str, headers: dict[str, str] | None = None) -> None:
+        self.url = url
+        self.headers = dict(headers or {})
+        self.session_id: str | None = None
+        self.protocol: str | None = None
+        self._out: queue.Queue = queue.Queue()
+        self._buf = b""
+        self._inflight = 0
+        self._cv = threading.Condition()
+        self._closed = False
+        self.stdin = self
+        self.stdout = self
+        self.returncode: int | None = None
+
+    # -- the subprocess face --------------------------------------------------
+
+    def write(self, data: bytes) -> int:
+        self._buf += data
+        while b"\n" in self._buf:
+            line, self._buf = self._buf.split(b"\n", 1)
+            if line.strip():
+                with self._cv:
+                    self._inflight += 1
+                threading.Thread(target=self._post, args=(line,), daemon=True).start()
+        return len(data)
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        """Client closed stdin: let the calls in flight finish, then end."""
+        def finish():
+            with self._cv:
+                self._cv.wait_for(lambda: self._inflight == 0, timeout=600)
+            self._delete_session()
+            self._closed = True
+            self._out.put(b"")
+        threading.Thread(target=finish, daemon=True).start()
+
+    def readline(self) -> bytes:
+        return self._out.get()
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.returncode = 0
+        return 0
+
+    def send_signal(self, _sig) -> None:
+        self.close()
+
+    # -- HTTP -------------------------------------------------------------------
+
+    def _request_headers(self) -> dict[str, str]:
+        h = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream", **self.headers}
+        if self.session_id:
+            h["Mcp-Session-Id"] = self.session_id
+        if self.protocol:
+            h["MCP-Protocol-Version"] = self.protocol
+        return h
+
+    def _emit(self, text: str) -> None:
+        text = text.strip()
+        if text:
+            self._out.put(text.encode() + b"\n")
+
+    def _post(self, line: bytes) -> None:
+        try:
+            try:
+                msg = json.loads(line)
+            except ValueError:
+                msg = None
+            rid = msg.get("id") if isinstance(msg, dict) and "method" in msg else None
+            is_init = isinstance(msg, dict) and msg.get("method") == "initialize"
+            req = urllib.request.Request(self.url, data=line, method="POST", headers=self._request_headers())
+            try:
+                with urllib.request.urlopen(req, timeout=300) as r:
+                    if is_init and r.headers.get("Mcp-Session-Id"):
+                        self.session_id = r.headers["Mcp-Session-Id"]
+                    ctype = (r.headers.get("Content-Type") or "").lower()
+                    if "text/event-stream" in ctype:
+                        data: list[str] = []
+                        for raw in r:
+                            s = raw.decode("utf-8", "replace").rstrip("\r\n")
+                            if s.startswith("data:"):
+                                data.append(s[5:].lstrip())
+                            elif s == "" and data:
+                                self._emit_message("\n".join(data), is_init)
+                                data = []
+                        if data:
+                            self._emit_message("\n".join(data), is_init)
+                    else:
+                        body = r.read()
+                        if body.strip():
+                            self._emit_message(body.decode("utf-8", "replace"), is_init)
+            except urllib.error.HTTPError as e:
+                detail = e.read()[:200].decode("utf-8", "replace")
+                if rid is not None:
+                    self._emit(json.dumps({"jsonrpc": "2.0", "id": rid, "error": {
+                        "code": -32603, "message": f"HTTP {e.code} from {self.url}: {detail}".strip()}}))
+            except Exception as e:  # noqa: BLE001 - unreachable, reset, timed out
+                if rid is not None:
+                    self._emit(json.dumps({"jsonrpc": "2.0", "id": rid, "error": {
+                        "code": -32603, "message": f"cannot reach {self.url}: {type(e).__name__}: {e}"}}))
+        finally:
+            with self._cv:
+                self._inflight -= 1
+                self._cv.notify_all()
+
+    def _emit_message(self, text: str, is_init: bool) -> None:
+        """One JSON body or SSE event, as one line; a batch as several."""
+        try:
+            msg = json.loads(text)
+        except ValueError:
+            return
+        for m in msg if isinstance(msg, list) else [msg]:
+            if is_init and isinstance(m, dict) and isinstance(m.get("result"), dict):
+                self.protocol = m["result"].get("protocolVersion") or self.protocol
+            self._emit(json.dumps(m, separators=(",", ":"), ensure_ascii=False))
+
+    def _delete_session(self) -> None:
+        if not self.session_id:
+            return
+        try:
+            req = urllib.request.Request(self.url, method="DELETE", headers=self._request_headers())
+            urllib.request.urlopen(req, timeout=5).close()
+        except Exception:  # noqa: BLE001 - the server expires it anyway
+            pass
+
+
 class Proxy:
     """Two pipes and a ledger of the tools/call requests in flight."""
 
     def __init__(self, argv: list[str], fe: FailEcho | None = None, *,
                  advise: bool | None = None, service: str | None = None,
-                 client_in: IO[bytes] | None = None, client_out: IO[bytes] | None = None) -> None:
+                 client_in: IO[bytes] | None = None, client_out: IO[bytes] | None = None,
+                 headers: dict[str, str] | None = None) -> None:
         self.argv = argv
+        self.headers = headers or {}
         disabled = os.environ.get("FAILECHO_DISABLED", "").strip().lower() in ("1", "true", "yes", "on")
         self.fe = None if disabled else (fe or FailEcho())
         if advise is None:
@@ -203,7 +359,7 @@ class Proxy:
                 self.service = info["name"]
             return None
         tool, started, digest = entry
-        service = self.service or (os.path.basename(self.argv[0]) if self.argv else "mcp")
+        service = self.service or _fallback_name(self.argv)
         latency = int((time.monotonic() - started) * 1000)
         text = _error_text(msg)
         if text is None:
@@ -259,11 +415,14 @@ class Proxy:
     # -- lifetime ----------------------------------------------------------------
 
     def run(self) -> int:
-        try:
-            self.proc = subprocess.Popen(self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        except OSError as exc:
-            print(f"failecho-mcp proxy: cannot start {self.argv[0]!r}: {exc}", file=sys.stderr)
-            return 127
+        if _is_url(self.argv[0]):
+            self.proc = HttpUpstream(self.argv[0], self.headers)   # type: ignore[assignment]
+        else:
+            try:
+                self.proc = subprocess.Popen(self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            except OSError as exc:
+                print(f"failecho-mcp proxy: cannot start {self.argv[0]!r}: {exc}", file=sys.stderr)
+                return 127
         for sig in (signal.SIGTERM, signal.SIGINT):
             try:
                 signal.signal(sig, lambda s, _f: self.proc and self.proc.send_signal(s))
@@ -280,14 +439,41 @@ class Proxy:
         return code
 
 
+def _is_url(s: str) -> bool:
+    return s.startswith(("http://", "https://"))
+
+
+def _fallback_name(argv: list[str]) -> str:
+    """The service name when the server gives none: the URL's host, or the
+    command's name."""
+    if not argv:
+        return "mcp"
+    if _is_url(argv[0]):
+        from urllib.parse import urlsplit
+        return (urlsplit(argv[0]).hostname or "mcp").lower()
+    return os.path.basename(argv[0])
+
+
+USAGE = ("usage: failecho-mcp proxy [--header 'Name: value' ...] -- <server command> [args...]\n"
+         "       failecho-mcp proxy [--header 'Name: value' ...] -- https://host/mcp")
+
+
 def main(argv: list[str]) -> int:
-    """``failecho-mcp proxy -- <server command...>``"""
+    """``failecho-mcp proxy [--header 'Name: value'] -- <command...> | <url>``"""
+    headers: dict[str, str] = {}
+    while argv and argv[0] != "--":
+        if argv[0] == "--header" and len(argv) > 1 and ":" in argv[1]:
+            name, value = argv[1].split(":", 1)
+            headers[name.strip()] = value.strip()
+            argv = argv[2:]
+        else:
+            break
     if argv and argv[0] == "--":
         argv = argv[1:]
     if not argv:
-        print("usage: failecho-mcp proxy -- <mcp server command> [args...]", file=sys.stderr)
+        print(USAGE, file=sys.stderr)
         return 2
-    code = Proxy(argv).run()
+    code = Proxy(argv, headers=headers).run()
     # The client-side reader is still blocked on stdin when the server has
     # gone; a normal interpreter exit then aborts on that stream's lock
     # (SIGABRT instead of the server's exit code). Flush and leave directly.

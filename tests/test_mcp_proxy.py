@@ -362,3 +362,98 @@ def test_a_repeat_that_fails_again_is_a_retry_that_did_not_work(net):
     # "upstream timeout" is transient, so the second failure is a retry that did not work
     outcomes = [o for o in net.observed if "action" in o]
     assert [(o["action"], o["successful"]) for o in outcomes] == [("retry", False)]
+
+
+# -- a remote Streamable HTTP server ----------------------------------------------------------
+
+
+def _free_port() -> int:
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+@pytest.fixture(params=["json", "sse"])
+def http_server(request):
+    port = _free_port()
+    proc = subprocess.Popen([sys.executable, str(ROOT / "tests" / "fake_http_mcp_server.py"), str(port), request.param, "tok"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    import socket
+    for _ in range(100):
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+            break
+        except OSError:
+            time.sleep(0.1)
+    yield f"http://127.0.0.1:{port}/mcp"
+    proc.terminate()
+    proc.wait(timeout=10)
+
+
+def _sdk_session(url: str, endpoint: str, headers: list[str]):
+    """Drive the proxy with the official SDK client, env passed explicitly
+    (the SDK does not inherit ours: see CLAUDE.md, 19 Sep)."""
+    import anyio
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    args = ["-m", "failecho_mcp", "proxy"]
+    for h in headers:
+        args += ["--header", h]
+    args += ["--", url]
+    env = {"PATH": os.environ["PATH"], "PYTHONPATH": str(ROOT), "FAILECHO_ENDPOINT": endpoint,
+           "FAILECHO_REPORTER_ID": "proxy-test"}
+
+    async def go():
+        out = {}
+        params = StdioServerParameters(command=sys.executable, args=args, env=env, cwd=str(ROOT))
+        async with stdio_client(params) as (r, w):
+            async with ClientSession(r, w) as s:
+                with anyio.fail_after(20):
+                    init = await s.initialize()
+                    out["server"] = init.server_info.name
+                    out["tools"] = sorted(t.name for t in (await s.list_tools()).tools)
+                    ok = await s.call_tool("ok", {"q": "secret-arg-token"})
+                    out["ok"] = [c.text for c in ok.content]
+                    bad = await s.call_tool("fails", {})
+                    out["fails"] = (bad.is_error, [c.text for c in bad.content])
+        return out
+
+    return anyio.run(go)
+
+
+def test_a_remote_server_through_the_proxy_with_the_official_client(http_server, net):
+    out = _sdk_session(http_server, net.url, ["Authorization: Bearer tok"])
+    assert out["server"] == "fake-http-server" and out["tools"] == ["fails", "ok"]
+    assert out["ok"] == ["ok secret-arg-token"]
+    is_error, texts = out["fails"]
+    # the SDK server hides the exception's text ("Error executing tool
+    # fails"); what matters is that the error arrives with the line added
+    assert is_error and len(texts) == 2
+    assert texts[-1] == "FailEcho: try backoff, worked 128/251 (confidence 0.61)."
+    time.sleep(0.5)
+    assert {(o["service"], o["operation"], o["outcome"]) for o in net.observed if "outcome" in o} == {
+        ("fake-http-server", "ok", "success"), ("fake-http-server", "fails", "failure")}
+    assert "secret-arg-token" not in json.dumps(net.observed + net.queries)
+    assert "tok" not in json.dumps(net.observed + net.queries).replace("token", "")
+
+
+def test_a_refused_remote_answers_the_client_instead_of_hanging(http_server, net):
+    """No token: the server says 401. The client must get an error on its
+    request, not wait forever for an answer."""
+    started = time.monotonic()
+    with pytest.raises(Exception) as info:
+        _sdk_session(http_server, net.url, [])
+    assert time.monotonic() - started < 10, "the client waited for an answer that never came"
+    assert "401" in repr(info.value) or "401" in str(getattr(info.value, "exceptions", "")) or "HTTP 401" in str(info.getrepr())
+
+
+def test_an_unreachable_remote_fails_fast_with_a_message():
+    s = Session("http://127.0.0.1:9", server=[f"http://127.0.0.1:{_free_port()}/mcp"])
+    started = time.monotonic()
+    s.send({"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}})
+    err = json.loads(s.recv())
+    assert err["id"] == 0 and "cannot reach" in err["error"]["message"]
+    assert time.monotonic() - started < 5
+    assert s.close() == 0
