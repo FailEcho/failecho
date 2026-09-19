@@ -254,7 +254,11 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
              "grep -v 'level=INFO' /work/opencode.err | tail -c 1500; echo '---MCP---'; grep -ci 'mcp' /work/opencode.err; "
              # what the MCP side said, and whether the guest kernel killed
              # anything: the proxy pair's lost reports and 137s (19 Sep)
-             "echo '---MCPLOG---'; grep -i 'mcp\\|packages\\|proxy' /work/opencode.err | tail -c 1200; "
+             "echo '---MCPLOG---'; { cat /work/opencode.err; "
+             # OpenCode logs to a file of its own, not stderr (19 Sep: stderr
+             # held no MCP lines while the ask twin stalled 6 runs to 1)
+             "cat $(ls -t \"$HOME\"/.local/share/opencode/log/*.log 2>/dev/null | head -1) 2>/dev/null; } "
+             "| grep -i 'mcp\\|packages\\|proxy\\|failecho\\|timeout\\|level=ERROR\\|level=WARN' | tail -c 1500; "
              "echo '---OOM---'; if dmesg >/dev/null 2>&1; then dmesg | grep -ci 'killed process'; else echo na; fi")
     try:
         with Sandbox(mem_mib=OC_MEM_MIB, scratch_mib=1536) as vm:
@@ -271,7 +275,7 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
     mcp_lines, _, mcp_log = mcp_lines.partition("---MCPLOG---")
     mcp_log, _, oom = mcp_log.partition("---OOM---")
     out["mcp_log_lines"] = int(mcp_lines.strip() or 0) if mcp_lines.strip().isdigit() else 0
-    out["mcp_log"] = mcp_log.strip()[-600:]
+    out["mcp_log"] = mcp_log.strip()[-1200:]
     out["guest_oom_kills"] = int(oom.strip()) if oom.strip().isdigit() else None
     for line in body.splitlines():
         ev.feed(line)
