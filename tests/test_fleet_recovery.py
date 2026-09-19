@@ -703,8 +703,9 @@ def test_a_dead_mark_expires_and_the_next_persona_probes(tmp_path, monkeypatch):
     state = json.loads((tmp_path / "state.json").read_text())
     assert "groq" not in state["provider_dead"], "a run that did not die re-opens the provider"
 
-    # the pre-18-Sep format, a bare date, is an expired mark too
-    assert F._quota_probe_due(today)
+    # the pre-18-Sep format, a bare date, is an expired mark too (yesterday:
+    # today's midnight is younger than QUOTA_PROBE_SECONDS until 02:00 UTC)
+    assert F._quota_probe_due((dt.date.today() - dt.timedelta(days=1)).isoformat())
     assert not F._quota_probe_due(dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))
 
     # and a probe that dies again refreshes the mark with a timestamp

@@ -63,7 +63,9 @@ QUOTA_PROBE_SECONDS = int(os.environ.get("FLEET_QUOTA_PROBE_SECONDS") or 7200)
 ETAG_BODY_MAX = 32 * 1024
 #: An OpenCode run's wall-clock budget. A six-step task takes ~150 s on
 #: NVIDIA; the eighteen-step one hit 280. The fleet slot waits for it.
-OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 240)
+#: 240 until 2026-09-19: the 220 s inner clock, not the task, decided most
+#: failures of both twins, so the versus row measured speed, not outcome.
+OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 380)
 #: What the sandbox guest is told to report to. Unset means the in-guest
 #: wrapper stays off; there is deliberately no default.
 LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None
