@@ -258,7 +258,7 @@ except Exception as exc:
     <p class="band-sub">
       Put that line in the tool error your model sees, and the model gets the
       evidence at the moment it decides whether to retry, without having to
-      think of asking. The read waits at most 1.5 seconds, on failures only.
+      think of asking. The read waits at most 3 seconds, on failures only.
     </p>
     <p class="band-sub">
       It never raises, never blocks (reports go to a worker thread, so an
