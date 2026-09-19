@@ -37,7 +37,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {{ text = "MIT" }}
 keywords = ["mcp", "model-context-protocol", "agents", "reliability", "retries"]
-dependencies = ["mcp>=2.0"]
+dependencies = ["mcp>=2.0", "failecho-autoreport>=0.1.4"]
 
 [project.urls]
 Homepage = "https://failecho.com"

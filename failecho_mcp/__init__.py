@@ -201,6 +201,11 @@ async def serve(
 
 
 def main() -> None:
+    # `failecho-mcp proxy -- <server>`: FailEcho in front of another server.
+    # Imported only here, so the plain relay never loads it.
+    if len(sys.argv) > 1 and sys.argv[1] == "proxy":
+        from failecho_mcp.proxy import main as proxy_main
+        raise SystemExit(proxy_main(sys.argv[2:]))
     # stdout carries the MCP protocol itself; every diagnostic goes to stderr.
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="failecho-mcp: %(message)s")
     for noisy in ("httpx", "httpx2"):
