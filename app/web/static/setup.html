@@ -240,6 +240,27 @@ def create_issue(...):                          # or one call site
 fe.recovered("github-mcp", "create_issue", "refresh_schema")  # what fixed it</code></pre>
     </figure>
     <p class="band-sub">
+      Reporting helps the next agent. To help <em>this</em> one, turn on
+      advice: when a watched call fails, the wrapper asks the network what
+      worked (a read that stores nothing) and attaches the answer to the
+      exception before it goes on up. Nothing is acted on for you, and the
+      exception's type and message are unchanged.
+    </p>
+    <figure class="snip">
+      <pre><code>fe = FailEcho(advise=True)          # or FAILECHO_ADVISE=1
+
+try:
+    create_issue(...)
+except Exception as exc:
+    exc.failecho                    # the network's answer, or None
+    fe.advice_text(exc)             # one line: "FailEcho: try fe.advice_text(exc)             # "FailEcho: try switch_model, worked 62/64 ..."lt;actionfe.advice_text(exc)             # "FailEcho: try switch_model, worked 62/64 ..."gt;, worked n/m ..."</code></pre>
+    </figure>
+    <p class="band-sub">
+      Put that line in the tool error your model sees, and the model gets the
+      evidence at the moment it decides whether to retry, without having to
+      think of asking. The read waits at most 3 seconds, on failures only.
+    </p>
+    <p class="band-sub">
       It never raises, never blocks (reports go to a worker thread, so an
       unreachable FailEcho costs the caller about 3ms rather than a timeout),
       and returns and raises exactly what your code did. It sends the failure's
