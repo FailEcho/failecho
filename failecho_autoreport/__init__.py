@@ -98,8 +98,14 @@ MAX_QUEUE = 256
 #: Not the caller's timeout -- the worker's. The caller never waits at all.
 TIMEOUT_SECONDS = 5.0
 #: How long a failing call may wait for advice. Short: a slow network answer
-#: must cost less than the retry it is meant to inform.
-ADVICE_TIMEOUT_SECONDS = 1.5
+#: must cost less than the retry it is meant to inform. 3 s, not 1.5: in a
+#: clean-install test (19 Sep) the first failure of a fresh process lost its
+#: advice at 1.5 s, while later reads took about 0.2 s -- a cold first
+#: connection, most likely. FAILECHO_ADVICE_TIMEOUT overrides.
+try:
+    ADVICE_TIMEOUT_SECONDS = float(os.environ.get("FAILECHO_ADVICE_TIMEOUT") or 3.0)
+except ValueError:
+    ADVICE_TIMEOUT_SECONDS = 3.0
 
 #: First match wins, and the order matters: "503 ... invalid upstream" is a
 #: server error rather than a validation one. Kept identical to the Claude Code
@@ -377,7 +383,17 @@ class FailEcho:
             a = tried.get(action) or {}
             evidence = (f", worked {a['successes']}/{a['attempts']}"
                         if "successes" in a and "attempts" in a else "")
-            return f"FailEcho: try {action}{evidence} (confidence {rec.get('confidence')})."
+            conf = rec.get("confidence")
+            conf = f" (confidence {conf:.2f})" if isinstance(conf, (int, float)) else ""
+            return f"FailEcho: try {action}{evidence}{conf}."
+        # No recommendation, but evidence: say what others tried and how it
+        # went, and that it is not a recommendation. Withholding it left a
+        # model with nothing where the network knew backoff worked 128/251.
+        seen = [a for a in tried.values() if "successes" in a and "attempts" in a and a["attempts"]]
+        if seen:
+            seen.sort(key=lambda a: -a["successes"] / a["attempts"])
+            parts = ", ".join(f"{a['action']} worked {a['successes']}/{a['attempts']}" for a in seen[:3])
+            return f"FailEcho: no clear fix yet; other agents tried {parts}."
         return None
 
     # -- recording ---------------------------------------------------------

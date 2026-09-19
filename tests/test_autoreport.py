@@ -478,6 +478,11 @@ def test_no_answer_means_nothing_attached():
 def test_advice_text_says_skip_and_says_nothing_without_evidence():
     assert FailEcho.advice_text({"recommendation": {"action": "skip", "confidence": 0.7}}).startswith("FailEcho: skip")
     assert FailEcho.advice_text({"known": False, "recommendation": None}) is None
+    evidence = {"known": True, "recommendation": None,
+                "recovery_actions": [{"action": "retry", "successes": 49, "attempts": 98},
+                                     {"action": "backoff", "successes": 128, "attempts": 251}]}
+    assert FailEcho.advice_text(evidence) == (
+        "FailEcho: no clear fix yet; other agents tried backoff worked 128/251, retry worked 49/98.")
     assert FailEcho.advice_text(RuntimeError("no answer attached")) is None
 
 

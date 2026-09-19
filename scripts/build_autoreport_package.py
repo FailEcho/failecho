@@ -106,7 +106,7 @@ Put that line in the tool error your model sees and the model has the
 evidence when it decides whether to retry, without having to think of
 asking. Nothing is acted on for you; the exception's type and message are
 unchanged (on Python 3.11+ the line is also added as a note). The read waits
-at most 1.5 seconds, on failures only -- the one place this package waits,
+at most 3 seconds, on failures only -- the one place this package waits,
 which is why it is off by default.
 
 The `recovered()` line is the one worth bothering with. Failures alone give
