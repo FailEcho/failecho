@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import re
 import shlex
+from pathlib import Path
 
 from failecho_sandbox import Sandbox, SandboxError, available
 
@@ -56,6 +57,36 @@ OC_TASKS: list[tuple[str, str]] = [
      r'"express":\s*"\d'),
 ]
 
+#: The proxy pair's tasks: the same kind of lookups, through an MCP server's
+#: tools rather than a script, because what is measured is what a tool
+#: failure looks like to the agent. Both twins are told the same thing.
+OCP_TASKS: list[tuple[str, str]] = [
+    ("Use the packages tools to find the latest PyPI versions of requests, httpx and urllib3, and write "
+     "result.json as {\"requests\": \"x\", \"httpx\": \"y\", \"urllib3\": \"z\"}. Do not guess numbers.",
+     r'"requests":\s*"\d+\.\d+'),
+    ("Use the packages tools to get the GitHub star counts of pallets/flask, psf/requests and encode/httpx and "
+     "write result.json as {\"pallets/flask\": n, ...}. If a tool refuses, put the reason under \"error\" in "
+     "result.json instead of inventing numbers.",
+     r'"(pallets/flask|error)":'),
+    ("Use the packages tools to get the latest release tag of astral-sh/uv and astral-sh/ruff and write "
+     "result.json as {\"astral-sh/uv\": \"tag\", \"astral-sh/ruff\": \"tag\"}. If a tool refuses, put the reason "
+     "under \"error\" instead of inventing tags.",
+     r'"(astral-sh/uv|error)":'),
+    ("Use the packages tools to get the latest npm version of express and the latest crates.io version of serde, "
+     "and write result.json as {\"express\": \"x\", \"serde\": \"y\"}.",
+     r'"express":\s*"\d'),
+]
+
+#: What the proxy pair's guest needs besides OpenCode: the API server, and
+#: for the ask twin the proxy and the wrapper it reports with -- the shipped
+#: source files, read from this checkout, so the lab runs what users install.
+_REPO = Path(__file__).resolve().parents[1]
+PROXY_FILES = {
+    "fe/packages_mcp.py": _REPO / "failecho_fleet" / "guest_packages_mcp.py",
+    "fe/proxy.py": _REPO / "failecho_mcp" / "proxy.py",
+    "fe/failecho_autoreport/__init__.py": _REPO / "failecho_autoreport" / "__init__.py",
+}
+
 AGENTS_MD = """# Task rules
 
 Work only inside this directory. Python 3 and Node are installed; use the
@@ -83,6 +114,17 @@ OC_PROVIDERS = {
     "mistral": {"id": "mistral", "env": "MISTRAL_API_KEY", "base_url": "https://api.mistral.ai/v1"},
     "xkiro": {"id": "xkiro", "env": "XKIRO_API_KEY", "base_url": "https://api.xkiro.com/v1"},
 }
+
+
+def packages_mcp(proxied: bool, lab_public_url: str | None, reporter: str) -> dict:
+    """The packages server as an OpenCode local MCP entry; through the
+    FailEcho proxy for the ask twin, directly for the blind one."""
+    server = ["python3", "/work/fe/packages_mcp.py"]
+    env = {"PYTHONPATH": "/work/fe"}
+    if proxied:
+        server = ["python3", "/work/fe/proxy.py", "--", *server]
+        env.update(FAILECHO_ENDPOINT=lab_public_url or "", FAILECHO_REPORTER_ID=reporter)
+    return {"type": "local", "command": server, "enabled": True, "environment": env}
 
 
 def opencode_config(provider: str, model: str, lab_mcp_url: str | None, reporter: str) -> dict:
@@ -119,6 +161,8 @@ class Events:
         self.events = 0
         self.tool_calls = 0
         self.failecho_calls = 0
+        #: tool outputs that carried the proxy's advice line
+        self.advice_seen = 0
         self.tool_names: dict[str, int] = {}
         self.steps = 0
         self.tokens_in = 0
@@ -154,6 +198,9 @@ class Events:
             if isinstance(tok, dict):
                 self.tokens_in += int(tok.get("input") or 0)
                 self.tokens_out += int(tok.get("output") or 0)
+            out = node.get("output")
+            if isinstance(out, str) and "FailEcho: " in out:
+                self.advice_seen += 1
             if t == "text" and isinstance(node.get("text"), str):
                 self.text.append(node["text"])
             if t == "error" or ("error" in node and isinstance(node.get("error"), (str, dict)) and depth == 0):
@@ -172,7 +219,7 @@ OC_MEM_MIB = 768
 
 
 def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: str, model: str, key: str,
-                 lab_public_url: str | None, timeout: int = 300) -> dict:
+                 lab_public_url: str | None, timeout: int = 300, proxy: bool = False) -> dict:
     """One headless OpenCode run in a fresh VM. Returns the ledger entry."""
     out: dict = {"reporter": reporter, "asks": asks, "provider": provider, "model": model, "task": task[0][:160],
                  "completed": False, "tool_calls": 0, "failecho_calls": 0, "steps": 0, "tokens_in": 0, "tokens_out": 0,
@@ -182,10 +229,18 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
         out["error"] = f"sandbox unavailable: {why}"
         return out
     prompt, check = task
-    lab_mcp = f"{lab_public_url}/mcp" if (asks and lab_public_url) else None
-    cfg = opencode_config(provider, model, lab_mcp, reporter)
-    files = {"project/opencode.json": json.dumps(cfg, indent=2),
-             "project/AGENTS.md": AGENTS_MD_FAILECHO if asks else AGENTS_MD}
+    if proxy:
+        # the proxy pair: no FailEcho tools, no FailEcho paragraph -- the ask
+        # twin's only difference is the proxy in front of its API server
+        cfg = opencode_config(provider, model, None, reporter)
+        cfg["mcp"] = {"packages": packages_mcp(asks, lab_public_url, reporter)}
+        files = {"project/opencode.json": json.dumps(cfg, indent=2), "project/AGENTS.md": AGENTS_MD}
+        files.update({k: v.read_text(encoding="utf-8") for k, v in PROXY_FILES.items()})
+    else:
+        lab_mcp = f"{lab_public_url}/mcp" if (asks and lab_public_url) else None
+        cfg = opencode_config(provider, model, lab_mcp, reporter)
+        files = {"project/opencode.json": json.dumps(cfg, indent=2),
+                 "project/AGENTS.md": AGENTS_MD_FAILECHO if asks else AGENTS_MD}
     env = {OC_PROVIDERS[provider]["env"]: key, "OPENCODE_DISABLE_AUTOUPDATE": "1", "CI": "1", "TERM": "dumb",
            "NO_COLOR": "1"}
     # `timeout` inside too: after a stream error OpenCode has been seen to
@@ -214,6 +269,7 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
     m = re.search(r"EXIT=(\d+)", body)
     out["seconds"] = round(float(r.get("seconds") or 0), 1)
     out.update(exit=int(m.group(1)) if m else None, tool_calls=ev.tool_calls, failecho_calls=ev.failecho_calls,
+               advice_seen=ev.advice_seen,
                steps=ev.steps, tokens_in=ev.tokens_in, tokens_out=ev.tokens_out, tool_names=ev.tool_names,
                answer=("\n".join(ev.text))[-300:], timed_out=bool(r.get("timed_out")))
     result = result.strip()

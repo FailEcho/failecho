@@ -811,7 +811,7 @@ def test_two_lanes_round_robin_their_own_personas_and_share_one_state(tmp_path, 
         assert F.lane_of(by[a]) == F.lane_of(by[b])
     vm = [F.PERSONAS[i][0] for i in F.lane_personas("vm")]
     light = [F.PERSONAS[i][0] for i in F.lane_personas("light")]
-    assert set(vm) == F.BUILD_PERSONAS | F.OPENCODE_PERSONAS and not (set(vm) & set(light))
+    assert set(vm) == F.BUILD_PERSONAS | F.OPENCODE_PERSONAS | F.OCPROXY_PERSONAS and not (set(vm) & set(light))
     assert len(vm) + len(light) == len(F.PERSONAS)
     # the vm lane's odd cycle swaps twins inside the lane
     assert F.PERSONAS[F.persona_index(0, "vm")][0] == vm[0]
@@ -971,3 +971,58 @@ def test_the_wrapped_pair_is_a_versus_group_of_its_own():
     names = {p[0]: p for p in F.PERSONAS}
     assert names["fleet-wrap-ask"][1:4] == ("wrapped", "mistral", True)
     assert F.lane_of(names["fleet-wrap-ask"]) == "light"
+
+
+def test_the_proxy_pair_differs_only_by_the_proxy(monkeypatch):
+    """fleet-ocp: the same packages MCP server for both twins; the ask twin
+    reaches it through failecho-mcp proxy. Neither gets FailEcho's own tools
+    or the FailEcho paragraph, and the guest runs the shipped source."""
+    import json
+
+    from failecho_fleet import opencode as oc
+
+    seen = {}
+
+    class FakeVM:
+        def __init__(self, **kw):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def run(self, argv, files=None, timeout=0, env=None, as_root=False):
+            if files:
+                seen[len(seen)] = files
+            from failecho_sandbox import Result
+            return Result({"exit": 0, "stdout": "EXIT=0\n---RESULT---\n{}\n---ERR---\n---MCP---\n0", "stderr": "",
+                           "seconds": 1.0, "timed_out": False})
+
+    monkeypatch.setattr(oc, "Sandbox", FakeVM)
+    monkeypatch.setattr(oc, "available", lambda: None)
+    for asks in (True, False):
+        seen.clear()
+        oc.run_opencode(reporter="r", asks=asks, task=oc.OCP_TASKS[0], provider="nvidia", model="m", key="k",
+                        lab_public_url="https://lab.example", proxy=True)
+        files = seen[0]
+        cfg = json.loads(files["project/opencode.json"])
+        assert list(cfg["mcp"]) == ["packages"], "no FailEcho tools for either twin"
+        cmd = cfg["mcp"]["packages"]["command"]
+        assert files["project/AGENTS.md"] == oc.AGENTS_MD
+        assert "fe/packages_mcp.py" in files
+        if asks:
+            assert cmd[:3] == ["python3", "/work/fe/proxy.py", "--"] and cmd[3:] == ["python3", "/work/fe/packages_mcp.py"]
+            assert cfg["mcp"]["packages"]["environment"]["FAILECHO_ENDPOINT"] == "https://lab.example"
+            assert "fe/proxy.py" in files and "fe/failecho_autoreport/__init__.py" in files
+        else:
+            assert cmd == ["python3", "/work/fe/packages_mcp.py"]
+            assert "FAILECHO_ENDPOINT" not in cfg["mcp"]["packages"]["environment"]
+
+
+def test_the_proxy_pair_is_wired():
+    names = {p[0]: p for p in F.PERSONAS}
+    assert names["fleet-ocp-ask-n"][1:4] == ("opencode", "nvidia", True)
+    assert ("fleet-ocp-ask-n", "fleet-ocp-blind-n") in F.TWINS
+    assert F.lane_of(names["fleet-ocp-ask-n"]) == "vm"

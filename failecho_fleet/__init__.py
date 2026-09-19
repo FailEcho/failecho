@@ -41,7 +41,7 @@ import urllib.request
 from failecho_autoreport import FailEcho, classify
 
 from .builder import BUILDER_SCHEMAS, BUILDER_TASKS, DOC_HOSTS, SYSTEM_PROMPT as BUILDER_PROMPT, Builder, fetch_doc
-from .opencode import OC_PROVIDERS, OC_TASKS, run_opencode
+from .opencode import OC_PROVIDERS, OC_TASKS, OCP_TASKS, run_opencode
 
 __version__ = "0.1.0"
 UA = "failecho-fleet/0.1 (+https://failecho.com; lab)"
@@ -305,11 +305,18 @@ PERSONAS = [
     # one-line advice in the tool error and decides for itself.
     ("fleet-wrap-ask",     "wrapped",   "mistral", True,  MIXED),
     ("fleet-wrap-blind",   "wrapped",   "mistral", False, MIXED),
+    # The MCP proxy, as a user would run it (2026-09-19): OpenCode with one
+    # real-API MCP server (PyPI, npm, crates.io, GitHub). The ask twin
+    # reaches it through `failecho-mcp proxy`, the blind twin directly;
+    # neither has FailEcho's tools or a FailEcho paragraph in AGENTS.md.
+    ("fleet-ocp-ask-n",    "opencode",  "nvidia", True,  OCP_TASKS),
+    ("fleet-ocp-blind-n",  "opencode",  "nvidia", False, OCP_TASKS),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
 OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
+OCPROXY_PERSONAS = {"fleet-ocp-ask-n", "fleet-ocp-blind-n"}
 #: The model OpenCode is pointed at, per provider: the strongest agentic one
 #: each tier serves with tool calls.
 OPENCODE_MODELS = {"nvidia": "nvidia/nemotron-3-super-120b-a12b", "mistral": "codestral-latest",
@@ -331,7 +338,7 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n"),
          ("fleet-decor-ask-d", "fleet-decor-blind-d"), ("fleet-decor-ask-e", "fleet-decor-blind-e"),
          ("fleet-build-ask-x", "fleet-build-blind-x"), ("fleet-oc-ask-n", "fleet-oc-blind-n"),
-         ("fleet-wrap-ask", "fleet-wrap-blind")]
+         ("fleet-wrap-ask", "fleet-wrap-blind"), ("fleet-ocp-ask-n", "fleet-ocp-blind-n")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 
@@ -1010,12 +1017,15 @@ class Run:
             return f"(provider {self.provider} daily cap reached; run skipped)"
         model = OPENCODE_MODELS[self.provider]
         self.model = f"opencode:{model}"
+        proxied = self.reporter in OCPROXY_PERSONAS
         out = run_opencode(reporter=self.reporter, asks=self.asks, task=task, provider=self.provider, model=model,
-                           key=p["key"], lab_public_url=LAB_PUBLIC_URL, timeout=OPENCODE_TIMEOUT)
+                           key=p["key"], lab_public_url=LAB_PUBLIC_URL, timeout=OPENCODE_TIMEOUT, proxy=proxied)
         self.opencode = out
         self.model_calls += int(out.get("steps") or 0)
         self.tool_calls += int(out.get("tool_calls") or 0)
-        self.asks_made += int(out.get("failecho_calls") or 0)
+        # the proxy pair never calls a FailEcho tool; what it got is advice in
+        # a tool's error, counted as the tool outputs that carried the line
+        self.asks_made += int(out.get("advice_seen" if proxied else "failecho_calls") or 0)
         self.tokens_prompt += int(out.get("tokens_in") or 0)
         self.tokens_completion += int(out.get("tokens_out") or 0)
         if out.get("error") and not out.get("completed"):
@@ -1219,6 +1229,7 @@ def write_report(state: dict) -> None:
         p["runs"] += 1; p["tool_calls"] += r["tool_calls"]; p["failures"] += len(r["failures"]); p["last"] = r["at"]
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
+                else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = cohorts.setdefault(key, blank())
@@ -1247,7 +1258,8 @@ def write_report(state: dict) -> None:
     real: dict[tuple[str, str], dict] = {}
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
-                or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS:
+                or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
+                or r["reporter"] in OCPROXY_PERSONAS:
             continue
         if r["at"] < FAIR_ORDER_SINCE:
             continue   # before the twins alternated order; see TWINS
@@ -1271,6 +1283,7 @@ def write_report(state: dict) -> None:
             continue
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
+                else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = costs.setdefault(key, {"cohort": key, "runs": 0, "completed": 0, "tokens": 0, "tokens_prompt": 0,
@@ -1300,7 +1313,8 @@ def write_report(state: dict) -> None:
             c[k] = round(c[k], 1)
     cost_rows = [costs[k] for k in ("real / ask", "real / blind", "test / ask", "test / blind",
                                     "build / ask", "build / blind", "opencode / ask", "opencode / blind",
-                                    "wrapped / ask", "wrapped / blind", "explore") if k in costs]
+                                    "wrapped / ask", "wrapped / blind", "ocproxy / ask", "ocproxy / blind",
+                                    "explore") if k in costs]
 
     # With FailEcho against without, the way a vendor benchmark table reads:
     # metrics as rows, the two sides as columns, the better side marked. Built
@@ -1321,7 +1335,8 @@ def write_report(state: dict) -> None:
                        ("real", "Real APIs (PyPI, npm, GitHub, crates.io, Stack Exchange)"),
                        ("build", "Coding agents (write and run code in a VM)"),
                        ("opencode", "OpenCode, a real agent product, with FailEcho's MCP server and without"),
-                       ("wrapped", "The shipped wrapper: advice in the tool error, the model decides (no harness help)")):
+                       ("wrapped", "The shipped wrapper: advice in the tool error, the model decides (no harness help)"),
+                       ("ocproxy", "OpenCode with an MCP server behind failecho-mcp proxy, and without")):
         a, b = costs.get(f"{key} / ask"), costs.get(f"{key} / blind")
         ca, cb = cohorts.get(f"{key} / ask"), cohorts.get(f"{key} / blind")
         if not a or not b:
@@ -1347,14 +1362,14 @@ def write_report(state: dict) -> None:
         if key == "build":
             rows.append({"metric": "seconds waiting on rate limits, per run", "unit": "s", "ask": a["wait_seconds_per_run"],
                          "blind": b["wait_seconds_per_run"], "better": _better(a["wait_seconds_per_run"], b["wait_seconds_per_run"])})
-        if key == "opencode":
+        if key in ("opencode", "ocproxy"):
             # the agent's own failures are inside OpenCode; what is visible is the
             # artefact, the steps, the tokens, and whether it reached for FailEcho
             rows = [r for r in rows if r["metric"] in ("tasks completed", "tokens per completed task", "seconds per run")]
             rows.append({"metric": "model steps per run", "unit": "", "ask": a["model_calls_per_run"], "blind": b["model_calls_per_run"],
                          "better": _better(a["model_calls_per_run"], b["model_calls_per_run"])})
-            rows.append({"metric": "FailEcho tool calls per run", "unit": "", "ask": a["asks_per_run"], "blind": b["asks_per_run"],
-                         "better": "tie"})
+            rows.append({"metric": "FailEcho tool calls per run" if key == "opencode" else "tool errors carrying advice, per run",
+                         "unit": "", "ask": a["asks_per_run"], "blind": b["asks_per_run"], "better": "tie"})
         if key == "wrapped":
             # nothing retries for the model here, so attempts and skips are
             # the harness's numbers and mean nothing; what the model did is
@@ -1375,7 +1390,7 @@ def write_report(state: dict) -> None:
         if r["at"] < PROVIDER_CONTROL_SINCE or not r.get("provider") or not r.get("metrics"):
             continue
         if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS or r["reporter"] in OPENCODE_PERSONAS \
-                or r["reporter"] in WRAPPED_PERSONAS:
+                or r["reporter"] in WRAPPED_PERSONAS or r["reporter"] in OCPROXY_PERSONAS:
             continue
         side = "ask" if r["asks"] else "blind"
         c = prov.setdefault(side, {"runs": 0, "completed": 0, "failures": 0, "recovered": 0, "tokens": 0, "seconds": 0.0,
@@ -1446,7 +1461,8 @@ def write_report(state: dict) -> None:
     halves: dict[str, dict] = {}
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
-                or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS:
+                or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
+                or r["reporter"] in OCPROXY_PERSONAS:
             continue
         if not r.get("metrics"):
             continue
@@ -1656,7 +1672,7 @@ def main(argv: list[str] | None = None) -> int:
     if any(m in answer for m in _NOT_A_RUN):
         record["answer"] = answer[:200]
     if run.opencode is not None:
-        record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "steps", "exit",
+        record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "advice_seen", "steps", "exit",
                                                                 "error", "tool_names", "result_head", "timed_out")}
         record["task"] = task[0][:160]
         record["answer"] = answer[:200]
