@@ -302,5 +302,16 @@ def test_the_tool_list_is_lean():
         assert "title" not in tool.parameters
         for prop in tool.parameters["properties"].values():
             assert "title" not in prop
+            assert "anyOf" not in prop, "an optional field is its plain type, left out of required"
         total += len(tool.description or "") + len(json.dumps(tool.parameters))
-    assert total < 7000, f"tool list is {total} chars (~{total // 4} tokens)"
+    assert total < 6000, f"tool list is {total} chars (~{total // 4} tokens)"
+
+
+def test_an_explicit_null_is_still_accepted(client):
+    """The schema no longer spells out `null`, but clients written against
+    the old one send it; the tool must not start rejecting them."""
+    from tests.conftest import mcp_call
+
+    result = mcp_call(client, "check_tool_failure", {"service": "x.example", "operation": "op", "error_type": None,
+                                                      "error_code": None, "reporter_id": None})
+    assert result["known"] is False

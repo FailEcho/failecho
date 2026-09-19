@@ -550,9 +550,27 @@ def _strip_schema_titles() -> None:
         schema = tool.parameters
         if isinstance(schema, dict):
             schema.pop("title", None)
-            for prop in (schema.get("properties") or {}).values():
+            for name, prop in list((schema.get("properties") or {}).items()):
                 if isinstance(prop, dict):
                     prop.pop("title", None)
+                    schema["properties"][name] = _compact_optional(prop)
+
+
+def _compact_optional(prop: dict) -> dict:
+    """``X | None = None`` comes out of Pydantic as ``anyOf: [X, {type:
+    null}]`` plus ``default: null``: two extra objects per optional field,
+    and most of our fields are optional. A field left out of ``required`` is
+    already optional, so the plain ``X`` says the same thing in a third of
+    the tokens. The function signature still accepts an explicit null, so a
+    client that sends one keeps working."""
+    variants = prop.get("anyOf")
+    if not isinstance(variants, list) or len(variants) != 2:
+        return prop
+    rest = [v for v in variants if v != {"type": "null"}]
+    if len(rest) != 1 or not isinstance(rest[0], dict):
+        return prop
+    out = {k: v for k, v in prop.items() if k != "anyOf" and not (k == "default" and v is None)}
+    return {**rest[0], **out}
 
 
 _strip_schema_titles()
