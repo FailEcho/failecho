@@ -190,7 +190,9 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
            "NO_COLOR": "1"}
     # `timeout` inside too: after a stream error OpenCode has been seen to
     # sit rather than exit, and the harness timeout would lose the output
-    cmd = ("cd /work/project && timeout " + str(max(timeout - 20, 30)) + " opencode run --format json --dir /work/project "
+    # -k: OpenCode has ignored the TERM before, and then the guest's own
+    # kill took every event with it (14 of 41 runs a twin, 18-19 Sep)
+    cmd = ("cd /work/project && timeout -k 10 " + str(max(timeout - 20, 30)) + " opencode run --format json --dir /work/project "
            + shlex.quote(prompt) + " 2>/work/opencode.err; echo EXIT=$?; echo '---RESULT---'; "
              "cat result.json result.txt 2>/dev/null | head -c 2000; echo; echo '---ERR---'; "
              "grep -v 'level=INFO' /work/opencode.err | tail -c 1500; echo '---MCP---'; grep -ci 'mcp' /work/opencode.err")
@@ -213,7 +215,7 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
     out["seconds"] = round(float(r.get("seconds") or 0), 1)
     out.update(exit=int(m.group(1)) if m else None, tool_calls=ev.tool_calls, failecho_calls=ev.failecho_calls,
                steps=ev.steps, tokens_in=ev.tokens_in, tokens_out=ev.tokens_out, tool_names=ev.tool_names,
-               answer=("\n".join(ev.text))[-300:], timed_out=bool(getattr(r, "timed_out", False)))
+               answer=("\n".join(ev.text))[-300:], timed_out=bool(r.get("timed_out")))
     result = result.strip()
     out["result_head"] = result[:200]
     out["completed"] = bool(result) and re.search(check, result) is not None

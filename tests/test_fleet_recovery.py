@@ -926,3 +926,11 @@ def test_completion_without_choices_is_a_provider_error_not_a_crash():
     for bad in ({"error": {"message": "overloaded"}}, {"choices": []}, {}, None):
         with pytest.raises(ValueError, match="no completion"):
             completion(bad)
+
+
+def test_the_opencode_budget_fits_inside_the_guest_cap():
+    """A task the guest kills at MAX_TIMEOUT comes back with no events; the
+    inner `timeout -k 10` must finish first (19 Sep: 360 s against 300)."""
+    from failecho_sandbox import guest_init
+    assert F.OPENCODE_TIMEOUT - 20 + 10 < guest_init.MAX_TIMEOUT
+    assert F.OPENCODE_TIMEOUT <= guest_init.MAX_TIMEOUT

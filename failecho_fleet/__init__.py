@@ -65,7 +65,9 @@ ETAG_BODY_MAX = 32 * 1024
 #: NVIDIA; the eighteen-step one hit 280. The fleet slot waits for it.
 #: 240 until 2026-09-19: the 220 s inner clock, not the task, decided most
 #: failures of both twins, so the versus row measured speed, not outcome.
-OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 380)
+#: Not above 300: the guest caps any task there (guest_init.MAX_TIMEOUT,
+#: baked into the rootfs) and a run it kills loses all of its events.
+OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 300)
 #: What the sandbox guest is told to report to. Unset means the in-guest
 #: wrapper stays off; there is deliberately no default.
 LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None
