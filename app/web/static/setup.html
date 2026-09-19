@@ -359,7 +359,8 @@ except Exception as exc:
 }</code></pre>
     </figure>
     <p class="band-sub">
-      For a remote server, give its URL instead of a command:
+      <code>npx -y failecho-mcp proxy -- …</code> works the same way, with no
+      Python needed. For a remote server, give its URL instead of a command:
       <code>failecho-mcp proxy --header "Authorization: Bearer $TOKEN" -- https://…/mcp</code>
       (a header token works; OAuth does not, so connect those directly).
     </p>
