@@ -369,6 +369,15 @@ except Exception as exc:
 FailEcho: try backoff, worked n/m (confidence 0.61).</code></pre>
     </figure>
     <p class="band-sub">
+      A server that wraps an API reports under its own name, so tell the proxy
+      which host each tool calls: <code>--upstream 'github_*=api.github.com'</code>
+      (or <code>--upstream api.github.com</code> for every tool). When the
+      server's own name has no advice yet, the proxy asks under that host and
+      says so &mdash; <code>FailEcho (evidence from api.github.com): …</code>.
+      Reports keep the server's name. The GitHub MCP server's own names map to
+      <code>api.github.com</code> without being told.
+    </p>
+    <p class="band-sub">
       Every other message passes through unchanged, byte for byte. Each call's
       outcome is reported as its shape only &mdash; the server's name, the tool,
       an error class and code, the latency &mdash; never arguments, results or
