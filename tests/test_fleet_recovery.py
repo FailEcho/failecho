@@ -1026,3 +1026,28 @@ def test_the_proxy_pair_is_wired():
     assert names["fleet-ocp-ask-n"][1:4] == ("opencode", "nvidia", True)
     assert ("fleet-ocp-ask-n", "fleet-ocp-blind-n") in F.TWINS
     assert F.lane_of(names["fleet-ocp-ask-n"]) == "vm"
+
+
+def test_the_prod_pair_reads_production_and_nothing_else(monkeypatch):
+    """fleet-prod-ask asks failecho.com's read path, labelled demo so the
+    server keeps it out of its counters; every other persona asks the lab.
+    Reports go to the lab for both."""
+    import io
+    import json
+
+    seen = []
+
+    def fake(req, timeout=10):
+        seen.append((req.full_url, dict(req.header_items())))
+        return io.BytesIO(json.dumps({"known": False}).encode())
+
+    monkeypatch.setattr(F.urllib.request, "urlopen", fake)
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://lab.local")
+    F.Run("fleet-prod-ask", "decorator", "nvidia", True)._ask("api.github.com", "github_repo", "rate_limit", "403")
+    F.Run("fleet-decor-ask-c", "decorator", "nvidia", True)._ask("api.github.com", "github_repo", "rate_limit", "403")
+    (prod_url, prod_h), (lab_url, lab_h) = seen
+    assert prod_url == "https://failecho.com/v1/query" and prod_h.get("X-reporter-kind") == "demo"
+    assert lab_url == "http://lab.local/v1/query" and "X-reporter-kind" not in lab_h
+    assert F.PROD_READ_URL.endswith("/v1/query")
+    assert F.Run("fleet-prod-ask", "decorator", "nvidia", True).fe.endpoint == "http://lab.local", \
+        "reports go to the lab, never to production"

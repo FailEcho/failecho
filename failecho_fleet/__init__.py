@@ -311,12 +311,25 @@ PERSONAS = [
     # neither has FailEcho's tools or a FailEcho paragraph in AGENTS.md.
     ("fleet-ocp-ask-n",    "opencode",  "nvidia", True,  OCP_TASKS),
     ("fleet-ocp-blind-n",  "opencode",  "nvidia", False, OCP_TASKS),
+    # What a new user of failecho.com gets today (2026-09-19): the same
+    # harness as the real-API twins, but the ask twin's advice is read from
+    # production, whose evidence is only our one first-party agent's. Reads
+    # store nothing; reports still go to the lab.
+    ("fleet-prod-ask",     "decorator", "nvidia", True,  MIXED),
+    ("fleet-prod-blind",   "decorator", "nvidia", False, MIXED),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
 OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
 OCPROXY_PERSONAS = {"fleet-ocp-ask-n", "fleet-ocp-blind-n"}
+PROD_ADVICE_PERSONAS = {"fleet-prod-ask", "fleet-prod-blind"}
+#: The one production URL the fleet may call: the read path, which stores
+#: nothing. Sent with X-Reporter-Kind: demo, the label the server accepts
+#: only as a downgrade, so these reads stay out of its usage counters. The
+#: fleet never holds the operator token (assert_lab_only), and never writes
+#: to production.
+PROD_READ_URL = "https://failecho.com/v1/query"
 #: The model OpenCode is pointed at, per provider: the strongest agentic one
 #: each tier serves with tool calls.
 OPENCODE_MODELS = {"nvidia": "nvidia/nemotron-3-super-120b-a12b", "mistral": "codestral-latest",
@@ -338,7 +351,8 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-decor-ask-c", "fleet-decor-blind-c"), ("fleet-build-ask-n", "fleet-build-blind-n"),
          ("fleet-decor-ask-d", "fleet-decor-blind-d"), ("fleet-decor-ask-e", "fleet-decor-blind-e"),
          ("fleet-build-ask-x", "fleet-build-blind-x"), ("fleet-oc-ask-n", "fleet-oc-blind-n"),
-         ("fleet-wrap-ask", "fleet-wrap-blind"), ("fleet-ocp-ask-n", "fleet-ocp-blind-n")]
+         ("fleet-wrap-ask", "fleet-wrap-blind"), ("fleet-ocp-ask-n", "fleet-ocp-blind-n"),
+         ("fleet-prod-ask", "fleet-prod-blind")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 
@@ -672,9 +686,12 @@ class Run:
         body = {"service": service, "operation": operation, "error_type": error_type}
         if code:
             body["error_code"] = code
-        req = urllib.request.Request(f"{LAB_ENDPOINT}/v1/query", data=json.dumps(body).encode(), method="POST",
-                                     headers={"Content-Type": "application/json", "User-Agent": UA,
-                                              "X-Reporter-ID": self.reporter})
+        headers = {"Content-Type": "application/json", "User-Agent": UA, "X-Reporter-ID": self.reporter}
+        url = f"{LAB_ENDPOINT}/v1/query"
+        if self.reporter in PROD_ADVICE_PERSONAS:
+            url = PROD_READ_URL
+            headers["X-Reporter-Kind"] = "demo"
+        req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST", headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 return json.load(r)
@@ -1230,6 +1247,7 @@ def write_report(state: dict) -> None:
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
+                else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = cohorts.setdefault(key, blank())
@@ -1259,7 +1277,7 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
-                or r["reporter"] in OCPROXY_PERSONAS:
+                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS:
             continue
         if r["at"] < FAIR_ORDER_SINCE:
             continue   # before the twins alternated order; see TWINS
@@ -1284,6 +1302,7 @@ def write_report(state: dict) -> None:
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
+                else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = costs.setdefault(key, {"cohort": key, "runs": 0, "completed": 0, "tokens": 0, "tokens_prompt": 0,
@@ -1313,7 +1332,7 @@ def write_report(state: dict) -> None:
             c[k] = round(c[k], 1)
     cost_rows = [costs[k] for k in ("real / ask", "real / blind", "test / ask", "test / blind",
                                     "build / ask", "build / blind", "opencode / ask", "opencode / blind",
-                                    "wrapped / ask", "wrapped / blind", "ocproxy / ask", "ocproxy / blind",
+                                    "wrapped / ask", "wrapped / blind", "ocproxy / ask", "ocproxy / blind", "prod / ask", "prod / blind",
                                     "explore") if k in costs]
 
     # With FailEcho against without, the way a vendor benchmark table reads:
@@ -1336,7 +1355,8 @@ def write_report(state: dict) -> None:
                        ("build", "Coding agents (write and run code in a VM)"),
                        ("opencode", "OpenCode, a real agent product, with FailEcho's MCP server and without"),
                        ("wrapped", "The shipped wrapper: advice in the tool error, the model decides (no harness help)"),
-                       ("ocproxy", "OpenCode with an MCP server behind failecho-mcp proxy, and without")):
+                       ("ocproxy", "OpenCode with an MCP server behind failecho-mcp proxy, and without"),
+                       ("prod", "Real APIs, advice read from production (what a new user gets today)")):
         a, b = costs.get(f"{key} / ask"), costs.get(f"{key} / blind")
         ca, cb = cohorts.get(f"{key} / ask"), cohorts.get(f"{key} / blind")
         if not a or not b:
@@ -1390,7 +1410,8 @@ def write_report(state: dict) -> None:
         if r["at"] < PROVIDER_CONTROL_SINCE or not r.get("provider") or not r.get("metrics"):
             continue
         if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS or r["reporter"] in OPENCODE_PERSONAS \
-                or r["reporter"] in WRAPPED_PERSONAS or r["reporter"] in OCPROXY_PERSONAS:
+                or r["reporter"] in WRAPPED_PERSONAS or r["reporter"] in OCPROXY_PERSONAS \
+                or r["reporter"] in PROD_ADVICE_PERSONAS:
             continue
         side = "ask" if r["asks"] else "blind"
         c = prov.setdefault(side, {"runs": 0, "completed": 0, "failures": 0, "recovered": 0, "tokens": 0, "seconds": 0.0,
@@ -1462,7 +1483,7 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
-                or r["reporter"] in OCPROXY_PERSONAS:
+                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS:
             continue
         if not r.get("metrics"):
             continue
