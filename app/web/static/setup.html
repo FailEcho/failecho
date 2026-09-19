@@ -351,16 +351,15 @@ except Exception as exc:
       <pre><code>{
   "mcpServers": {
     "github": {
-      "command": "npx",
-      "args": ["-y", "failecho-mcp", "proxy", "--",
+      "command": "uvx",
+      "args": ["failecho-mcp", "proxy", "--",
                "npx", "-y", "@modelcontextprotocol/server-github"]
     }
   }
 }</code></pre>
     </figure>
     <p class="band-sub">
-      <code>uvx failecho-mcp proxy -- …</code> works the same way. For a remote
-      server, give its URL instead of a command:
+      For a remote server, give its URL instead of a command:
       <code>failecho-mcp proxy --header "Authorization: Bearer $TOKEN" -- https://…/mcp</code>
       (a header token works; OAuth does not, so connect those directly).
     </p>
