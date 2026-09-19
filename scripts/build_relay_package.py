@@ -82,7 +82,59 @@ Four tools: `check_tool_failure` before a retry, and `report_tool_failure`,
 `report_tool_success`, `report_recovery_outcome` to contribute. No account, no
 API key. Set `FAILECHO_URL` to relay to your own server instead.
 
-The relay stores nothing itself. MIT.
+The relay stores nothing itself.
+
+## Proxy: FailEcho in front of your other MCP servers
+
+A model given FailEcho's tools has to think of asking, and while it is
+handling a failure it mostly does not. The proxy puts the answer where the
+model is already looking. Wrap the command a client would start:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "uvx",
+      "args": ["failecho-mcp", "proxy", "--", "npx", "-y", "@modelcontextprotocol/server-github"]
+    }
+  }
+}
+```
+
+or a remote server (a header token works; OAuth does not -- connect those
+directly):
+
+```bash
+uvx failecho-mcp proxy --header "Authorization: Bearer $TOKEN" -- https://mcp.example.com/mcp
+```
+
+Every message passes through unchanged, as the same bytes, except the
+response to a tool call that failed. That one gets one line added:
+
+```
+FailEcho: try backoff, worked 128/251 (confidence 0.61).
+```
+
+-- or `no clear fix yet; other agents tried ...`, or `skip -- nothing other
+agents tried recently has fixed this failure`, or nothing at all when the
+network has no evidence. Nothing is acted on for you.
+
+Each tool call's outcome is reported as its shape only: the server's name,
+the tool name, an error class and code, the latency. Never arguments,
+results or the error text. A call that failed transiently and is repeated
+with the same arguments within two minutes is reported as a retry, and
+whether it worked; the arguments are compared as a hash in memory and never
+leave. Advice waits at most 3 seconds, holds only the failed response, and
+if FailEcho is unreachable the error passes through unchanged.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FAILECHO_DISABLED` | unset | `1`: a plain pipe, nothing reported or added |
+| `FAILECHO_ADVISE` | `1` | `0`: report, but do not add advice |
+| `FAILECHO_ENDPOINT` | `https://failecho.com` | Network to report to and read from |
+| `FAILECHO_REPORTER_ID` | random per run | Stable id, so your machine counts as one reporter |
+
+MIT.
 '''
 
 

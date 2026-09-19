@@ -12,6 +12,13 @@
  */
 "use strict";
 
+// `failecho-mcp proxy -- <server>`: FailEcho in front of another MCP server
+// (see proxy.js). Loaded only here, so the plain relay never runs it.
+if (process.argv[2] === "proxy") {
+  require("./proxy.js").main(process.argv.slice(3));
+  return;
+}
+
 const DEFAULT_URL = "https://failecho.com/mcp";
 const VERSION = require("../package.json").version;
 const TIMEOUT_MS = 15000;

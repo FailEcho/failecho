@@ -22,6 +22,19 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 FAKE = [sys.executable, str(ROOT / "tests" / "fake_mcp_server.py")]
+#: The proxy exists twice, one per package manager; every test runs both.
+IMPLS = {"python": [sys.executable, "-m", "failecho_mcp", "proxy"],
+         "node": ["node", str(ROOT / "npm-relay" / "bin" / "failecho-mcp.js"), "proxy"]}
+PROXY = IMPLS["python"]
+
+
+@pytest.fixture(autouse=True, params=["python", "node"])
+def impl(request, monkeypatch):
+    import shutil
+    if request.param == "node" and shutil.which("node") is None:
+        pytest.skip("node not installed")
+    monkeypatch.setattr(sys.modules[__name__], "PROXY", IMPLS[request.param])
+    return request.param
 ADVICE = {"known": True, "recommendation": {"action": "backoff", "confidence": 0.61},
           "recovery_actions": [{"action": "backoff", "successes": 128, "attempts": 251}]}
 
@@ -69,7 +82,7 @@ class Session:
         env = {**os.environ, "FAILECHO_ENDPOINT": endpoint, "FAILECHO_REPORTER_ID": "proxy-test",
                **(extra_env or {})}
         env.pop("FAILECHO_OPERATOR_TOKEN", None)
-        self.proc = subprocess.Popen([sys.executable, "-m", "failecho_mcp", "proxy", "--", *server],
+        self.proc = subprocess.Popen([*PROXY, "--", *server],
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      cwd=ROOT, env=env)
         self.lines: queue.Queue = queue.Queue()
@@ -308,7 +321,7 @@ def test_the_servers_exit_code_is_the_proxys(net):
 
 
 def test_a_command_that_does_not_exist_says_so():
-    p = subprocess.run([sys.executable, "-m", "failecho_mcp", "proxy", "--", "no-such-mcp-server-xyz"],
+    p = subprocess.run([*PROXY, "--", "no-such-mcp-server-xyz"],
                        capture_output=True, timeout=30, cwd=ROOT,
                        env={**os.environ, "FAILECHO_ENDPOINT": "http://127.0.0.1:9"})
     assert p.returncode == 127 and b"cannot start" in p.stderr
@@ -398,7 +411,7 @@ def _sdk_session(url: str, endpoint: str, headers: list[str]):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
-    args = ["-m", "failecho_mcp", "proxy"]
+    args = list(PROXY[1:])
     for h in headers:
         args += ["--header", h]
     args += ["--", url]
@@ -407,7 +420,7 @@ def _sdk_session(url: str, endpoint: str, headers: list[str]):
 
     async def go():
         out = {}
-        params = StdioServerParameters(command=sys.executable, args=args, env=env, cwd=str(ROOT))
+        params = StdioServerParameters(command=PROXY[0], args=args, env=env, cwd=str(ROOT))
         async with stdio_client(params) as (r, w):
             async with ClientSession(r, w) as s:
                 with anyio.fail_after(20):
@@ -457,3 +470,31 @@ def test_an_unreachable_remote_fails_fast_with_a_message():
     assert err["id"] == 0 and "cannot reach" in err["error"]["message"]
     assert time.monotonic() - started < 5
     assert s.close() == 0
+
+
+def test_both_proxies_classify_and_advise_exactly_alike(impl):
+    """Evidence from the two languages must land on the same fingerprints,
+    and a model must read the same line whichever package it came from."""
+    import shutil
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+    from failecho_autoreport import FailEcho, classify
+    samples = ["429 rate limit exceeded", "HTTP 403 Forbidden: API rate limit exceeded", "403 Forbidden",
+               "deadline exceeded", "ETIMEDOUT", "HTTP 404 Not Found", "422 validation failed: field required",
+               "ECONNREFUSED 127.0.0.1", "503 service unavailable", "upstream timeout", "-32602 Tool x not found",
+               "MCP error -32602: Input validation error", "Error executing tool fails", "something odd"]
+    answers = [
+        {"recommendation": {"action": "backoff", "confidence": 0.6139},
+         "recovery_actions": [{"action": "backoff", "successes": 128, "attempts": 251}]},
+        {"recommendation": {"action": "skip", "confidence": 0.7}},
+        {"recommendation": None, "recovery_actions": [{"action": "retry", "successes": 49, "attempts": 98},
+                                                      {"action": "backoff", "successes": 128, "attempts": 251}]},
+        {"known": False, "recommendation": None}]
+    script = ("const p=require(process.argv[1]);const d=JSON.parse(require('fs').readFileSync(0,'utf8'));"
+              "process.stdout.write(JSON.stringify({c:d.s.map(t=>p.classify(t)),a:d.a.map(x=>p.adviceText(x))}))")
+    out = subprocess.run(["node", "-e", script, str(ROOT / "npm-relay" / "bin" / "proxy.js")],
+                         input=json.dumps({"s": samples, "a": answers}).encode(), capture_output=True, timeout=30)
+    node = json.loads(out.stdout)
+    for text, (et, code) in zip(samples, node["c"]):
+        assert classify(RuntimeError(text)) == (et, code), text
+    assert node["a"] == [FailEcho.advice_text(a) for a in answers]

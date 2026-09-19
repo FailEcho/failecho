@@ -19,7 +19,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "failecho-mcp",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
@@ -43,7 +43,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "failecho-mcp",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
