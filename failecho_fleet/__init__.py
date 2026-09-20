@@ -1685,8 +1685,18 @@ def main(argv: list[str] | None = None) -> int:
     if path == "opencode":
         with _state_lock():
             st = _state()
+            # The gap consumes whichever OpenCode persona the lane cursor
+            # reaches, and on 20 Sep that was the same pair every time: the
+            # proxy pair did not run between 10:46 and 18:44 while the other
+            # pair ran nine times. The OpenCode personas take their turns on
+            # a cursor of their own, so a gap costs frequency, not fairness.
+            order = [i for i, p in enumerate(PERSONAS) if p[1] == "opencode"]
+            turn = int(st.get("next_opencode") or 0)
+            idx = order[turn % len(order)]
+            st["next_opencode"] = turn + 1
             st["last_opencode_at"] = time.time()
             _save(st)
+        reporter, path, provider, asks, workload = PERSONAS[idx]
     run = Run(reporter, path, provider, asks)
     started = time.monotonic()
     task = None

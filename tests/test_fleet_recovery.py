@@ -1096,3 +1096,33 @@ def test_opencode_runs_wait_for_the_gap_so_the_host_keeps_its_memory(tmp_path, m
     (tmp_path / "state.json").write_text(json.dumps(state))
     assert F.main(["--lane", "vm"]) == 0
     assert ran and F.PERSONAS[names.index(ran[0])][1] == "opencode", "the gap has passed; it should run"
+
+
+def test_the_opencode_personas_take_turns_on_their_own_cursor(tmp_path, monkeypatch):
+    """With a gap between OpenCode runs, the lane cursor alone starved one
+    pair: 20 Sep, the proxy pair sat out eight hours while the other pair ran
+    nine times."""
+    import datetime as dt
+    import json
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(F, "assert_lab_only", lambda: None)
+    monkeypatch.setattr(F.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(F.FailEcho, "flush", lambda self, timeout=5.0: True)
+    monkeypatch.setattr(F, "OPENCODE_MIN_GAP_SECONDS", 0)
+    ran = []
+    monkeypatch.setattr(F.Run, "run_opencode", lambda self, *a, **k: ran.append(self.reporter) or "done")
+    monkeypatch.setattr(F.Run, "run_build", lambda self, *a, **k: "done")
+    vm = F.lane_personas("vm")
+    start = next(i for i, m in enumerate(vm) if F.PERSONAS[m][1] == "opencode")
+    state = {"next_vm": start, "runs": [], "day": dt.date.today().isoformat(), "runs_today": 0}
+    (tmp_path / "state.json").write_text(json.dumps(state))
+    for _ in range(12):
+        F.main(["--lane", "vm"])
+    opencode_personas = [p[0] for p in F.PERSONAS if p[1] == "opencode"]
+    assert set(ran) == set(opencode_personas), f"starved: {set(opencode_personas) - set(ran)}"
+    counts = {name: ran.count(name) for name in opencode_personas}
+    assert max(counts.values()) - min(counts.values()) <= 1, counts
