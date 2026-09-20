@@ -1,182 +1,130 @@
-# FailEcho lab: the first 48 hours, with and without
+# FailEcho lab: four days, with and without
 
-*Window: 2026-09-16 09:17 to 2026-09-18 12:34 UTC. Everything below is from
-the lab (lab.failecho.com), a separate instance the fleet reports to. None of
-it is adoption; production has 0 independent observations. Numbers are the
-scoreboard's own at 12:34 UTC; the live page is
-[lab.failecho.com/fleet](https://lab.failecho.com/fleet).*
+*Window: 2026-09-16 09:17 to 2026-09-20 10:46 UTC. Everything below comes from
+the lab (lab.failecho.com), a separate instance our own test agents report to.
+**None of it is adoption**: production has 0 independent reporters. The live
+page is [lab.failecho.com/fleet](https://lab.failecho.com/fleet).*
+
+*An outside review on 20 September (docs/review-2026-09-20.md) checked the
+arithmetic and found it sound, and found the wording around it too wide. This
+report uses the narrower wording. Nothing here shows a generalizable uplift for
+an ordinary installation; it shows what one mechanism did against one weak
+control, in one lab.*
+
+## How a run is graded, exactly
+
+- **A model run counts as completed when it returned an answer** rather than a
+  failure marker. An answer that is wrong, vague or unhelpful counts. The
+  metric is therefore called **"runs marked completed"**, not "tasks
+  completed".
+- **A builder or OpenCode run counts** when the file the task named exists and
+  matches the task's pattern. A partly correct file can match.
+- **Per-call numbers are the harder evidence**: failures met, second attempts
+  made, second attempts that succeeded. Those come from the call ledger, not
+  from judging an answer.
+- **The control is one retry after 3 seconds.** It is not competent recovery
+  engineering (no `Retry-After` handling, no fallback table, no circuit
+  breaker), so a win here is a win over a weak policy, not over a careful
+  engineer.
+- **Runs the guest kernel killed for memory before they produced a result are
+  excluded** from every rate and counted on their own row. They ran 7 to 0
+  against the FailEcho side, whose twins run one extra process in the same
+  768 MB guest.
 
 ## What was run
 
-1,476 runs by 37 personas on one machine, one run every two minutes. Each
-persona is a small agent with a fixed workload against real services (PyPI,
-npm, the GitHub API, crates.io, Stack Exchange), a test service that returns
-what it is asked for (httpbingo), or a coding task inside a throwaway VM.
-Personas come in twins: same workload, same model, same order lottery; the
-*ask* twin calls FailEcho before retrying a failed call and follows what it
-says, the *blind* twin retries the way an agent without it does. Six
-explorers try what the network has no evidence for and report the outcome;
-askers inherit what the network then recommends.
+45 personas, 49,230 observations over 23 services, 6,587 recovery outcomes.
+Personas come in twins: same workload, same model, alternating order. The
+*ask* twin consults FailEcho before retrying; the *blind* twin retries by fixed
+rules. Six explorers try actions the network has no evidence for, which is how
+the evidence askers inherit gets made.
 
-Models: gpt-oss-20b/120b (groq), gemini-flash (Gemini), three free models
-on OpenRouter, gpt-oss:20b, nemotron-3-nano and gemma4 (Ollama cloud); from
-18 Sep also nemotron-3-super (NVIDIA), ministral-8b (Mistral) and qwen3.6-27b
-(xKiro). All free tiers, all under their documented caps.
+Services: PyPI, npm, crates.io, the GitHub API, Stack Exchange, httpbingo (a
+test service that returns what it is asked for), and the model providers
+themselves. Models: gpt-oss-20b/120b (groq), gemini-flash, three free models on
+OpenRouter, gpt-oss:20b / nemotron-3-nano / gemma4 (Ollama), nemotron-3-super
+(NVIDIA), ministral (Mistral), qwen3.6-27b (xKiro). All free tiers, all under
+their documented caps.
 
-The lab holds 14,012 observations over 17 services, 1,352 recovery
-outcomes, 369 recommendations built on another agent's evidence.
+## The strongest result: a failure with a known fix
 
-## The five claims and where each stands
+Model providers under their own quotas, since the control changed on 18 Sep
+05:30. 516 ask runs, 511 blind.
 
-| Claim | Evidence | Status |
+| | With FailEcho | Without |
 |---|---|---|
-| Faster on failures | test cohort 18.1 vs 26.2 s/run; 14.4 vs 22.6 s lost inside failures; holds every hour for two days | **proven** |
-| The skip verdict is almost never wrong | in the hours and shapes the network told askers to skip, blind retried 174 times and recovered once | **proven** |
-| The right fix when one exists | advised second attempts recover 31/42 (74%) vs blind 39/98 (40%) | **shown on one shape** (httpbingo 503); more shapes needed |
-| Costs nothing extra | 487 vs 493 tokens per run; asking takes 72 ms per run | **proven** |
-| Finishes tasks a blind agent gives up on | provider-quota experiment started 18 Sep 05:30; 44 vs 46 runs, tie so far, askers have no `switch_model` recommendation to inherit yet (3 of 5 attempts) | **open** |
+| Runs marked completed | 92.8 % | 77.7 % |
+| Provider failures met | 142 | 142 |
+| **Provider failures recovered** | **78.2 %** | **20.4 %** |
+| Tokens per completed run | 1,835 | 1,984 |
+| Seconds per run | 9.6 | 9.9 |
 
-## Ask vs blind, the vendor table
+Both sides met the same number of failures. The difference is what they did
+next: the network's evidence says `switch_model` works, and it does. This is
+the one place where the completion number and the per-call number agree, and
+it is the result to lead with.
 
-Real APIs (275 vs 278 runs, since the twins alternated order at 17 Sep 06:30):
+## The rest, honestly
 
-| metric | ask | blind |
-|---|---:|---:|
-| tasks completed | 62.5 % | 65.1 % |
-| tokens per run | 487 | 493 |
-| tokens per completed task | 779 | 758 |
-| seconds per run | 5.3 | 4.9 |
-| seconds lost inside failures, per run | 1.90 | 1.99 |
-| retry attempts per failure | 1.43 | 1.56 |
-| pointless retries avoided | 79 | 0 |
-
-Flaky, broken and slow endpoints (42 vs 42):
-
-| metric | ask | blind |
-|---|---:|---:|
-| seconds per run | 18.1 | 26.2 |
-| seconds lost inside failures, per run | 14.4 | 22.6 |
-| retry attempts per failure | 1.68 | 2.00 |
-| pointless retries avoided | 100 | 0 |
-
-Coding agents in a VM (32 vs 32):
-
-| metric | ask | blind |
-|---|---:|---:|
-| tasks completed | 78.1 % | 78.1 % |
-| tokens per completed task | 4,160 | 3,985 |
-| seconds per run | 25.2 | 31.8 |
-| seconds waiting on rate limits, per run | 4.7 | 10.9 |
-
-Read: where the network can change an outcome, it saves time and retries.
-Completion is a tie, and the real-API completion gap is not the product:
-the twins share one IP and GitHub's 60-an-hour budget, and whoever meets
-the 403s finishes fewer tasks. Nobody recovers a 403 (6 of 182 asker
-retries, 9 of 150 blind); the honest answer is "stop", and that is what
-the asker does.
+| Group | Runs | Marked completed | What it means |
+|---|---|---|---|
+| Flaky test endpoints | 158 vs 158 | n/a | **18.6 vs 25.4 s per run**; 15.2 vs 21.9 s lost inside failures; 1.51 vs 2.0 attempts per failure; 332 retries the network said to skip |
+| Real APIs | 1,095 vs 1,090 | 72.7 vs 66.2 % | Mostly fewer wasted retries; tokens even (1,202 vs 1,206) |
+| Coding agents | 434 vs 434 | 84.8 vs 83.6 % | Their failures are their own bugs; the one gain is waiting on rate limits, 3.6 vs 4.1 s per run |
+| OpenCode, FailEcho's MCP tools | 113 vs 121 | 77.9 vs 82.6 % | **Behind.** The model must choose to ask and does so 0.12 times per run, while paying for four tool definitions every step: 59,078 vs 54,229 tokens |
+| Python wrapper (shipped) | 84 vs 84 | 100 vs 100 % | Advice attached to 38 failures; all were GitHub 403s, which nothing fixes without a token |
+| OpenCode behind the proxy | 65 vs 65 | 86.2 vs 84.6 % | **Not a FailEcho win**: no advice line has appeared in a scheduled run yet. The difference is provider luck |
+| Advice read from production | 55 vs 54 | 90.9 vs 98.1 % | What a new user gets today: production has almost no evidence, so asking costs time and returns nothing |
 
 ## What the advice is worth, by failure shape
 
-Since 17 Sep 06:30, twins only. "Advised" is a second attempt the network
-recommended; "no advice" is an asker with nothing from the network, which
-then does what blind does; the last column is blind's yield in the same
-hour on the same shape the network said skip.
+| Shape | Skipped | Advised retries that worked | Blind retries that worked |
+|---|---|---|---|
+| httpbingo 503 | 163 | 103 / 158 (65 %) | 123 / 331 (37 %) |
+| GitHub 403 rate limit | 51 | n/a (advice was skip) | 57 / 1,297 (4.4 %) |
+| Stack Exchange 429 | 182 | n/a (advice was skip) | 0 / 186 |
 
-| shape | advised | no advice | blind | skipped | blind recovered where skipped |
-|---|---:|---:|---:|---:|---:|
-| httpbingo 503 | 31/42 (74%) | – | 39/98 (40%) | 47 | 0/47 |
-| httpbingo 429 | – | 25/50 (50%) | 22/47 (47%) | 0 | – |
-| httpbingo timeout | – | – | 0/47 | 47 | 0/47 |
-| GitHub 403 | – | 6/182 (3%) | 9/150 (6%) | 46 | 1/43 |
-| Stack Exchange 429 | – | 0/4 | 0/35 | 31 | 0/35 |
-| OpenRouter 429 | – | 0/2 | 0/4 | 2 | 0/2 |
+The skip verdict is where the review's caution matters: in the hours and shapes
+where askers were told to skip, blind agents retried 63 times on GitHub and
+recovered **5** times. So "skip" is right far more often than not, but it is
+not free, and the count of skips is **not** a count of avoided failures.
 
-Two things this table settles. Where the network has a recommendation,
-second attempts recover 74% against 40%. Where it has none, the asker
-behaves exactly like blind (50 vs 47, 3 vs 6) -- the control is clean and
-the asker's edge is inherited, not invented.
+## Onboarding
 
-## Does it get better with evidence?
+127 runs of a cheap model reading llms.txt in a clean VM: 81 graded, 54 passed.
+The rest wrote config in the wrong place, skipped the verification step, or
+claimed success without checking.
 
-Share of an asker's failures the network had a recommendation for, per half
-day: 0% (17 Sep morning), 7% (17 Sep afternoon), 26% (18 Sep morning). The
-network's own learning curve. Completion per half day moves with the
-GitHub budget, not with this.
+## What shipped during the window
 
-## Onboarding from llms.txt
+- **failecho-autoreport 0.1.5** (PyPI): advice attached to the exception when a
+  wrapped call fails.
+- **failecho-mcp 0.2.1** (PyPI and npm): the proxy. Put it in front of any MCP
+  server and a failed tool call comes back with one line of evidence; it can
+  also draw on the evidence filed under the API host the server wraps.
+- Both were installed from the registries in clean environments and checked
+  against real servers.
 
-Every hour a cheap model is dropped into a clean VM with the one line "set
-up FailEcho for this project" and llms.txt. Five scenes: clean project, a
-project that already has another MCP server, one that already has ours, a
-home directory full of projects, a read-only checkout. 46 runs, 26 graded
-(the rest were the provider refusing), 11 passed.
+## Known limits
 
-| scene | graded | passed | what fails |
-|---|---:|---:|---|
-| clean | 4 | 3 | did not verify (1) |
-| other server present | 10 | 6 | did not verify (3), clobbered the other entry (1) |
-| ours already present | 2 | 1 | grader error, since fixed |
-| home directory | 8 | 1 | wrote a config anyway instead of asking (5), did not ask (7) |
-| read-only | 2 | 0 | did not verify (2) |
+- **Cold start.** Production has 0 independent reporters and only our
+  first-party agent's evidence. A new user gets little until others report.
+- **The bare MCP endpoint barely helps**: models rarely call a tool they have
+  to choose. Use the plugin, the wrapper or the proxy.
+- **The proxy** does not support MCP servers that log in with OAuth, and does
+  not carry a server's own event stream. Remote servers are re-serialised, not
+  forwarded byte for byte; that guarantee holds for local stdio servers.
+- **Inferred recovery is correlation.** A repeat of a failed call that succeeds
+  is recorded as a retry that worked, without knowing what else changed.
+- **Reporter ids are not independence.** They are self-chosen, and a restart
+  mints a new one, so "unique reporters" counts processes.
+- **Nothing here sees an agent's own `curl`** or shell commands.
+- **Grading is shallow** (see the top). Deliverable-level grading is the next
+  measurement to build.
 
-Per model: gemma4-31b 4/5, gpt-oss-120b 2/2, ministral-14b 1/1,
-qwen3.6-27b 1/1, gpt-oss:20b 2/6, nex-n2.5-mini 1/2, nemotron-3-nano 0/5,
-lfm-2.5-2.6b 0/2, nemotron-3-super 0/1. Gemini and two OpenRouter models
-never got a graded run: their free tiers were exhausted before their turn.
+## What would make the next report stronger
 
-Three document changes came out of this, each after the same grade fell
-across models: "look first" for the home directory, the verify step made an
-instruction with the request inline, and a shorter default section. The
-model that had missed "verify" four times ran the query itself on its first
-run after the rewrite.
-
-## Builders
-
-Two coding-agent twins (groq), from 18 Sep three pairs (NVIDIA and xKiro
-added). 32 vs 32 runs graded on whether the task came out done: 78.1% both.
-The ask builder spends 4.7 s a run waiting on rate limits against 10.9 --
-it is told when a wait is pointless. Inside the VM the wrapper filed 116
-shared failures and 15 local ones for the ask twin, 75 and 24 for blind;
-the coverage counter (how much of a program's traffic the wrapper saw) is
-known to be wrong and is not quoted.
-
-## What broke and was fixed, in the open
-
-125 commits in the window; the day logs (docs/night-2026-09-16.md,
-docs/day-2026-09-17.md) carry each one with numbers. The ones that changed
-a number:
-
-- The twins ran in a fixed order (ask first) and the second met the 403s
-  the first had used the budget for. Alternated from 17 Sep 06:30; the
-  proof table counts from there.
-- Askers retried after a skip verdict and tied with blind. From 17 Sep
-  04:40 they honour it.
-- Blind gave up on a provider failure at once, which flattered the ask
-  side. From 18 Sep 05:30 it retries once.
-- A provider marked out of quota was held dead until midnight UTC;
-  groq's day is not UTC. Marks expire after two hours.
-- Fence refusals (the VM's egress allowlist) were filed twice as failures
-  of the host; both fixed.
-- Two grader misgrades (a `find -name` read as a home edit; a request for
-  the choice without a question mark not read as asking).
-
-## What is not shown
-
-- No gain in tasks completed on real APIs. The failures there are hard
-  limits nobody recovers from; saving time on them is the win, finishing
-  them is not possible.
-- The provider-quota experiment is a day old. Askers will inherit
-  `switch_model` once explorers reach the five-attempt floor; today they
-  behave like blind.
-- One shape with advised recoveries. Three would make the third claim.
-- Zero independent adoption. The lab proves mechanism, not demand.
-- Everything ran from one IP on one machine; GitHub's per-IP budget shapes
-  the real-API numbers more than anything we did.
-
-## Reproduce it
-
-`scripts/ask_vs_blind.py` runs the ask/blind comparison against any
-FailEcho instance except production (it refuses failecho.com). The fleet,
-the sandbox and the onboarding harness are in the repository under
-`failecho_fleet/` and `failecho_sandbox/`; docs/fleet-test-plan.md is the
-plan with every change dated.
+1. Grade the artefact, not its shape.
+2. Add a third arm: competent local recovery, with and without FailEcho.
+3. Report inferred outcomes separately from reported ones.
+4. Real users, so production's evidence is not ours alone.
