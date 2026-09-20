@@ -69,10 +69,12 @@ ETAG_BODY_MAX = 32 * 1024
 #: baked into the rootfs) and a run it kills loses all of its events.
 OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 300)
 #: Least time between two OpenCode runs. Its guest takes 768 MB, three times
-#: a builder's, and on 20 Sep swap reached 3.6 of 4 GB with one running every
-#: VM tick; production lives on the same host. A gap costs runs per hour, not
-#: the comparison: both twins are slowed the same way.
-OPENCODE_MIN_GAP_SECONDS = int(os.environ.get("FLEET_OPENCODE_MIN_GAP") or 600)
+#: a builder's, and production lives on the same host. 10 min was not enough:
+#: at 08:18 and 08:31 on 20 Sep the kernel ran out of memory and killed
+#: firecracker (the test VM, not the server -- but the next one could be the
+#: server), with swap at 3.9 of 4 GB. 30 min, and 2 GB more swap on the host.
+#: A gap costs runs per hour, not the comparison: both twins wait alike.
+OPENCODE_MIN_GAP_SECONDS = int(os.environ.get("FLEET_OPENCODE_MIN_GAP") or 1800)
 #: What the sandbox guest is told to report to. Unset means the in-guest
 #: wrapper stays off; there is deliberately no default.
 LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None
