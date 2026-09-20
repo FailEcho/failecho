@@ -89,13 +89,15 @@ ERROR_CLASSES = (
         r"\b40[13]\b|unauthori[sz]ed|forbidden|permission denied|authenticat|invalid (api )?key",
         re.I)),
     ("not_found", re.compile(r"\b404\b|not found|no such", re.I)),
+    # server_error before validation_error, as in the hook and the wrapper:
+    # "503 invalid upstream response" was validation_error/503 (review, 20 Sep)
+    ("server_error", re.compile(
+        r"\b5\d\d\b|internal (server )?error|service unavailable|bad gateway|upstream", re.I)),
     ("validation_error", re.compile(
         r"\b4(00|22)\b|invalid|validation|required|must be|schema", re.I)),
     ("connection_error", re.compile(
         r"ECONN(REFUSED|RESET)|ENOTFOUND|EPIPE|connection (refused|reset|closed|error)"
         r"|network|socket", re.I)),
-    ("server_error", re.compile(
-        r"\b5\d\d\b|internal (server )?error|service unavailable|bad gateway|upstream", re.I)),
 )
 HTTP_CLASSES = {"rate_limit", "auth_error", "not_found", "validation_error", "server_error"}
 _STATUS = re.compile(r"\b([45]\d\d)\b")

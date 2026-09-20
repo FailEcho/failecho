@@ -119,13 +119,16 @@ ERROR_CLASSES = (
         r"\b40[13]\b|unauthori[sz]ed|forbidden|permission denied|authenticat|invalid (api )?key",
         re.I)),
     ("not_found", re.compile(r"\b404\b|not found|no such", re.I)),
+    # server_error before validation_error: "503 invalid upstream response"
+    # matched "invalid" first and was filed as validation_error/503 (found in
+    # review, 20 Sep). A 5xx is the service's, whatever words came with it.
+    ("server_error", re.compile(
+        r"\b5\d\d\b|internal (server )?error|service unavailable|bad gateway|upstream", re.I)),
     ("validation_error", re.compile(
         r"\b4(00|22)\b|invalid|validation|required|must be|schema", re.I)),
     ("connection_error", re.compile(
         r"ECONN(REFUSED|RESET)|ENOTFOUND|EPIPE|connection (refused|reset|closed|error)"
         r"|network|socket", re.I)),
-    ("server_error", re.compile(
-        r"\b5\d\d\b|internal (server )?error|service unavailable|bad gateway|upstream", re.I)),
 )
 HTTP_CLASSES = {"rate_limit", "auth_error", "not_found", "validation_error", "server_error"}
 
@@ -390,8 +393,23 @@ class FailEcho:
             evidence = (f", worked {a['successes']}/{a['attempts']}"
                         if "successes" in a and "attempts" in a else "")
             conf = rec.get("confidence")
-            conf = f" (confidence {conf:.2f})" if isinstance(conf, (int, float)) else ""
-            return f"FailEcho: try {action}{evidence}{conf}."
+            conf = f" (evidence score {conf:.2f})" if isinstance(conf, (int, float)) else ""
+            # What the server qualified the recommendation with. Dropping any
+            # of it (found in review, 20 Sep) let a decaying action read as
+            # solid: "try retry, worked 100/105" while its recent attempts
+            # were failing. Confidence is a score over observed attempts, not
+            # the chance that this caller recovers.
+            marks = []
+            if rec.get("decaying"):
+                marks.append("recent attempts are failing")
+            if rec.get("warning"):
+                marks.append(str(rec["warning"])[:120])
+            if rec.get("scope") and rec["scope"] != "operation":
+                marks.append(f"evidence pooled across this {rec['scope']}")
+            if rec.get("from_other_agents") is False:
+                marks.append("your own history only")
+            tail = f" -- {'; '.join(marks)}" if marks else ""
+            return f"FailEcho: try {action}{evidence}{conf}{tail}."
         # No recommendation, but evidence: say what others tried and how it
         # went, and that it is not a recommendation. Withholding it left a
         # model with nothing where the network knew backoff worked 128/251.

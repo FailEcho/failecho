@@ -122,7 +122,9 @@
       <h2 id="demand-title" class="label">What agents asked for</h2>
       <p class="band-sub">
         Every query the network answered in the last 24 hours, and whether it
-        had evidence to answer with. A query stores nothing and is never rate
+        had evidence to answer with. A query writes no observation and keeps no
+        record of what you asked -- it does add 1 to a daily counter of
+        answered/unanswered queries -- and is never rate
         limited, so this counts curiosity as well as trouble.
       </p>
     </div>

@@ -242,7 +242,7 @@ fe.recovered("github-mcp", "create_issue", "refresh_schema")  # what fixed it</c
     <p class="band-sub">
       Reporting helps the next agent. To help <em>this</em> one, turn on
       advice: when a watched call fails, the wrapper asks the network what
-      worked (a read that stores nothing) and attaches the answer to the
+      worked (a read that writes no observation; it adds 1 to a daily query counter) and attaches the answer to the
       exception before it goes on up. Nothing is acted on for you, and the
       exception's type and message are unchanged.
     </p>
@@ -299,7 +299,7 @@ except Exception as exc:
     </p>
     <p class="band-sub">
       If your client can only start a local process and cannot speak HTTP, run
-      the relay. It is on PyPI, imports only the MCP SDK, and stores nothing
+      the relay. It is on PyPI, imports only the MCP SDK, and keeps nothing
       itself — every call is forwarded to the same network:
     </p>
     <figure class="snip">
@@ -392,7 +392,7 @@ FailEcho: try backoff, worked n/m (confidence 0.61).</code></pre>
   <section class="shell band" id="rest-api" aria-labelledby="rest-title">
     <div class="band-head">
       <h2 id="rest-title" class="label">Your own code, no MCP</h2>
-      <p class="band-sub">One HTTP call. This one stores nothing and is never rate limited.</p>
+      <p class="band-sub">One HTTP call. It writes no observation and keeps no record of the question, and is never rate limited; it adds 1 to a daily counter of answered/unanswered queries.</p>
     </div>
     <figure class="snip">
       <pre><code>curl -X POST {{PUBLIC_URL}}/v1/query \

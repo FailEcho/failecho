@@ -1385,7 +1385,7 @@ def write_report(state: dict) -> None:
         apf_a = (ca["attempts"] / ca["failures"]) if ca and ca["failures"] else None
         apf_b = (cb["attempts"] / cb["failures"]) if cb and cb["failures"] else None
         rows = [
-            {"metric": "tasks completed", "unit": "%", "ask": _pct(a["completed_rate"]), "blind": _pct(b["completed_rate"]),
+            {"metric": "runs marked completed (see grading)", "unit": "%", "ask": _pct(a["completed_rate"]), "blind": _pct(b["completed_rate"]),
              "better": _better(a["completed_rate"], b["completed_rate"], lower_is_better=False)},
             {"metric": "tokens per completed task", "unit": "", "ask": a["tokens_per_completed"], "blind": b["tokens_per_completed"],
              "better": _better(a["tokens_per_completed"], b["tokens_per_completed"])},
@@ -1395,11 +1395,11 @@ def write_report(state: dict) -> None:
              "better": _better(a["failure_seconds_per_run"], b["failure_seconds_per_run"])},
             {"metric": "retry attempts per failure", "unit": "", "ask": round(apf_a, 2) if apf_a else None, "blind": round(apf_b, 2) if apf_b else None,
              "better": _better(apf_a, apf_b)},
-            {"metric": "pointless retries avoided", "unit": "", "ask": ca["skipped"] if ca else 0, "blind": cb["skipped"] if cb else 0,
+            {"metric": "retries the network said to skip", "unit": "", "ask": ca["skipped"] if ca else 0, "blind": cb["skipped"] if cb else 0,
              "better": _better(-(ca["skipped"] if ca else 0), -(cb["skipped"] if cb else 0))},
         ]
         if key == "test":
-            rows = [r for r in rows if r["metric"] not in ("tasks completed", "tokens per completed task")]
+            rows = [r for r in rows if r["metric"] not in ("runs marked completed (see grading)", "tokens per completed task")]
         if key == "build":
             rows.append({"metric": "seconds waiting on rate limits, per run", "unit": "s", "ask": a["wait_seconds_per_run"],
                          "blind": b["wait_seconds_per_run"], "better": _better(a["wait_seconds_per_run"], b["wait_seconds_per_run"])})
@@ -1408,7 +1408,7 @@ def write_report(state: dict) -> None:
             lost = {side: sum(n for rep, n in lost_memory[side].items() if rep in members) for side in ("ask", "blind")}
             # the agent's own failures are inside OpenCode; what is visible is the
             # artefact, the steps, the tokens, and whether it reached for FailEcho
-            rows = [r for r in rows if r["metric"] in ("tasks completed", "tokens per completed task", "seconds per run")]
+            rows = [r for r in rows if r["metric"] in ("runs marked completed (see grading)", "tokens per completed task", "seconds per run")]
             rows.append({"metric": "model steps per run", "unit": "", "ask": a["model_calls_per_run"], "blind": b["model_calls_per_run"],
                          "better": _better(a["model_calls_per_run"], b["model_calls_per_run"])})
             rows.append({"metric": "FailEcho tool calls per run" if key == "opencode" else "tool errors carrying advice, per run",
@@ -1419,7 +1419,7 @@ def write_report(state: dict) -> None:
             # nothing retries for the model here, so attempts and skips are
             # the harness's numbers and mean nothing; what the model did is
             # in its tool calls, and whether it got the task done
-            rows = [r for r in rows if r["metric"] in ("tasks completed", "tokens per completed task", "seconds per run")]
+            rows = [r for r in rows if r["metric"] in ("runs marked completed (see grading)", "tokens per completed task", "seconds per run")]
             rows.append({"metric": "tool calls per run", "unit": "", "ask": a["tool_calls_per_run"], "blind": b["tool_calls_per_run"],
                          "better": _better(a["tool_calls_per_run"], b["tool_calls_per_run"])})
             rows.append({"metric": "failures with advice attached", "unit": "", "ask": ca["asked"] if ca else 0,
@@ -1455,7 +1455,7 @@ def write_report(state: dict) -> None:
         spr = lambda c: round(c["seconds"] / c["runs"], 1) if c["runs"] else None   # noqa: E731
         versus.append({"group": "provider", "label": "Model providers under real quotas (groq, Gemini, OpenRouter, Ollama)",
                        "since": PROVIDER_CONTROL_SINCE, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": [
-            {"metric": "tasks completed", "unit": "%", "ask": _pct(cr(a)), "blind": _pct(cr(b)),
+            {"metric": "runs marked completed (see grading)", "unit": "%", "ask": _pct(cr(a)), "blind": _pct(cr(b)),
              "better": _better(cr(a), cr(b), lower_is_better=False)},
             {"metric": "provider failures met", "unit": "", "ask": a["failures"], "blind": b["failures"], "better": "tie"},
             {"metric": "provider failures recovered", "unit": "%", "ask": _pct(rr(a)), "blind": _pct(rr(b)),

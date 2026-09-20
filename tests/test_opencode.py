@@ -106,7 +106,7 @@ def test_the_versus_table_has_an_opencode_group(tmp_path, monkeypatch):
     report = json.loads((tmp_path / "fleet.json").read_text())
     (g,) = [g for g in report["versus"] if g["group"] == "opencode"]
     rows = {r["metric"]: r for r in g["rows"]}
-    assert rows["tasks completed"]["ask"] == 100.0 and rows["tasks completed"]["blind"] == 0.0
+    assert rows["runs marked completed (see grading)"]["ask"] == 100.0 and rows["runs marked completed (see grading)"]["blind"] == 0.0
     assert rows["model steps per run"] == {"metric": "model steps per run", "unit": "", "ask": 8.0, "blind": 12.0, "better": "ask"}
     assert rows["FailEcho tool calls per run"]["ask"] == 1.0 and rows["FailEcho tool calls per run"]["blind"] == 0.0
     assert not [g for g in report["versus"] if g["group"] == "provider"], "OpenCode runs stay out of the provider group"

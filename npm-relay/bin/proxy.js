@@ -39,9 +39,10 @@ const ERROR_CLASSES = [
   ["rate_limit", /\b429\b|rate.?limit|too many requests|quota/i],
   ["auth_error", /\b40[13]\b|unauthori[sz]ed|forbidden|permission denied|authenticat|invalid (api )?key/i],
   ["not_found", /\b404\b|not found|no such/i],
+  // server_error first: "503 invalid upstream response" was validation_error
+  ["server_error", /\b5\d\d\b|internal (server )?error|service unavailable|bad gateway|upstream/i],
   ["validation_error", /\b4(00|22)\b|invalid|validation|required|must be|schema/i],
   ["connection_error", /ECONN(REFUSED|RESET)|ENOTFOUND|EPIPE|connection (refused|reset|closed|error)|network|socket/i],
-  ["server_error", /\b5\d\d\b|internal (server )?error|service unavailable|bad gateway|upstream/i],
 ];
 // MCP servers that wrap exactly one API host, by the name they report.
 const DEFAULT_UPSTREAMS = {
@@ -134,8 +135,16 @@ function adviceText(answer) {
   if (rec.action) {
     const a = tried.get(rec.action) || pooled.get(rec.action) || {};
     const evidence = "successes" in a && "attempts" in a ? `, worked ${a.successes}/${a.attempts}` : "";
-    const conf = typeof rec.confidence === "number" ? ` (confidence ${rec.confidence.toFixed(2)})` : "";
-    return `FailEcho: try ${rec.action}${evidence}${conf}.`;
+    const conf = typeof rec.confidence === "number" ? ` (evidence score ${rec.confidence.toFixed(2)})` : "";
+    // everything the server qualified the recommendation with; dropping it
+    // let a decaying action read as solid (review, 20 Sep)
+    const marks = [];
+    if (rec.decaying) marks.push("recent attempts are failing");
+    if (rec.warning) marks.push(String(rec.warning).slice(0, 120));
+    if (rec.scope && rec.scope !== "operation") marks.push(`evidence pooled across this ${rec.scope}`);
+    if (rec.from_other_agents === false) marks.push("your own history only");
+    const tail = marks.length ? ` -- ${marks.join("; ")}` : "";
+    return `FailEcho: try ${rec.action}${evidence}${conf}${tail}.`;
   }
   for (const [lead, source] of [["other agents tried", tried], ["on this service's other operations, agents tried", pooled]]) {
     const seen = [...source.values()].filter((a) => "successes" in a && "attempts" in a && a.attempts);
@@ -192,6 +201,8 @@ class Network {
   }
 
   observe(service, operation, outcome, latencyMs, errorType, errorCode) {
+    // never an error_message field: the text is read locally to pick a class
+    // and dropped, whatever the environment says (review, 20 Sep)
     const body = { service, operation, outcome };
     if (outcome === "failure") {
       body.error_type = errorType;

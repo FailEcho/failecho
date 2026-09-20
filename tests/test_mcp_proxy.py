@@ -204,7 +204,7 @@ def test_an_iserror_result_gets_one_line_of_advice_and_keeps_everything_else(net
     r = json.loads(s.recv())["result"]
     assert r["isError"] is True
     assert r["content"][0] == {"type": "text", "text": "429 rate limit exceeded secret-error-token"}
-    assert r["content"][1] == {"type": "text", "text": "FailEcho: try backoff, worked 128/251 (confidence 0.61)."}
+    assert r["content"][1] == {"type": "text", "text": "FailEcho: try backoff, worked 128/251 (evidence score 0.61)."}
     assert len(r["content"]) == 2
     s.close()
 
@@ -215,7 +215,7 @@ def test_a_jsonrpc_error_gets_the_line_on_its_message_and_keeps_its_code(net):
     s.send({"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "rpc_error", "arguments": {}}})
     e = json.loads(s.recv())["error"]
     assert e["code"] == -32603
-    assert e["message"].splitlines() == ["upstream timeout", "FailEcho: try backoff, worked 128/251 (confidence 0.61)."]
+    assert e["message"].splitlines() == ["upstream timeout", "FailEcho: try backoff, worked 128/251 (evidence score 0.61)."]
     s.close()
 
 
@@ -456,7 +456,7 @@ def test_a_remote_server_through_the_proxy_with_the_official_client(http_server,
     # the SDK server hides the exception's text ("Error executing tool
     # fails"); what matters is that the error arrives with the line added
     assert is_error and len(texts) == 2
-    assert texts[-1] == "FailEcho: try backoff, worked 128/251 (confidence 0.61)."
+    assert texts[-1] == "FailEcho: try backoff, worked 128/251 (evidence score 0.61)."
     time.sleep(0.5)
     assert {(o["service"], o["operation"], o["outcome"]) for o in net.observed if "outcome" in o} == {
         ("fake-http-server", "ok", "success"), ("fake-http-server", "fails", "failure")}
@@ -564,3 +564,35 @@ def test_a_tool_no_pattern_covers_is_not_sent_to_any_host():
         assert [q["service"] for q in n.queries] == ["fake-server"]
     finally:
         n.close()
+
+
+def test_the_proxy_never_sends_error_text_even_with_send_errors_on(net):
+    """FAILECHO_SEND_ERRORS is the wrapper's switch, for an author's own
+    errors. Through the proxy the text belongs to somebody else's tool."""
+    s = Session(net.url, {"FAILECHO_SEND_ERRORS": "1"})
+    s.init()
+    s.send({"jsonrpc": "2.0", "id": 90, "method": "tools/call", "params": {"name": "fails", "arguments": {}}})
+    s.recv()
+    s.close()
+    sent = json.dumps(net.observed)
+    assert "error_message" not in sent and "secret-error-token" not in sent, sent[:300]
+
+
+def test_the_advice_line_carries_what_the_server_qualified_it_with(impl):
+    """A decaying recommendation must not read as solid."""
+    import shutil
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+    from failecho_autoreport import FailEcho
+    answer = {"recommendation": {"action": "retry", "confidence": 0.89, "decaying": True,
+                                 "scope": "service", "from_other_agents": False},
+              "recovery_actions": [{"action": "retry", "successes": 100, "attempts": 105}]}
+    line = FailEcho.advice_text(answer)
+    for mark in ("recent attempts are failing", "evidence pooled across this service",
+                 "your own history only", "evidence score 0.89"):
+        assert mark in line, line
+    out = subprocess.run(["node", "-e",
+                          "const p=require(process.argv[1]);process.stdout.write(p.adviceText(JSON.parse(process.argv[2]))||'')",
+                          str(ROOT / "npm-relay" / "bin" / "proxy.js"), json.dumps(answer)],
+                         capture_output=True, timeout=30)
+    assert out.stdout.decode() == line

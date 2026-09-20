@@ -575,8 +575,8 @@ def test_the_versus_table_is_built_from_the_same_ledger(tmp_path, monkeypatch):
     rows = {r["metric"]: r for r in versus[0]["rows"]}
     assert rows["seconds per run"] == {"metric": "seconds per run", "unit": "s", "ask": 25.0, "blind": 34.0, "better": "ask"}
     assert rows["retry attempts per failure"]["ask"] == 1.0 and rows["retry attempts per failure"]["blind"] == 2.0
-    assert rows["pointless retries avoided"]["ask"] == 2 and rows["pointless retries avoided"]["better"] == "ask"
-    assert "tasks completed" not in rows, "the test endpoints have no task to complete"
+    assert rows["retries the network said to skip"]["ask"] == 2 and rows["retries the network said to skip"]["better"] == "ask"
+    assert "runs marked completed (see grading)" not in rows, "the test endpoints have no task to complete"
 
 
 def test_the_versus_table_has_a_provider_group_since_the_control_changed(tmp_path, monkeypatch):
@@ -606,7 +606,7 @@ def test_the_versus_table_has_a_provider_group_since_the_control_changed(tmp_pat
     prov = [g for g in versus if g["group"] == "provider"][0]
     assert prov["since"] == F.PROVIDER_CONTROL_SINCE and prov["runs_ask"] == 1 and prov["runs_blind"] == 1
     rows = {r["metric"]: r for r in prov["rows"]}
-    assert rows["tasks completed"] == {"metric": "tasks completed", "unit": "%", "ask": 100.0, "blind": 0.0, "better": "ask"}
+    assert rows["runs marked completed (see grading)"] == {"metric": "runs marked completed (see grading)", "unit": "%", "ask": 100.0, "blind": 0.0, "better": "ask"}
     assert rows["provider failures recovered"]["ask"] == 100.0 and rows["provider failures recovered"]["blind"] == 0.0
     assert rows["provider failures met"]["ask"] == 1 and rows["provider failures met"]["better"] == "tie"
 

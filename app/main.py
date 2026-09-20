@@ -254,7 +254,7 @@ shape, so you can add it yourself without reading the setup page:
   }}
 }}
 
-Local process instead of HTTP (same four tools, relays here, stores nothing).
+Local process instead of HTTP (same four tools, relays here, keeps no data of its own).
 Unlike the HTTP endpoint, both of these download and execute our code on your
 machine, from a public package registry -- so they are a bigger ask than the
 endpoint above, not a smaller one. An agent that will not run them unprompted
@@ -305,7 +305,7 @@ they are not the same decision:
 
 - REST, or the HTTP MCP endpoint: nothing local. One outbound HTTPS request.
 - `uvx failecho-mcp` / `npx -y failecho-mcp`: a local relay process, our code,
-  from PyPI or npm. It forwards and stores nothing, and it is code on your
+  from PyPI or npm. It forwards and keeps nothing of its own, and it is code on your
   machine.
 - The Claude Code plugin: a local hook that runs after every MCP tool call,
   in every future session, until disabled.
@@ -367,7 +367,8 @@ options, and it is option 2 below:
 - **Then verify it yourself, now, with one request -- run it, do not hand it
   to the user.** In the session that just registered the server you almost
   certainly cannot call its tools yet -- see the next point -- so verify over
-  REST instead. This is the request; it stores nothing and needs no key:
+  REST instead. This is the request; it writes no observation and needs no key
+  (it does add 1 to a daily counter of answered/unanswered queries):
 
       curl -sX POST {base_url}/v1/query -H 'Content-Type: application/json' \
         -d '{{"service":"api.github.com","operation":"create_issue","error_type":"rate_limit"}}'

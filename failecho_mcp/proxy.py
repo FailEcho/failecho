@@ -296,6 +296,13 @@ class Proxy:
         self.upstreams = list(upstreams or []) + parse_upstreams([os.environ.get("FAILECHO_UPSTREAM", "")])
         disabled = os.environ.get("FAILECHO_DISABLED", "").strip().lower() in ("1", "true", "yes", "on")
         self.fe = None if disabled else (fe or FailEcho())
+        if self.fe is not None:
+            # The proxy sees other people's tool traffic, so its promise is
+            # unconditional: the error text is read here to pick a class and
+            # dropped. FAILECHO_SEND_ERRORS is the wrapper's switch, for code
+            # whose own errors the author knows; it must not reach through
+            # here (found in review, 20 Sep).
+            self.fe.send_errors = False
         if advise is None:
             advise = os.environ.get("FAILECHO_ADVISE", "1").strip().lower() not in ("0", "false", "no", "off")
         self.advise = bool(advise) and self.fe is not None

@@ -444,7 +444,7 @@ def test_advice_is_attached_and_the_exception_is_otherwise_unchanged():
     assert info.value.failecho is SWITCH
     assert client.last_advice[("api.groq.com", "chat.completions")] is SWITCH
     line = FailEcho.advice_text(info.value)
-    assert line == "FailEcho: try switch_model, worked 62/64 (confidence 0.89)."
+    assert line == "FailEcho: try switch_model, worked 62/64 (evidence score 0.89)."
     if hasattr(info.value, "__notes__"):
         assert info.value.__notes__ == [line]
     drained(client)
