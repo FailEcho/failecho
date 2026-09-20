@@ -405,12 +405,17 @@ def http_server(request):
     proc = subprocess.Popen([sys.executable, str(ROOT / "tests" / "fake_http_mcp_server.py"), str(port), request.param, "tok"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     import socket
-    for _ in range(100):
+    # up to 30 s: uvicorn's start is slow when the machine is busy, and a
+    # half-started server made this test flaky in the full suite (20 Sep)
+    for _ in range(300):
         try:
-            socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+            socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
             break
         except OSError:
             time.sleep(0.1)
+    else:
+        proc.terminate()
+        pytest.fail(f"the test HTTP server never came up on {port}")
     yield f"http://127.0.0.1:{port}/mcp"
     proc.terminate()
     proc.wait(timeout=10)
@@ -475,7 +480,10 @@ def test_a_refused_remote_answers_the_client_instead_of_hanging(http_server, net
 
 
 def test_an_unreachable_remote_fails_fast_with_a_message():
-    s = Session("http://127.0.0.1:9", server=[f"http://127.0.0.1:{_free_port()}/mcp"])
+    # port 9 (discard) is reliably closed here; a "free" port can be taken by
+    # the next test's server before the proxy gets there, and then the call
+    # succeeds instead of failing (flaky in the full suite, 20 Sep)
+    s = Session("http://127.0.0.1:9", server=["http://127.0.0.1:9/mcp"])
     started = time.monotonic()
     s.send({"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}})
     err = json.loads(s.recv())
