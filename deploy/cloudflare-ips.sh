@@ -30,12 +30,16 @@ while true; do
   num=$(ufw status numbered | grep -i 'cloudflare' | tail -1 \
         | sed 's/^\[ *\([0-9]*\).*/\1/' || true)
   [ -z "$num" ] && break
-  yes | ufw delete "$num" >/dev/null
+  # --force, not `yes |`: ufw stops reading stdin once it has its answer, so
+  # `yes` died of SIGPIPE and pipefail failed the whole run -- weekly, from
+  # 13 Sep until 20 Sep, leaving the ranges unrefreshed (the rules themselves
+  # were intact).
+  ufw --force delete "$num" >/dev/null
 done
 
 # ...and the blanket web rules, if they are still there.
 for spec in "80/tcp" "443/tcp"; do
-  yes | ufw delete allow "$spec" >/dev/null 2>&1 || true
+  ufw --force delete allow "$spec" >/dev/null 2>&1 || true
 done
 
 added=0

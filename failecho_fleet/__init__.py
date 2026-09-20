@@ -68,6 +68,11 @@ ETAG_BODY_MAX = 32 * 1024
 #: Not above 300: the guest caps any task there (guest_init.MAX_TIMEOUT,
 #: baked into the rootfs) and a run it kills loses all of its events.
 OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 300)
+#: Least time between two OpenCode runs. Its guest takes 768 MB, three times
+#: a builder's, and on 20 Sep swap reached 3.6 of 4 GB with one running every
+#: VM tick; production lives on the same host. A gap costs runs per hour, not
+#: the comparison: both twins are slowed the same way.
+OPENCODE_MIN_GAP_SECONDS = int(os.environ.get("FLEET_OPENCODE_MIN_GAP") or 600)
 #: What the sandbox guest is told to report to. Unset means the in-guest
 #: wrapper stays off; there is deliberately no default.
 LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None
@@ -1644,8 +1649,15 @@ def main(argv: list[str] | None = None) -> int:
             skipped = 0
             members = len(lane_personas(lane))
             idx = persona_index(state[cursor], lane)
-            while (PERSONAS[idx][2] in dead or PERSONAS[idx][2] in capped) and skipped < members:
-                if PERSONAS[idx][2] in capped:
+            last_oc = float(state.get("last_opencode_at") or 0)
+            def _too_soon(i: int) -> bool:
+                return (PERSONAS[i][1] == "opencode"
+                        and 0 < time.time() - last_oc < OPENCODE_MIN_GAP_SECONDS)
+            while (PERSONAS[idx][2] in dead or PERSONAS[idx][2] in capped or _too_soon(idx)) and skipped < members:
+                if _too_soon(idx):
+                    log(f"skip {PERSONAS[idx][0]}: another OpenCode run less than "
+                        f"{OPENCODE_MIN_GAP_SECONDS // 60} min ago (memory)")
+                elif PERSONAS[idx][2] in capped:
                     log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} at its daily cap")
                 else:
                     log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone; next probe after "
@@ -1656,7 +1668,7 @@ def main(argv: list[str] | None = None) -> int:
                 idx = persona_index(state[cursor], lane)
             if skipped >= members:
                 _save(state)
-                log("every provider is out of daily quota; nothing to run this tick"); return 0
+                log("nothing runnable this tick (quota, cap or the OpenCode gap)"); return 0
             state[cursor] += 1
         state.setdefault("provider_calls_today", {})
         if state.get("provider_day") != today:
@@ -1668,6 +1680,11 @@ def main(argv: list[str] | None = None) -> int:
         _save(state)
 
     reporter, path, provider, asks, workload = PERSONAS[idx]
+    if path == "opencode":
+        with _state_lock():
+            st = _state()
+            st["last_opencode_at"] = time.time()
+            _save(st)
     run = Run(reporter, path, provider, asks)
     started = time.monotonic()
     task = None

@@ -1061,3 +1061,38 @@ def test_a_run_the_guest_killed_for_memory_is_not_a_failed_task():
     assert F._lost_to_guest_memory(lost)
     assert not F._lost_to_guest_memory(ok), "a kill after the result cost nothing"
     assert not F._lost_to_guest_memory(plain) and not F._lost_to_guest_memory({})
+
+
+def test_opencode_runs_wait_for_the_gap_so_the_host_keeps_its_memory(tmp_path, monkeypatch):
+    """Its guest is 768 MB on a host that also runs production, so a second
+    OpenCode run inside the gap gives its slot to the next persona."""
+    import datetime as dt
+    import json
+    import time
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(F, "assert_lab_only", lambda: None)
+    monkeypatch.setattr(F.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(F.FailEcho, "flush", lambda self, timeout=5.0: True)
+    names = [p[0] for p in F.PERSONAS]
+    vm = F.lane_personas("vm")
+    start = next(i for i, m in enumerate(vm) if F.PERSONAS[m][1] == "opencode")
+    ran = []
+    monkeypatch.setattr(F.Run, "run_opencode", lambda self, *a, **k: ran.append(self.reporter) or "done")
+    monkeypatch.setattr(F.Run, "run_build", lambda self, *a, **k: ran.append(self.reporter) or "done")
+    state = {"next_vm": start, "runs": [], "day": dt.date.today().isoformat(), "runs_today": 0,
+             "last_opencode_at": time.time()}
+    (tmp_path / "state.json").write_text(json.dumps(state))
+    assert F.main(["--lane", "vm"]) == 0
+    assert ran and F.PERSONAS[names.index(ran[0])][1] != "opencode", f"ran {ran[0]} inside the gap"
+
+    ran.clear()
+    state = json.loads((tmp_path / "state.json").read_text())
+    state["next_vm"] = start
+    state["last_opencode_at"] = time.time() - F.OPENCODE_MIN_GAP_SECONDS - 1
+    (tmp_path / "state.json").write_text(json.dumps(state))
+    assert F.main(["--lane", "vm"]) == 0
+    assert ran and F.PERSONAS[names.index(ran[0])][1] == "opencode", "the gap has passed; it should run"
