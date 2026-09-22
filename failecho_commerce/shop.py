@@ -36,7 +36,7 @@ BUILDS = {
     "v3": {"fields": ["email", "address", "card", "coupon"], "broken": "checkout.payment"},
 }
 
-STATE = {"build": "v1", "stock": 3, "challenge_after": 0, "requests": 0}
+STATE = {"build": "v1", "stock": 3, "challenge_after": 0, "requests": 0, "card": "ok"}
 
 
 def _form(build: str) -> str:
@@ -79,6 +79,10 @@ class Shop(BaseHTTPRequestHandler):
         if path == "/checkout":
             return self._send(200, f"<html><body>{_form(STATE['build'])}</body></html>")
         if path == "/pay":
+            if STATE["card"] == "declined":
+                # the person's card, not the merchant's site: the adapter
+                # must recognise this and report nothing at all
+                return self._send(200, "<html><body>Your card was declined.</body></html>")
             if build["broken"] == "checkout.payment":
                 time.sleep(0.2)
                 return self._send(504, "<html><body>Gateway timeout</body></html>")

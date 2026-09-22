@@ -80,17 +80,49 @@ what one agent wants to tell another. The compromise: send a hash of the
 selector by default, and the selector itself only when the reporter is the
 site's own operator reporting about their own site.
 
-## The adapter, when it is built
+## The adapter (built 22 Sep, `failecho_commerce/browser.py`)
 
 Wrap the page object so failures are caught where they happen, with the same
 three properties the Python wrapper has (never raises, never blocks, never
 changes behaviour):
 
-    page = failecho.watch(page, site="example.com", flow="checkout")
-    page.click("#pay")     # on failure: classify, report shape, attach advice
+    from failecho_commerce.browser import watch
+
+    page = watch(page, site="example.com", fe=failecho)
+    page.click("#pay", op="checkout.payment")
 
 The advice arrives on the exception the agent already handles, exactly as it
 does in `failecho-autoreport`.
+
+It does not import Playwright. It wraps whatever page object it is handed and
+recognises failures by what they say, so it works with Playwright, with
+Puppeteer through a binding, and with a stub -- which is how it is tested here,
+on a host that does not have 400-700 MB to spare for a browser.
+
+Three things it does that a naive wrapper would get wrong, each with a test in
+`tests/test_browser_adapter.py`:
+
+* **A 403 challenge is caught where it happens.** A driver does not raise when
+  it navigates to a challenge page; it returns, and the agent finds out one
+  click later, where the failure looks like a missing button. Reporting that as
+  `element_missing` would teach the network a lie, so a step that *returns* is
+  checked too: the status is already known, and the page is only read when the
+  status is bad.
+* **A declined card is counted as nothing at all.** Not a failure -- it is not
+  the merchant's -- and not a success either, which is why the payment and
+  login steps read the page on the way out. Everywhere else the success path
+  stays free.
+* **The page beats the driver's words.** Every Playwright error is a
+  `TimeoutError` of some kind, so the class comes from the page first and the
+  exception's own class name last.
+
+Advice for `element_missing` splits on whether the shape changed since this
+step was last seen: an unchanged page gets `reload`, a redeployed one gets
+`human_handoff`, because reloading will not bring back a button that was
+renamed.
+
+What remains, and needs a machine with a browser: running the same test file
+against real Playwright by swapping `FakePage` out.
 
 ## Staging
 
