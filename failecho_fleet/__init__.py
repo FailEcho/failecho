@@ -1932,7 +1932,8 @@ def main(argv: list[str] | None = None) -> int:
     if run.opencode is not None:
         # what it actually produced, checked against truth fetched from the
         # same public APIs the task names (see grading.py)
-        record["graded"] = grade(task[0] if task else "", run.opencode.get("result_head") or "",
+        record["graded"] = grade(task[0] if task else "",
+                                 run.opencode.get("result_text") or run.opencode.get("result_head") or "",
                                  bool(run.opencode.get("completed")))
         record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "advice_seen", "idle_after_result", "guest_oom_kills",
                                                                 "mcp_log", "steps", "exit",

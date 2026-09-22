@@ -347,6 +347,51 @@ def test_a_client_that_hangs_up_is_not_an_error_here(client):
             sent.append(message)
 
         asyncio.run(mcp_endpoint(scope, receive, send))   # must not raise
-        assert sent == [], "nothing is sent to a client that is already gone"
+        # A response is still produced: returning without one made Starlette's
+        # middleware raise RuntimeError("No response returned.") instead, which
+        # is the same traceback wearing a different hat.
+        assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
+        assert sent[0]["status"] == 499, "nginx's code for a client that closed the request"
+    finally:
+        mcp_endpoint.app = real
+
+
+def test_a_disconnect_does_not_become_no_response_returned(client):
+    """The regression this pair of tests exists for: the first fix swallowed
+    ClientDisconnect and returned, and Starlette's BaseHTTPMiddleware raised
+    RuntimeError("No response returned.") two seconds after that deploy. The
+    endpoint is wrapped by real middleware here, so the whole stack has to be
+    satisfied, not just the endpoint."""
+    import anyio
+    from starlette.requests import ClientDisconnect
+
+    from app.main import app as real_app
+    from app.mcp_server import mcp_endpoint
+
+    class Hangup:
+        async def __call__(self, scope, receive, send):
+            raise ClientDisconnect()
+
+    real, mcp_endpoint.app = mcp_endpoint.app, Hangup()
+    try:
+        messages = []
+
+        async def drive():
+            scope = {"type": "http", "http_version": "1.1", "method": "POST", "path": "/mcp",
+                     "raw_path": b"/mcp", "query_string": b"", "root_path": "", "scheme": "http",
+                     "headers": [(b"host", b"testserver"), (b"content-type", b"application/json")],
+                     "client": ("127.0.0.1", 50000), "server": ("testserver", 80), "app": real_app}
+
+            async def receive():
+                return {"type": "http.request", "body": b"{}", "more_body": False}
+
+            async def send(message):
+                messages.append(message)
+
+            await real_app(scope, receive, send)
+
+        anyio.run(drive)
+        statuses = [m.get("status") for m in messages if m["type"] == "http.response.start"]
+        assert statuses == [499], statuses
     finally:
         mcp_endpoint.app = real

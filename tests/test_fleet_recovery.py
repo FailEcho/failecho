@@ -12,6 +12,7 @@ evidence askers inherit gets made.
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 from email.message import Message
 
@@ -1451,3 +1452,36 @@ def test_a_graded_light_lane_run_reaches_the_scoreboard(tmp_path, monkeypatch):
     assert rows["every checked value correct"]["blind"] == 0.0
     assert rows["runs where truth was checkable"] == {
         "metric": "runs where truth was checkable", "unit": "", "ask": 1, "blind": 1, "better": "tie"}
+
+
+def test_the_grader_reads_the_whole_result_file_not_the_ledger_head():
+    """The ledger keeps 200 characters of a result file, which is plenty to
+    eyeball a run and not enough to grade one: five release tags are about
+    400. Every such run was being marked invalid for being cut off, and the
+    audit on 22 Sep found it. The grader is handed the full text; a head that
+    genuinely is short still fails, because three tags are not five."""
+    import failecho_fleet.grading as grading
+    from failecho_fleet.opencode import OC_TASKS
+
+    tags = ["0.12.17", "0.12.16", "0.12.15", "0.12.14", "0.12.13"]
+    real = json.dumps([{"tag": t, "published_at": "2026-09-18T18:59:24Z"} for t in tags], indent=2)
+    prompt = next(p for p, _ in OC_TASKS if "five newest tags" in p)
+    original, grading.truth = grading.truth, lambda kind, arg: tags if kind == "github_tags" else None
+    try:
+        assert grading.grade(prompt, real, True)["correct"] is True
+        assert grading.grade(prompt, real[:200], True)["valid"] is False, "a short head is not five tags"
+        # truncated mid-record, but with all five labels visible
+        assert grading.grade(prompt, real[:-3], True)["correct"] is True
+    finally:
+        grading.truth = original
+
+
+def test_the_run_record_carries_the_text_the_grader_needs():
+    """result_text is for grading and is not stored: the record copies a
+    fixed set of keys and this is not one of them."""
+    import inspect
+
+    source = inspect.getsource(F.run_once) if hasattr(F, "run_once") else open("failecho_fleet/__init__.py").read()
+    assert 'run.opencode.get("result_text")' in source
+    stored = re.search(r'record\["opencode"\] = \{k: run\.opencode\.get\(k\) for k in \(([^)]*)\)', source, re.S)
+    assert stored and "result_text" not in stored.group(1), "the full text must not be stored in the ledger"

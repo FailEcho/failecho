@@ -486,6 +486,20 @@ class _MCPEndpoint:
             # scanners, a restarted client) and a log full of tracebacks
             # that mean nothing is how a traceback that means something
             # gets missed.
+            #
+            # A response still has to be produced. Swallowing the exception
+            # and returning is what the first version did, and Starlette's
+            # middleware then raised `RuntimeError("No response returned.")`
+            # in its place -- one traceback traded for another, visible in
+            # production two seconds after that deploy. So: 499, nginx's
+            # code for a client that closed the request, written to a socket
+            # that is probably already gone.
+            try:
+                await send({"type": "http.response.start", "status": 499,
+                            "headers": [(b"content-length", b"0")]})
+                await send({"type": "http.response.body", "body": b""})
+            except Exception:  # noqa: BLE001 - the socket really is gone
+                pass
             return
 
 

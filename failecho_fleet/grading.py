@@ -444,7 +444,10 @@ def _grade_list(checks, text: str, out: dict) -> dict:
     try:
         data = json.loads((text or "").strip())
     except ValueError:
-        data = None
+        # A truncated file, the same way the mapping path handles one: pull
+        # the labelled values out rather than calling the run invalid for
+        # having been cut off somewhere we cannot see.
+        data = [{label: v} for v in re.findall(rf'"{re.escape(label)}"\s*:\s*"([^"]{{1,60}})"', text or "")]
     if not isinstance(data, list) or not data:
         out["valid"] = False
         return out

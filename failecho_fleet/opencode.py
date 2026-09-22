@@ -337,6 +337,12 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
                answer=("\n".join(ev.text))[-300:], timed_out=bool(r.get("timed_out")))
     result = result.strip()
     out["result_head"] = result[:200]
+    # The grader reads the whole file, the ledger keeps the head. 200
+    # characters is plenty to eyeball a run and not enough to grade one: a
+    # list of five release tags is about 400, so every such run was being
+    # marked invalid for being cut off. Not stored -- the record copies a
+    # fixed set of keys, and this is not one of them.
+    out["result_text"] = result[:4000]
     out["completed"] = bool(result) and re.search(check, result) is not None
     if ev.errors:
         out["error"] = ev.errors[-1][:200]
