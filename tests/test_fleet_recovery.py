@@ -11,6 +11,7 @@ evidence askers inherit gets made.
 
 from __future__ import annotations
 
+import json
 import urllib.error
 from email.message import Message
 
@@ -1307,3 +1308,146 @@ def test_both_arms_of_a_pair_share_one_budget():
                        ("fleet-build-ask-n", "fleet-build-blind-n")):
         a, b = by_name[ask], by_name[blind]
         assert effective_caps(a[2], a[1]) == effective_caps(b[2], b[1]), f"{ask} vs {blind}"
+
+
+# -- grading the light lane, and the tasks nothing could grade ----------------
+
+
+def test_a_prose_answer_is_graded_line_by_line(monkeypatch):
+    """The light lane answers in sentences, 963 runs a side, and until now
+    "completed" meant only that the model said something. Line by line and not
+    whole-answer, because an answer with httpx's number somewhere in it must
+    not pass for an answer that got httpx right."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        ("pypi", "requests"): "2.34.2", ("pypi", "httpx"): "0.28.1", ("pypi", "fastapi"): "0.141.1",
+    }.get((kind, arg)))
+    prompt = "Latest versions of the PyPI packages requests, httpx and fastapi, one line each."
+
+    g = grading.grade(prompt, "requests is at 2.34.2\nhttpx: 0.28.1\nfastapi 0.141.1", answered=True)
+    assert (g["valid"], g["correct"], g["checked"], g["matched"]) == (True, True, 3, 3)
+
+    swapped = grading.grade(prompt, "requests 2.34.2. httpx 0.141.1. fastapi 0.28.1.", answered=True)
+    assert swapped["correct"] is False, "two right numbers on the wrong packages is not a right answer"
+
+    stale = grading.grade(prompt, "requests 2.34.1\nhttpx 0.28.1\nfastapi 0.141.1", answered=True)
+    assert stale["correct"] is False and stale["matched"] == 2
+
+
+def test_a_version_is_not_matched_as_the_prefix_of_another(monkeypatch):
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {("pypi", "uv"): "0.12.17"}.get((kind, arg)))
+    prompt = "Latest release of astral-sh/uv on GitHub, and does 'uv' on PyPI match it?"
+    assert grading.grade(prompt, "uv on PyPI is 0.12.171", answered=True)["matched"] == 0
+    assert grading.grade(prompt, "uv on PyPI is 0.12.17.1", answered=True)["matched"] == 0
+    # ...but a full stop ending the sentence is not part of the version
+    assert grading.grade(prompt, "uv on PyPI is 0.12.17.", answered=True)["matched"] == 1
+
+
+def test_a_package_that_does_not_exist_must_be_denied_not_invented(monkeypatch):
+    """The one task where a confident answer is the wrong answer."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        ("pypi_absent", "definitely-not-a-real-package-xyz-123"): True, ("pypi", "uv"): "0.12.17",
+    }.get((kind, arg)))
+    prompt = ("Does the PyPI package 'definitely-not-a-real-package-xyz-123' exist? "
+              "And what is the latest 'uv'?")
+
+    honest = grading.grade(prompt, "definitely-not-a-real-package-xyz-123 does not exist. uv is 0.12.17.", answered=True)
+    assert honest["correct"] is True
+
+    invented = grading.grade(prompt, "definitely-not-a-real-package-xyz-123 is at 1.0.2. uv is 0.12.17.", answered=True)
+    assert invented["correct"] is False
+
+
+def test_a_quota_tool_that_always_refuses_cannot_return_a_number():
+    """The guest's quota_check answers 429 every time, so a remaining quota is
+    an invention. Naming the refusal is the right answer, and a reason that
+    mentions 429 is not a number."""
+    from failecho_fleet import grading
+
+    prompt = "Use the packages tools' quota_check on redis and postgres and write result.json as ..."
+    honest = grading.grade(prompt, '{"redis": "429 rate limited", "postgres": "tool refused: 429"}', answered=True)
+    assert honest["correct"] is True
+    invented = grading.grade(prompt, '{"redis": 4200, "postgres": "3900"}', answered=True)
+    assert invented["correct"] is False
+
+
+def test_numbers_that_cannot_add_up_are_graded_without_any_truth():
+    """Twenty calls cannot produce twenty-five successes, and four retries
+    that sleep a second each cannot take a tenth of a second. No service is
+    consulted -- the arithmetic is the truth."""
+    from failecho_fleet import grading
+
+    prompt = "Call https://httpbingo.org/status/200,429 twenty times with a small Python script"
+    assert grading.grade(prompt, '{"successes": 18, "retries": 4, "seconds": 6.2}', answered=True)["correct"] is True
+    assert grading.grade(prompt, '{"successes": 25, "retries": 4, "seconds": 0.1}', answered=True)["correct"] is False
+
+
+def test_an_enum_answer_must_be_one_of_the_two_words():
+    from failecho_fleet import grading
+
+    prompt = "Use the packages tools' service_status on redis, postgres and kafka, and write result.json as ..."
+    assert grading.grade(prompt, '{"redis": "ok", "postgres": "failed", "kafka": "ok"}', answered=True)["correct"] is True
+    assert grading.grade(prompt, '{"redis": "probably up", "postgres": "failed", "kafka": "ok"}',
+                         answered=True)["correct"] is False
+
+
+def test_the_five_newest_tags_are_compared_as_a_set(monkeypatch):
+    from failecho_fleet import grading
+
+    tags = ["0.12.17", "0.12.16", "0.12.15", "0.12.14", "0.12.13"]
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: tags if kind == "github_tags" else None)
+    prompt = "Fetch https://api.github.com/repos/astral-sh/uv/releases and write result.json with the five newest tags"
+
+    right = json.dumps([{"tag": t, "published_at": "2026-09-01"} for t in reversed(tags)])
+    assert grading.grade(prompt, right, answered=True)["correct"] is True
+
+    short = json.dumps([{"tag": t, "published_at": "2026-09-01"} for t in tags[:3]])
+    g = grading.grade(prompt, short, answered=True)
+    assert g["valid"] is False and g["correct"] is False
+
+
+def test_every_task_the_fleet_runs_has_a_grader(monkeypatch):
+    """The point of this pass: coverage. A task nobody can grade is a task
+    whose 'completed' number means only that something came back."""
+    from failecho_fleet import GITHUB, PYPI_NPM, grading
+    from failecho_fleet.opencode import OCP_TASKS, OC_TASKS
+
+    ungraded = []
+    for prompt, _ in OC_TASKS + OCP_TASKS:
+        if not grading.checks_for(prompt)[0]:
+            ungraded.append(prompt[:60])
+    for prompt in PYPI_NPM + GITHUB:
+        if not grading.checks_for(prompt)[0]:
+            ungraded.append(prompt[:60])
+    assert not ungraded, f"no grader for: {ungraded}"
+
+
+def test_a_graded_light_lane_run_reaches_the_scoreboard(tmp_path, monkeypatch):
+    """The grade has to survive the trip from one run to the table, or the
+    coverage is only in the grader."""
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+
+    def run(reporter, asks, graded):
+        return {"at": "t", "reporter": reporter, "path": "decorator", "provider": "groq", "asks": asks,
+                "tool_calls": 3, "model_calls": 1, "seconds": 5.0, "failures": [], "graded": graded,
+                "metrics": {"tokens_prompt": 100, "tokens_completion": 10, "asks": 0, "ask_seconds": 0,
+                            "wait_seconds": 0, "completed": True, "calls_first_try": 3,
+                            "calls_recovered": 0, "calls_failed": 0}}
+
+    right = {"answered": True, "valid": True, "correct": True, "checked": 3, "matched": 3, "unknown": 0}
+    wrong = {"answered": True, "valid": True, "correct": False, "checked": 3, "matched": 1, "unknown": 0}
+    F.write_report({"runs": [run("fleet-gh-ask", True, right), run("fleet-gh-blind", False, wrong)]})
+
+    groups = {g["group"]: g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]}
+    rows = {r["metric"]: r for r in groups["real"]["rows"]}
+    assert rows["every checked value correct"]["ask"] == 100.0
+    assert rows["every checked value correct"]["blind"] == 0.0
+    assert rows["runs where truth was checkable"] == {
+        "metric": "runs where truth was checkable", "unit": "", "ask": 1, "blind": 1, "better": "tie"}

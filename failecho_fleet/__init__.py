@@ -1573,6 +1573,24 @@ def write_report(state: dict) -> None:
                          "better": _better(a["tool_calls_per_run"], b["tool_calls_per_run"])})
             rows.append({"metric": "failures with advice attached", "unit": "", "ask": ca["asked"] if ca else 0,
                          "blind": cb["asked"] if cb else 0, "better": "tie"})
+        if key not in ("opencode", "ocproxy") and (a.get("graded_runs") or b.get("graded_runs")):
+            # The light lane answers in prose and was graded on a pattern
+            # until 22 Sep: "completed" meant the model said something. These
+            # three rows say what it actually got right, on far more runs than
+            # the OpenCode pair will ever produce.
+            def _rate(side, num, den):
+                n, d = side.get(num, 0), side.get(den, 0)
+                return _pct(n / d) if d else None
+            valid = (_rate(a, "valid_runs", "graded_runs"), _rate(b, "valid_runs", "graded_runs"))
+            correct = (_rate(a, "correct_runs", "checkable_runs"), _rate(b, "correct_runs", "checkable_runs"))
+            rows.append({"metric": "answer complete and not a placeholder", "unit": "%",
+                         "ask": valid[0], "blind": valid[1],
+                         "better": _better(valid[0], valid[1], lower_is_better=False)})
+            rows.append({"metric": "every checked value correct", "unit": "%",
+                         "ask": correct[0], "blind": correct[1],
+                         "better": _better(correct[0], correct[1], lower_is_better=False)})
+            rows.append({"metric": "runs where truth was checkable", "unit": "",
+                         "ask": a.get("checkable_runs", 0), "blind": b.get("checkable_runs", 0), "better": "tie"})
         versus.append({"group": key, "label": label, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": rows})
     # Model providers under their real quotas: the model-driven personas
     # (not builders, not explorers) since blind started retrying once. A
@@ -1903,6 +1921,14 @@ def main(argv: list[str] | None = None) -> int:
         record["answer"] = answer[:200]
     if any(m in answer for m in _NOT_A_RUN):
         record["answer"] = answer[:200]
+    if run.opencode is None and run.build is None and isinstance(task, str):
+        # The light lane answers in prose, and for three years' worth of runs
+        # "completed" meant only that the model said something. Grade the
+        # sentence against truth fetched from the same APIs the task names --
+        # here, before the answer is truncated for storage.
+        graded = grade(task, answer, bool(run.completed))
+        if graded["checked"] or graded["valid"] is not None:
+            record["graded"] = graded
     if run.opencode is not None:
         # what it actually produced, checked against truth fetched from the
         # same public APIs the task names (see grading.py)
