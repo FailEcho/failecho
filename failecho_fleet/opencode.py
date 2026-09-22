@@ -262,6 +262,12 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
     # kill took every event with it (14 of 41 runs a twin, 18-19 Sep)
     cmd = ("cd /work/project && timeout -k 10 " + str(max(timeout - 20, 30)) + " opencode run --format json --dir /work/project "
            + shlex.quote(prompt) + " 2>/work/opencode.err; echo EXIT=$?; echo END=$(date +%s); "
+             # OpenCode kills its MCP servers on the way out, and the guest is
+             # destroyed as soon as this command returns. The proxy flushes its
+             # queued reports on exit, and without this pause they were lost
+             # whenever a run ended on the clock (22 Sep: 6 tool calls, 2
+             # reports). Three seconds against a run of minutes.
+             "sleep 3; "
              "echo RESULT_MTIME=$(stat -c %Y result.json result.txt 2>/dev/null | head -1); echo '---RESULT---'; "
              "cat result.json result.txt 2>/dev/null | head -c 2000; echo; echo '---ERR---'; "
              "grep -v 'level=INFO' /work/opencode.err | tail -c 1500; echo '---MCP---'; grep -ci 'mcp' /work/opencode.err; "
