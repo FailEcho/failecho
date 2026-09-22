@@ -1266,3 +1266,44 @@ def test_the_local_arm_is_competent_at_the_tool_level_too(monkeypatch):
         assert not ok and json.loads(out)["error"] == "rate_limit"
     assert waits["fleet-local-blind"][0] > 5, "the local twin waits for the stated reset"
     assert waits["fleet-decor-blind-a"][0] == 3, "the ordinary control just backs off"
+
+
+# -- the OpenCode reserve -----------------------------------------------------
+
+
+def test_the_opencode_twins_get_the_last_slice_of_the_day():
+    """Every persona shares one provider budget, and the light lane runs every
+    minute while an OpenCode run takes four. On 22 September that lane reached
+    nvidia's cap at 20:06 and the OpenCode twins -- the experiment actually
+    being watched -- got no run at all between 17:16 and midnight. The reserve
+    changes the queueing, never the cap."""
+    from failecho_fleet import OPENCODE_RESERVE, PROVIDERS, effective_caps
+
+    cap = PROVIDERS["nvidia"]["daily_cap"]
+    assert effective_caps("nvidia", "opencode")[0] == cap, "the twins get the whole cap"
+    assert effective_caps("nvidia", "builder")[0] == int(cap * (1 - OPENCODE_RESERVE))
+    assert effective_caps("nvidia", "decorator")[0] == int(cap * (1 - OPENCODE_RESERVE))
+    assert effective_caps("nvidia", "builder")[0] < cap
+
+
+def test_no_persona_may_spend_more_than_its_provider_cap():
+    from failecho_fleet import PERSONAS, PROVIDERS, effective_caps
+
+    for name, path, provider, *_ in PERSONAS:
+        if provider not in PROVIDERS:
+            continue
+        calls, tokens = effective_caps(provider, path)
+        assert calls <= PROVIDERS[provider].get("daily_cap", 10 ** 9), name
+        assert tokens <= PROVIDERS[provider].get("daily_token_cap", 10 ** 12), name
+
+
+def test_both_arms_of_a_pair_share_one_budget():
+    """A reserve that fed one twin and not the other would invent a result."""
+    from failecho_fleet import PERSONAS, effective_caps
+
+    by_name = {p[0]: p for p in PERSONAS}
+    for ask, blind in (("fleet-oc-ask-n", "fleet-oc-blind-n"),
+                       ("fleet-ocp-ask-n", "fleet-ocp-blind-n"),
+                       ("fleet-build-ask-n", "fleet-build-blind-n")):
+        a, b = by_name[ask], by_name[blind]
+        assert effective_caps(a[2], a[1]) == effective_caps(b[2], b[1]), f"{ask} vs {blind}"

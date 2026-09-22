@@ -372,6 +372,28 @@ PERSONAS = [
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
+#: Share of each provider's daily budget that only the OpenCode twins may
+#: spend. Everything else stops at 85% of the cap. The caps themselves do not
+#: move -- they stay at the documented free tiers -- so this costs the light
+#: lane a few runs an evening and buys the experiment that is actually being
+#: watched its runs at all. Both arms of every pair lose the same runs, so no
+#: comparison moves.
+OPENCODE_RESERVE = 0.15
+
+def effective_caps(provider: str, path: str) -> tuple[int, int]:
+    """The call and token budget this persona may spend today.
+
+    The OpenCode twins get the whole cap; everything else stops at
+    ``1 - OPENCODE_RESERVE`` of it.
+    """
+    limits = PROVIDERS.get(provider, {})
+    cap = limits.get("daily_cap", 10 ** 9)
+    token_cap = limits.get("daily_token_cap", 10 ** 12)
+    if path == "opencode":
+        return cap, token_cap
+    return int(cap * (1 - OPENCODE_RESERVE)), int(token_cap * (1 - OPENCODE_RESERVE))
+
+
 OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 #: When the MCP twin's instruction became a rule rather than a paragraph
 #: (see AGENTS_MD_FAILECHO). Everything before this is the polite version,
@@ -1771,9 +1793,22 @@ def main(argv: list[str] | None = None) -> int:
             # in three hours, dragging the build and OpenCode rows.
             calls = state.get("provider_calls_today", {}) if state.get("provider_day") == today else {}
             tokens = state.get("provider_tokens_today", {}) if state.get("provider_day") == today else {}
-            capped = {name for name, p in PROVIDERS.items()
-                      if calls.get(name, 0) >= p.get("daily_cap", 10**9)
-                      or tokens.get(name, 0) >= p.get("daily_token_cap", 10**12)}
+
+            def _capped(i: int) -> bool:
+                """Whether this persona's provider is spent for the day.
+
+                Every persona shares one budget, and the cheap lanes run every
+                minute while an OpenCode run takes four -- so on 22 Sep the
+                light lane reached nvidia's cap at 20:06 and the OpenCode
+                twins, the ones the current experiment is about, got no runs
+                at all between 17:16 and midnight. The reserve fixes the
+                queueing, not the caps: the last slice of each provider's day
+                is spendable only by the twins.
+                """
+                provider = PERSONAS[i][2]
+                cap, token_cap = effective_caps(provider, PERSONAS[i][1])
+                return calls.get(provider, 0) >= cap or tokens.get(provider, 0) >= token_cap
+
             skipped = 0
             members = len(lane_personas(lane))
             idx = persona_index(state[cursor], lane)
@@ -1781,12 +1816,13 @@ def main(argv: list[str] | None = None) -> int:
             def _too_soon(i: int) -> bool:
                 return (PERSONAS[i][1] == "opencode"
                         and 0 < time.time() - last_oc < OPENCODE_MIN_GAP_SECONDS)
-            while (PERSONAS[idx][2] in dead or PERSONAS[idx][2] in capped or _too_soon(idx)) and skipped < members:
+            while (PERSONAS[idx][2] in dead or _capped(idx) or _too_soon(idx)) and skipped < members:
                 if _too_soon(idx):
                     log(f"skip {PERSONAS[idx][0]}: another OpenCode run less than "
                         f"{OPENCODE_MIN_GAP_SECONDS // 60} min ago (memory)")
-                elif PERSONAS[idx][2] in capped:
-                    log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} at its daily cap")
+                elif _capped(idx):
+                    reserved = "" if PERSONAS[idx][1] == "opencode" else " (OpenCode reserve)"
+                    log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} at its daily cap{reserved}")
                 else:
                     log(f"skip {PERSONAS[idx][0]}: {PERSONAS[idx][2]} daily quota gone; next probe after "
                         f"{QUOTA_PROBE_SECONDS // 60} min")
