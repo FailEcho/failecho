@@ -102,14 +102,33 @@ system python (python3) and write files here. Finish by producing the file the
 task names. Do not ask questions; decide and act. Keep it under ten steps.
 """
 
+#: The MCP path's instruction, made as strong as an instruction can be
+#: (22 Sep 18:0x). Until now it was one polite paragraph and the twin called
+#: FailEcho 0.12 times a run while paying for four tool definitions in every
+#: step -- and finished fewer tasks than the twin without it. A tool a model
+#: must choose loses to the task in front of it. Before deciding that the
+#: paste-the-URL path cannot work, it deserves its best shot: a rule, stated
+#: as a constraint, with the order of actions spelled out. Whatever this
+#: gives is what we will tell users to expect, in either direction.
 AGENTS_MD_FAILECHO = AGENTS_MD + """
-# FailEcho
+# FailEcho: rules for failed calls
 
-A FailEcho MCP server is connected. When an HTTP call or tool fails, call
-`check_tool_failure` with the service host and the operation BEFORE retrying:
-it says whether other agents hit the same failure and what recovery worked, or
-`skip` when nothing has. Follow it. Report what you tried with
-`report_recovery_outcome`. Send metadata only, never request or response bodies.
+A FailEcho MCP server is connected. These rules are not optional.
+
+1. **Never retry a failed tool or HTTP call before calling
+   `check_tool_failure`.** That call is always your first action after an
+   error, before any retry, workaround or apology.
+2. Call it with `service` and `operation` as the *server* names them --
+   `api.github.com` and `create_issue`, not your own alias -- plus the error
+   class and code.
+3. Do what it says. `skip` means nothing has fixed this lately: do not retry,
+   record why in your answer and move on. A recommendation means try that
+   action once.
+4. After you try a fix, call `report_recovery_outcome` with the action and
+   whether it worked. Both outcomes matter.
+5. Metadata only: never a prompt, an argument, a result, a body or a key.
+
+One check costs a second. Retrying blindly into a rate limit costs the task.
 """
 
 

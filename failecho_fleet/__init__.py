@@ -373,6 +373,11 @@ PERSONAS = [
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
 OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
+#: When the MCP twin's instruction became a rule rather than a paragraph
+#: (see AGENTS_MD_FAILECHO). Everything before this is the polite version,
+#: which got 0.12 FailEcho calls a run; the rows below split on it, because
+#: a before-and-after in one group is easy to read as one number otherwise.
+MCP_RULES_SINCE = "2026-09-22T18:00:00"
 WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
 OCPROXY_PERSONAS = {"fleet-ocp-ask-n", "fleet-ocp-blind-n"}
 PROD_ADVICE_PERSONAS = {"fleet-prod-ask", "fleet-prod-blind"}
@@ -1503,6 +1508,24 @@ def write_report(state: dict) -> None:
                          "better": _better(a["model_calls_per_run"], b["model_calls_per_run"])})
             rows.append({"metric": "FailEcho tool calls per run" if key == "opencode" else "tool errors carrying advice, per run",
                          "unit": "", "ask": a["asks_per_run"], "blind": b["asks_per_run"], "better": "tie"})
+            if key == "opencode":
+                # the same two numbers since the instruction became a rule
+                since = [r for r in runs if r["reporter"] in OPENCODE_PERSONAS and r["at"] >= MCP_RULES_SINCE]
+                sides = {True: [r for r in since if r["asks"]], False: [r for r in since if not r["asks"]]}
+                def _per_run(rs, field):
+                    if not rs:
+                        return None
+                    return round(sum((r.get("metrics") or {}).get(field, 0) for r in rs) / len(rs), 2)
+                def _done(rs):
+                    return _pct(sum(1 for r in rs if (r.get("metrics") or {}).get("completed")) / len(rs)) if rs else None
+                rows.append({"metric": "runs since the stricter rules", "unit": "",
+                             "ask": len(sides[True]), "blind": len(sides[False]), "better": "tie"})
+                rows.append({"metric": "FailEcho tool calls per run, since the rules", "unit": "",
+                             "ask": _per_run(sides[True], "asks"), "blind": _per_run(sides[False], "asks"),
+                             "better": "tie"})
+                rows.append({"metric": "runs marked completed, since the rules", "unit": "%",
+                             "ask": _done(sides[True]), "blind": _done(sides[False]),
+                             "better": _better(_done(sides[True]), _done(sides[False]), lower_is_better=False)})
             rows.append({"metric": "runs lost to guest memory (not counted above)", "unit": "",
                          "ask": lost["ask"], "blind": lost["blind"], "better": "tie"})
             # graded against truth fetched independently, not against a pattern

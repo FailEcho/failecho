@@ -57,7 +57,10 @@ def test_no_key_ever_lands_in_the_config_file():
 def test_agents_md_differs_only_by_the_failecho_paragraph():
     assert OC.AGENTS_MD_FAILECHO.startswith(OC.AGENTS_MD)
     extra = OC.AGENTS_MD_FAILECHO[len(OC.AGENTS_MD):]
-    assert "check_tool_failure" in extra and "BEFORE retrying" in extra and "metadata only" in extra
+    assert "check_tool_failure" in extra
+    # a rule, not a suggestion (22 Sep): the polite version got 0.12 calls a run
+    assert "Never retry" in extra and "not optional" in extra
+    assert "report_recovery_outcome" in extra and "Metadata only" in extra
 
 
 def test_every_task_ends_in_a_checkable_file():
@@ -128,3 +131,39 @@ def test_both_shapes_of_the_advice_line_are_counted():
     ev = Events()
     ev.feed('{"type": "tool", "tool": "packages_pypi_latest", "state": "done", "output": "{\\"version\\": \\"1.0\\"}"}')
     assert ev.advice_seen == 0
+
+
+def test_the_opencode_group_splits_on_the_stricter_rules(tmp_path, monkeypatch):
+    """The instruction became a rule on 22 Sep; a group average that mixes
+    both sides of that change answers nothing."""
+    import json
+
+    import failecho_fleet as F
+
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "LAB_DB", "")
+
+    def run(at, reporter, asks, asks_made, completed):
+        return {"at": at, "reporter": reporter, "path": "opencode", "provider": "nvidia", "asks": asks,
+                "tool_calls": 1, "model_calls": 3, "seconds": 20.0, "failures": [],
+                "metrics": {"asks": asks_made, "completed": completed, "tokens_prompt": 10,
+                            "tokens_completion": 1, "ask_seconds": 0.0, "wait_seconds": 0.0,
+                            "calls_first_try": 1, "calls_recovered": 0, "calls_failed": 0,
+                            "model_retries_after_skip": 0},
+                "opencode": {"completed": completed, "steps": 3}}
+
+    before, after = "2026-09-22T10:00:00", "2026-09-22T19:00:00"
+    state = {"runs": [run(before, "fleet-oc-ask-n", True, 0, True),
+                      run(before, "fleet-oc-blind-n", False, 0, True),
+                      run(after, "fleet-oc-ask-n", True, 2, True),
+                      run(after, "fleet-oc-ask-n", True, 4, False),
+                      run(after, "fleet-oc-blind-n", False, 0, True)]}
+    F.write_report(state)
+    versus = {g["group"]: {r["metric"]: r for r in g["rows"]}
+              for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]}
+    rows = versus["opencode"]
+    assert rows["runs since the stricter rules"]["ask"] == 2
+    assert rows["FailEcho tool calls per run, since the rules"]["ask"] == 3.0, "2 and 4 calls -> 3.0"
+    assert rows["FailEcho tool calls per run"]["ask"] == 2.0, "the all-time average keeps the polite runs"
+    assert rows["runs marked completed, since the rules"]["ask"] == 50.0
