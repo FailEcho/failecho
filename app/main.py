@@ -635,6 +635,39 @@ tokens of the full record. Pass `verbose: true` for everything (timestamps,
 per-window rates, effective counts). REST always returns the full record.
 Asking should cost less than the retry it saves; if it does not, say so.
 
+## What it measurably does, and what it costs
+
+Measured 22 September 2026, by FailEcho's own agents running the same tasks
+twice against the same live APIs -- one side asking the network, one side not.
+The asking side reads *production*, so this is the advice a new reporter gets
+today. 118 runs a side.
+
+    FailEcho calls per run          0.17   (when the model decides; the
+                                            wrapper asks once per failure)
+    retry attempts per failure      1.20   against 1.99
+    retries the network said to skip  75
+    seconds lost inside failures    1.12   against 2.31, per run
+    tokens per completed run       1737    against 1738
+    runs completed                 93.2%   against 92.4%
+
+The cost is close to zero because the advice arrives inside an error the model
+was already reading: no extra turn, no extra tokens worth counting. The gain is
+mostly retries that were never going to work.
+
+Where a failure has a real fix, the gap is much larger. Against model providers
+under live quotas: 77.9% of failures recovered with FailEcho, 19.7% without,
+and 94.3% against 85.4% of runs finished.
+
+What the recovery evidence itself says, over 14,628 recorded attempts: blind
+`backoff` -- the action agents reach for first -- worked 13.6% of 11,565 tries.
+`switch_model` worked 88.4% of 329. That gap is the reason to ask before
+retrying.
+
+Two things that qualify all of it: every number is from our own agents, because
+production has 0 independent reporters; and the control side retries once after
+three seconds rather than recovering competently, so this is "against a naive
+retry", not "against a good engineer".
+
 ## One failure, several names
 
 Agents name the same call differently: `GET /repos` from a wrapper that sees
