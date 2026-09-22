@@ -38,7 +38,9 @@ Environment:
 
     FAILECHO_ENDPOINT        default https://failecho.com
     FAILECHO_DISABLED=1      do nothing at all
-    FAILECHO_REPORTER_ID     stable id, so this process counts as one reporter
+    FAILECHO_REPORTER_ID     stable id; otherwise one is generated once and
+                             kept in ~/.local/state/failecho/installation, so a
+                             restart is the same reporter
     FAILECHO_SEND_ERRORS=1   also send the error text (normalized server-side)
     FAILECHO_REPORT_SUCCESS=0  do not report successful calls
     FAILECHO_OPERATOR_TOKEN  FailEcho's own agents only. Marks reports as
@@ -154,6 +156,48 @@ def classify(exc: BaseException) -> tuple[str, str | None]:
     return "error", None
 
 
+#: Where this installation's id lives. One per machine and user, so a
+#: restart is the same reporter rather than a new one.
+def _id_path() -> str:
+    base = (os.environ.get("XDG_STATE_HOME")
+            or os.path.join(os.path.expanduser("~"), ".local", "state"))
+    return os.path.join(base, "failecho", "installation")
+
+
+def installation_id() -> str:
+    """A stable id for this installation, created on first use.
+
+    Without it every process was a new "unique reporter": a restart, a cron
+    tick or a container respawn each looked like another independent agent,
+    which quietly inflated the one number the network is judged on. An
+    outside review made the point on 20 Sep and it was right.
+
+    Falls back to a per-process id when nothing on this machine is writable
+    (a read-only container, a locked-down home), because reporting something
+    beats reporting nothing -- and an unstable id is still only counted as
+    one reporter per process, never as evidence of independence.
+    """
+    path = _id_path()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            saved = fh.read().strip()
+        if saved:
+            return saved
+    except OSError:
+        pass
+    fresh = f"install-{uuid.uuid4().hex[:16]}"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(fresh)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except OSError:
+        return f"anon-{uuid.uuid4().hex[:12]}"
+    return fresh
+
+
 def _truthy(value: str | None, default: bool) -> bool:
     if value is None:
         return default
@@ -178,7 +222,7 @@ class FailEcho:
         self.endpoint = (endpoint or os.environ.get("FAILECHO_ENDPOINT")
                          or DEFAULT_ENDPOINT).rstrip("/")
         self.reporter_id = (reporter_id or os.environ.get("FAILECHO_REPORTER_ID")
-                            or f"anon-{uuid.uuid4().hex[:12]}")
+                            or installation_id())
         disabled = _truthy(os.environ.get("FAILECHO_DISABLED"), False)
         self.enabled = (not disabled) if enabled is None else enabled
         self.report_success = (

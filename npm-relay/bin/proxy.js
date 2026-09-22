@@ -25,6 +25,9 @@
 
 const { spawn } = require("node:child_process");
 const crypto = require("node:crypto");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 const VERSION = require("../package.json").version;
 const ADVICE_TIMEOUT_MS = 3000;
@@ -169,6 +172,31 @@ function annotate(message, line) {
   return out;
 }
 
+/**
+ * A stable id for this installation, created on first use and kept in
+ * ~/.local/state/failecho/installation -- the same file the Python wrapper
+ * uses, so one machine is one reporter whichever client runs there. Without
+ * it every process counted as another "unique reporter", which inflated the
+ * one number the network is judged on (review, 20 Sep). Falls back to a
+ * per-process id where nothing is writable.
+ */
+function installationId() {
+  const base = process.env.XDG_STATE_HOME || path.join(os.homedir() || "/tmp", ".local", "state");
+  const file = path.join(base, "failecho", "installation");
+  try {
+    const saved = fs.readFileSync(file, "utf8").trim();
+    if (saved) return saved;
+  } catch { /* not created yet */ }
+  const fresh = `install-${crypto.randomBytes(8).toString("hex")}`;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, fresh, { mode: 0o600 });
+    return fresh;
+  } catch {
+    return `anon-${crypto.randomBytes(6).toString("hex")}`;
+  }
+}
+
 /** Reports and reads against the network. Never throws, never blocks a message. */
 class Network {
   constructor() {
@@ -176,7 +204,7 @@ class Network {
     this.headers = {
       "Content-Type": "application/json",
       "User-Agent": `failecho-mcp-node/${VERSION}`,
-      "X-Reporter-ID": process.env.FAILECHO_REPORTER_ID || `anon-${crypto.randomBytes(6).toString("hex")}`,
+      "X-Reporter-ID": process.env.FAILECHO_REPORTER_ID || installationId(),
     };
     if (process.env.FAILECHO_OPERATOR_TOKEN) {
       this.headers.Authorization = `Bearer ${process.env.FAILECHO_OPERATOR_TOKEN}`;
@@ -521,4 +549,5 @@ function main(argv) {
   run(argv, headers, parseUpstreams(upstreamSpecs));
 }
 
-module.exports = { main, classify, adviceText, annotate, errorText, ERROR_CLASSES, parseUpstreams, upstreamFor };
+module.exports = { main, classify, adviceText, annotate, errorText, ERROR_CLASSES, parseUpstreams, upstreamFor,
+                   installationId };

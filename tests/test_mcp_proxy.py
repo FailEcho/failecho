@@ -606,3 +606,23 @@ def test_the_advice_line_carries_what_the_server_qualified_it_with(impl):
                           str(ROOT / "npm-relay" / "bin" / "proxy.js"), json.dumps(answer)],
                          capture_output=True, timeout=30)
     assert out.stdout.decode() == line
+
+
+def test_both_clients_share_one_installation_id(tmp_path):
+    """One machine is one reporter, whichever client runs there: the Node
+    proxy and the Python wrapper read and write the same file."""
+    import shutil
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+    env = {**os.environ, "XDG_STATE_HOME": str(tmp_path)}
+    env.pop("FAILECHO_REPORTER_ID", None)
+    node = subprocess.run(["node", "-e",
+                           "process.stdout.write(require(process.argv[1]).installationId())",
+                           str(ROOT / "npm-relay" / "bin" / "proxy.js")],
+                          capture_output=True, timeout=30, env=env).stdout.decode()
+    py = subprocess.run([sys.executable, "-c",
+                         "import sys;sys.path.insert(0,%r);from failecho_autoreport import installation_id;"
+                         "sys.stdout.write(installation_id())" % str(ROOT)],
+                        capture_output=True, timeout=30, env=env).stdout.decode()
+    assert node and node == py, (node, py)
+    assert (tmp_path / "failecho" / "installation").read_text().strip() == node

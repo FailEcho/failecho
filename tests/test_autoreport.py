@@ -512,3 +512,36 @@ def test_the_check_is_a_read_of_the_query_endpoint(monkeypatch):
     assert seen["body"] == {"service": "api.groq.com", "operation": "chat.completions",
                             "error_type": "rate_limit", "error_code": "429"}
     assert seen["timeout"] == mod.ADVICE_TIMEOUT_SECONDS
+
+
+# -- who is reporting ------------------------------------------------------
+
+
+def test_a_restart_is_the_same_reporter(tmp_path, monkeypatch):
+    """Every process used to mint a new id, so a restart, a cron tick or a
+    container respawn each looked like another independent agent."""
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.delenv("FAILECHO_REPORTER_ID", raising=False)
+    first = FailEcho(endpoint="http://127.0.0.1:9").reporter_id
+    second = FailEcho(endpoint="http://127.0.0.1:9").reporter_id
+    assert first == second and first.startswith("install-")
+    assert (tmp_path / "failecho" / "installation").read_text().strip() == first
+
+
+def test_an_explicit_id_still_wins(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.setenv("FAILECHO_REPORTER_ID", "acme-crawler")
+    assert FailEcho(endpoint="http://127.0.0.1:9").reporter_id == "acme-crawler"
+    assert FailEcho(endpoint="http://127.0.0.1:9", reporter_id="given").reporter_id == "given"
+
+
+def test_a_read_only_machine_still_reports(tmp_path, monkeypatch):
+    """A locked-down container must not lose reporting because it cannot
+    write an id; it just does not get a stable one."""
+    import failecho_autoreport as mod
+
+    monkeypatch.setattr(mod.os, "makedirs", lambda *a, **k: (_ for _ in ()).throw(OSError("read-only")))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "nowhere"))
+    monkeypatch.delenv("FAILECHO_REPORTER_ID", raising=False)
+    rid = mod.installation_id()
+    assert rid.startswith("anon-")
