@@ -1217,7 +1217,11 @@ def test_the_local_pair_is_wired_and_kept_out_of_the_naive_comparison():
     names = {p[0]: p for p in F.PERSONAS}
     assert names["fleet-local-ask"][1:4] == ("decorator", "mistral", True)
     assert ("fleet-local-ask", "fleet-local-blind") in F.TWINS
-    assert F.LOCAL_PERSONAS == {"fleet-local-ask", "fleet-local-blind"}
+    assert F.LOCAL_PERSONAS == {"fleet-local-ask", "fleet-local-blind",
+                                "fleet-local-ask-2", "fleet-local-blind-2"}
+    assert ("fleet-local-ask-2", "fleet-local-blind-2") in F.TWINS
+    asks = sum(1 for p in F.PERSONAS if p[0] in F.LOCAL_PERSONAS and p[3])
+    assert asks == 2 and len(F.LOCAL_PERSONAS) == 4, "two pairs, evenly split"
 
 
 def test_the_local_blind_twin_never_asks_the_network(monkeypatch):

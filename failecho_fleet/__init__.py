@@ -359,6 +359,12 @@ PERSONAS = [
     # retrying blindly". These two answer "better than doing it properly".
     ("fleet-local-ask",    "decorator", "mistral", True,  MIXED),
     ("fleet-local-blind",  "decorator", "mistral", False, MIXED),
+    # a second pair on the same provider (22 Sep): the arm that answers
+    # "better than doing it properly?" was gathering 0.3 runs an hour a side,
+    # six days to a readable result. Same provider on purpose -- two pairs
+    # differing only in sample size, not in the model's behaviour.
+    ("fleet-local-ask-2",  "decorator", "mistral", True,  MIXED),
+    ("fleet-local-blind-2", "decorator", "mistral", False, MIXED),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
@@ -368,7 +374,7 @@ OCPROXY_PERSONAS = {"fleet-ocp-ask-n", "fleet-ocp-blind-n"}
 PROD_ADVICE_PERSONAS = {"fleet-prod-ask", "fleet-prod-blind"}
 #: Both sides recover like a careful engineer; only the ask twin also asks the
 #: network. The blind twin here is *not* the naive control.
-LOCAL_PERSONAS = {"fleet-local-ask", "fleet-local-blind"}
+LOCAL_PERSONAS = {"fleet-local-ask", "fleet-local-blind", "fleet-local-ask-2", "fleet-local-blind-2"}
 #: The one production URL the fleet may call: the read path, which stores
 #: nothing. Sent with X-Reporter-Kind: demo, the label the server accepts
 #: only as a downgrade, so these reads stay out of its usage counters. The
@@ -397,7 +403,8 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-decor-ask-d", "fleet-decor-blind-d"), ("fleet-decor-ask-e", "fleet-decor-blind-e"),
          ("fleet-build-ask-x", "fleet-build-blind-x"), ("fleet-oc-ask-n", "fleet-oc-blind-n"),
          ("fleet-wrap-ask", "fleet-wrap-blind"), ("fleet-ocp-ask-n", "fleet-ocp-blind-n"),
-         ("fleet-prod-ask", "fleet-prod-blind"), ("fleet-local-ask", "fleet-local-blind")]
+         ("fleet-prod-ask", "fleet-prod-blind"), ("fleet-local-ask", "fleet-local-blind"),
+         ("fleet-local-ask-2", "fleet-local-blind-2")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 
