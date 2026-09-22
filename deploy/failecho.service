@@ -51,6 +51,10 @@ ReadWritePaths=/srv/failecho/data
 # this box has no other human accounts, but "no other account can read the
 # database" is a cheaper thing to guarantee than to keep checking.
 UMask=0077
+# The fleet's test VMs share this host. The kernel picked them every time
+# so far, but that was luck: these two say so as policy (22 Sep).
+OOMScoreAdjust=-800
+MemoryMin=96M
 MemoryMax=400M
 
 [Install]

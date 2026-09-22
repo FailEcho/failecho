@@ -77,7 +77,7 @@ OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 300)
 #: 10 min on 22 Sep, when the host's other projects were stopped and 889 MB
 #: came free.
 #: A gap costs runs per hour, not the comparison: both twins wait alike.
-OPENCODE_MIN_GAP_SECONDS = int(os.environ.get("FLEET_OPENCODE_MIN_GAP") or 600)
+OPENCODE_MIN_GAP_SECONDS = int(os.environ.get("FLEET_OPENCODE_MIN_GAP") or 1800)
 #: What the sandbox guest is told to report to. Unset means the in-guest
 #: wrapper stays off; there is deliberately no default.
 LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None

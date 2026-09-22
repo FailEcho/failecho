@@ -28,6 +28,9 @@ ExecStart=/srv/failecho/.venv/bin/python -m failecho_fleet --lane light
 TimeoutStartSec=420
 # a builder run holds one 384 MiB microVM; every other persona is ~40 MB
 # the light lane boots no VM
+# first to be killed when the host runs short: a lost test run costs a
+# data point, a lost production process costs the service (22 Sep)
+OOMScoreAdjust=800
 MemoryMax=400M
 StateDirectory=failecho-fleet failecho-sandbox-scratch
 RuntimeDirectory=failecho-sandbox

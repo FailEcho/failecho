@@ -229,10 +229,11 @@ class Events:
 #: 768 until 22 Sep: the proxy pair runs OpenCode *and* the proxy *and* the
 #: packages server in one guest, and the guest kernel began killing runs
 #: mid-flight, losing their reports (10:30: 11 tool calls, 1 report). The host
-#: has the room now that its other projects are stopped.
+#: has the room now that its other projects are stopped. 896 from 22 Sep
+#: 12:00: the user prefers slower tests to a bigger host.
 #: OpenCode (a bun binary) is killed inside a 384 MB guest; at 640 MB an
 #: eight-step task finished and was then killed on exit (137).
-OC_MEM_MIB = 1024
+OC_MEM_MIB = 896
 
 
 def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: str, model: str, key: str,

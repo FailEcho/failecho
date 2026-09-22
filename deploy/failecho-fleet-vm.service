@@ -29,7 +29,10 @@ TimeoutStartSec=540
 # a builder run holds one 384 MiB microVM; every other persona is ~40 MB
 # the VM lane: a builder's 384 MB guest or OpenCode's 768 MB one (a bun
 # binary is killed in 384); the guest's resident pages count against this unit
-MemoryMax=1400M
+# first to be killed when the host runs short: a lost test run costs a
+# data point, a lost production process costs the service (22 Sep)
+OOMScoreAdjust=800
+MemoryMax=1200M
 StateDirectory=failecho-fleet failecho-sandbox-scratch
 RuntimeDirectory=failecho-sandbox
 RuntimeDirectoryPreserve=yes

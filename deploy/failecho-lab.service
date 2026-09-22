@@ -19,6 +19,10 @@ ExecStart=/srv/failecho/.venv/bin/python -m uvicorn app.main:app \
     --timeout-graceful-shutdown 5
 Restart=on-failure
 RestartSec=3
+# The fleet's test VMs share this host. The kernel picked them every time
+# so far, but that was luck: these two say so as policy (22 Sep).
+OOMScoreAdjust=-800
+MemoryMin=48M
 MemoryMax=250M
 UMask=0077
 # the fleet writes the scoreboard here; the lab reads it
