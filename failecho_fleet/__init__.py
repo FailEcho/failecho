@@ -399,6 +399,14 @@ OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 #: (see AGENTS_MD_FAILECHO). Everything before this is the polite version,
 #: which got 0.12 FailEcho calls a run; the rows below split on it, because
 #: a before-and-after in one group is easy to read as one number otherwise.
+#: Grades recorded before this are not counted. Grading is computed once, at
+#: record time, so a grader bug is frozen into the ledger: between 20:45 and
+#: 21:55 on 22 Sep the local arm's right answers were scored wrong because a
+#: model writes "LlamaIndex" where the task names run-llama/llama_index. The
+#: answers behind those grades were not kept, so they cannot be re-graded --
+#: and a rate that silently mixes two graders is worse than a shorter one.
+GRADING_SINCE = "2026-09-22T21:55:00"
+
 MCP_RULES_SINCE = "2026-09-22T18:00:00"
 WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
 OCPROXY_PERSONAS = {"fleet-ocp-ask-n", "fleet-ocp-blind-n"}
@@ -1449,7 +1457,7 @@ def write_report(state: dict) -> None:
         c["calls_failed"] += m.get("calls_failed", 0)
         c["failure_seconds"] += sum(float(f.get("seconds") or 0) for f in r["failures"])
         c["model_retries_after_skip"] += m.get("model_retries_after_skip", 0)
-        g = r.get("graded") or {}
+        g = r.get("graded") or {} if r["at"] >= GRADING_SINCE else {}
         if g.get("valid") is not None:
             c["graded_runs"] = c.get("graded_runs", 0) + 1
             c["valid_runs"] = c.get("valid_runs", 0) + int(bool(g.get("valid")))

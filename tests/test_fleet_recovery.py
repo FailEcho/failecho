@@ -1542,3 +1542,33 @@ def test_a_repo_name_still_has_to_appear_somehow(monkeypatch):
     prompt = "Open issues on langchain-ai/langchain and run-llama/llama_index."
     g = grading.grade(prompt, "LangChain has 557 open issues. The other one has 836.", answered=True)
     assert g["valid"] is False and g["missed"] == ["run-llama/llama_index"]
+
+
+def test_grades_from_the_broken_grader_are_not_counted(tmp_path, monkeypatch):
+    """A grade is computed once, at record time, so a grader bug is frozen
+    into the ledger. The answers behind those grades were not kept, so they
+    cannot be re-graded -- and a rate that silently mixes two graders is worse
+    than a shorter one."""
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+
+    def run(at, asks, correct):
+        return {"at": at, "reporter": "fleet-gh-ask" if asks else "fleet-gh-blind", "path": "decorator",
+                "provider": "groq", "asks": asks, "tool_calls": 2, "model_calls": 1, "seconds": 3.0,
+                "failures": [], "graded": {"answered": True, "valid": True, "correct": correct,
+                                           "checked": 2, "matched": 2 if correct else 0, "unknown": 0,
+                                           "missed": []},
+                "metrics": {"tokens_prompt": 50, "tokens_completion": 5, "asks": 0, "ask_seconds": 0,
+                            "wait_seconds": 0, "completed": True, "calls_first_try": 2,
+                            "calls_recovered": 0, "calls_failed": 0}}
+
+    before = "2026-09-22T21:00:00"      # the broken grader's window
+    after = "2026-09-22T23:00:00"
+    F.write_report({"runs": [run(before, True, False), run(before, False, False),
+                             run(after, True, True), run(after, False, True)]})
+
+    groups = {g["group"]: g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]}
+    rows = {r["metric"]: r for r in groups["real"]["rows"]}
+    assert rows["runs where truth was checkable"]["ask"] == 1, "only the run graded by the fixed grader"
+    assert rows["every checked value correct"]["ask"] == 100.0
