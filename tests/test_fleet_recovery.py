@@ -1485,3 +1485,60 @@ def test_the_run_record_carries_the_text_the_grader_needs():
     assert 'run.opencode.get("result_text")' in source
     stored = re.search(r'record\["opencode"\] = \{k: run\.opencode\.get\(k\) for k in \(([^)]*)\)', source, re.S)
     assert stored and "result_text" not in stored.group(1), "the full text must not be stored in the ledger"
+
+
+def test_a_wrong_value_is_named_so_a_misgrade_can_be_told_apart(monkeypatch):
+    """45% correct against 65% completed is either a model getting versions
+    wrong or a grader that cannot read them, and the two look identical in a
+    rate. The label that missed is recorded -- the label, not what it said."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        "requests": "2.34.2", "httpx": "0.28.1", "fastapi": "0.141.1"}.get(arg))
+    prompt = "Latest versions of the PyPI packages requests, httpx and fastapi, one line each."
+
+    g = grading.grade(prompt, "requests 2.34.2\nhttpx 0.28.1\nfastapi 0.9.9", answered=True)
+    assert g["missed"] == ["fastapi"]
+    assert grading.grade(prompt, "requests 2.34.2\nhttpx 0.28.1\nfastapi 0.141.1",
+                         answered=True)["missed"] == []
+
+
+def test_only_a_disputed_answer_is_kept():
+    """The ledger keeps the head of an answer the grader called wrong, and
+    nothing else: an audit needs the disputed ones, not all of them."""
+    source = open("failecho_fleet/__init__.py").read()
+    assert 'if graded.get("correct") is False:' in source
+    assert 'record["answer"] = answer[:200]' in source
+
+
+def test_the_grader_finds_the_line_when_a_model_uses_the_human_name(monkeypatch):
+    """The misgrade the 21:45 pass found: the local arm answered '836 open
+    issues' for run-llama/llama_index, which is right, and the grader looked
+    for 'llama_index', found nothing, and scored it wrong. Every graded local
+    run was failing this way -- 0% correct against 100% completed. Punctuation
+    is ignored on both sides now."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        "langchain-ai/langchain": 557, "run-llama/llama_index": 836}.get(arg))
+    prompt = "Open issues on langchain-ai/langchain and run-llama/llama_index."
+    answer = "**LangChain:** 557 open issues.\n\n**LlamaIndex:** 836 open issues."
+
+    g = grading.grade(prompt, answer, answered=True)
+    assert (g["valid"], g["correct"], g["matched"]) == (True, True, 2), g
+
+    wrong = grading.grade(prompt, "**LangChain:** 557 open issues.\n**LlamaIndex:** 12 open issues.",
+                          answered=True)
+    assert wrong["correct"] is False and wrong["missed"] == ["run-llama/llama_index"]
+
+
+def test_a_repo_name_still_has_to_appear_somehow(monkeypatch):
+    """Ignoring punctuation must not turn 'any number in the answer' into a
+    match: an answer that never mentions the second repo is still incomplete."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        "langchain-ai/langchain": 557, "run-llama/llama_index": 836}.get(arg))
+    prompt = "Open issues on langchain-ai/langchain and run-llama/llama_index."
+    g = grading.grade(prompt, "LangChain has 557 open issues. The other one has 836.", answered=True)
+    assert g["valid"] is False and g["missed"] == ["run-llama/llama_index"]

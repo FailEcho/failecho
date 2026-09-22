@@ -309,9 +309,18 @@ def _line_for(text: str, label: str) -> str:
     needles = [label.lower()]
     if "/" in label:
         needles.append(label.split("/", 1)[1].lower())
+    # A model writes the name a human uses: "LlamaIndex" for
+    # run-llama/llama_index, "Python SDK" for python-sdk. On 22 Sep that cost
+    # the local arm its whole correctness rate -- 836 open issues, the right
+    # answer, graded as no answer at all -- so punctuation is ignored on both
+    # sides before the comparison.
+    flat = [re.sub(r"[^a-z0-9]", "", n) for n in needles]
     for line in re.split(r"[\n;]|(?<=[.!])\s", text or ""):
         low = line.lower()
         if any(n in low for n in needles):
+            return line
+        squashed = re.sub(r"[^a-z0-9]", "", low)
+        if any(n and n in squashed for n in flat):
             return line
     return ""
 
@@ -354,6 +363,10 @@ def _grade_prose(checks, text: str, out: dict) -> dict:
         out["checked"] += 1
         if line and _matches_in_line(line, want, kind, arg):
             out["matched"] += 1
+        else:
+            # which value was wrong, not what it said: enough to tell a model
+            # that got fastapi wrong from a grader that cannot read a date
+            out["missed"].append(label)
     out["valid"] = answered_lines == len(checks)
     if out["checked"]:
         out["correct"] = out["checked"] == out["matched"]
@@ -383,6 +396,8 @@ def _grade_invariant(checks, values: dict, out: dict) -> bool | None:
             other = _number(values.get(arg)) or 0
             ok = got >= other          # one second of sleep per retry, at least
         out["matched"] += int(bool(ok))
+        if not ok:
+            out["missed"].append(label)
         holds = bool(ok) if holds is None else (holds and bool(ok))
     return holds
 
@@ -390,7 +405,7 @@ def _grade_invariant(checks, values: dict, out: dict) -> bool | None:
 def grade(prompt: str, result_text: str, answered: bool) -> dict:
     """answered / valid / correct for one run, with the counts behind them."""
     out = {"answered": bool(answered), "valid": None, "correct": None,
-           "checked": 0, "matched": 0, "unknown": 0}
+           "checked": 0, "matched": 0, "unknown": 0, "missed": []}
     checks, mode = checks_for(prompt or "")
     if not checks:
         return out
@@ -424,7 +439,10 @@ def grade(prompt: str, result_text: str, answered: bool) -> dict:
         if kind in ("enum", "never_number"):
             # No fetch: the truth is what the tool can possibly have returned.
             out["checked"] += 1
-            out["matched"] += int(_matches(values[key], None, kind, arg))
+            if _matches(values[key], None, kind, arg):
+                out["matched"] += 1
+            else:
+                out["missed"].append(key)
             continue
         want = truth(kind, arg)
         if want is None:
@@ -433,6 +451,8 @@ def grade(prompt: str, result_text: str, answered: bool) -> dict:
         out["checked"] += 1
         if _matches(values[key], want, kind, arg):
             out["matched"] += 1
+        else:
+            out["missed"].append(key)
     if out["checked"]:
         out["correct"] = out["checked"] == out["matched"] and out["valid"] is not False
     return out
@@ -458,6 +478,9 @@ def _grade_list(checks, text: str, out: dict) -> dict:
         out["unknown"] += 1
         return out
     out["checked"] += 1
-    out["matched"] += int(_matches(got, want, kind, arg))
+    if _matches(got, want, kind, arg):
+        out["matched"] += 1
+    else:
+        out["missed"].append(label)
     out["correct"] = out["checked"] == out["matched"] and out["valid"] is not False
     return out

@@ -1929,6 +1929,12 @@ def main(argv: list[str] | None = None) -> int:
         graded = grade(task, answer, bool(run.completed))
         if graded["checked"] or graded["valid"] is not None:
             record["graded"] = graded
+            if graded.get("correct") is False:
+                # Keep the head of an answer the grader marked wrong, so the
+                # next pass can tell a model that got a version wrong from a
+                # grader that cannot read one. Our own task, our own model,
+                # our own ledger -- and only the ones in dispute.
+                record["answer"] = answer[:200]
     if run.opencode is not None:
         # what it actually produced, checked against truth fetched from the
         # same public APIs the task names (see grading.py)
