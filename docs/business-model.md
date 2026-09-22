@@ -1,98 +1,190 @@
 # How FailEcho could make money, and what has to be true first
 
-Written 22 September 2026, after the outside review and the first releases.
-This is an argument, not a plan of record. Every number in it that comes from
-the lab is our own agents' (see `docs/report-48h.md`); production has **0
-independent reporters**, and that single fact decides the order of everything
-below.
+Written 22 September 2026, after the outside review and the first releases;
+revised the same day after a second reviewer argued with it. This is an
+argument, not a plan of record. Lab numbers are our own agents'
+(`docs/report-48h.md`); production has **0 independent reporters**.
+
+**What FailEcho is, in one paragraph.** A shared reliability-intelligence
+network for AI agents and tools. Independent agents contribute privacy-safe
+failure and recovery evidence. FailEcho turns that evidence into incident
+detection, proven recovery strategies, and eventually real-time reliability
+intelligence. Not a marketplace for error data.
+
+## Two bootstraps, run in parallel
+
+The first version of this document said "independent reporters first, nothing
+has value until that moves", and then said private team networks are useful at
+zero reporters. Both are true because they are different problems:
+
+    PUBLIC NETWORK BOOTSTRAP          BUSINESS BOOTSTRAP
+    independent reporters             one team's own agents
+    -> corroboration                  -> repeated failures
+    -> incidents                      -> recovery history
+    -> cross-provider intelligence    -> team intelligence
+    -> reliability feed               -> first paying customer
+
+The public network is the moat and takes outsiders. The private product needs
+nobody: five recoveries and an agent starts getting its own evidence back.
+Running them in parallel is also safer -- revenue does not wait on adoption we
+do not control.
 
 ## What exists already
 
-The architecture people sketch for this product is mostly built:
-ingestion with auth and rate limits, schema validation, privacy and
-normalization, fingerprints, the recovery engine, confidence scoring, the
-query API, and the three client paths (Claude Code plugin, the Python wrapper,
-the MCP proxy). The pieces that are missing are the ones that would make the
-data sellable:
+Ingestion with auth and rate limits, schema validation, privacy and
+normalization, fingerprints, the recovery engine, confidence scoring, the query
+API, and three client paths (Claude Code plugin, Python wrapper, MCP proxy).
 
-| Missing piece | What it buys |
+**The denominator is not missing, which the second reviewer assumed.** Rates
+need attempts, not just failures, and successes have been reported since the
+beginning: `report_tool_success` in the MCP tools, `report_success` in the
+wrapper (on by default), and the proxy reports every successful tool call. The
+lab holds **61,425 successes against 28,110 failures**, and `/v1/query` returns
+a failure rate computed from both, per fingerprint and per hour.
+
+What *is* missing around it:
+
+| Missing | Why it matters |
 |---|---|
-| **Reporter reputation and provenance** | Any answer to "why should I trust this number?" Today reporter ids are self-chosen and a restart mints a new one, so "unique reporters" counts processes |
-| **Incident detection** | "42 agents hit this in the last 10 minutes" -- the most shareable free feature, and the basis of a status feed |
-| **Reliability history** | Provider comparisons over time, which is the thing a router would pay for |
+| **Aggregate counters** (`attempts/successes/failures` per 5-minute window) as an alternative to per-call success reports | Cheaper for high-traffic callers, who will not send one report per request |
+| **Coverage flag** | A reporter that sends only failures must not be silently mixed into a rate. The answer must say what share of the denominator it actually has |
+| **Version and environment breakdown** | "Provider A is 99.2%" is meaningless across versions and regions |
+| **Persistent reporter identity** | Below |
+| **Incident detection** | Correlated spikes across *independent* reporters |
+| **Reliability history** | Rates over time, per provider/operation/version |
 
-An event bus or queue is *not* missing. This project runs one uvicorn process
-and SQLite on a small VPS by deliberate constraint; those stages stay functions
-in one process until there is traffic that justifies otherwise.
+Never publish a reliability percentage from a denominator we do not have. That
+rule goes in the API response, not only in the documentation.
+
+## Provenance before reputation
+
+A reputation algorithm on top of unstable identity is worthless. Today
+`reporter_id` is optional and a restart mints a new one, so "unique reporters"
+counts processes.
+
+1. **Persist the id.** On first run, generate one and store it
+   (`~/.config/failecho/reporter`), so a restart is the same reporter. Small,
+   and it removes the accidental inflation.
+2. **Sign observations.** Ed25519 keypair at install; `reporter_id =
+   hash(public key)`; observations signed. Now an id cannot be borrowed, and
+   "independent" means something checkable.
+3. **Then layer identities**: installation, organization, integration --
+   "Reporter a91f..., Acme Corp, Claude MCP proxy, organization verified".
+4. **Only then reputation**, weighting evidence by corroboration and history.
+
+## The layers, in order of value
+
+    L1  Known failure        "have we seen this?"
+    L2  Recovery             "what actually fixed it?"          <- we are here
+    L3  Incident             "is this happening everywhere, now?"
+    L4  Reliability          "how reliable is this operation, this version?"
+    L5  Routing              "what should my agent use right now?"
+
+L5 is the biggest business and the one FailEcho should *not* build into a
+router. It supplies `P(success | provider, operation, version, time,
+environment)`; other people build routing on top. That is a clean
+infrastructure position and it keeps us out of the traffic path.
 
 ## What must not be sold
 
-Contributors send failure metadata under a plain promise: metadata only, no
-prompts, arguments, results or bodies; reads store nothing; error text off by
-default. **Selling their records, even aggregated, breaks that promise** unless
-the terms said so before the data arrived -- and they did not. What can be sold
-is what the network *computes* from the data, which no single contributor owns:
-reliability, incidents, recovery evidence.
+Contributors send metadata under a plain promise: no prompts, arguments,
+results or bodies; reads store nothing; error text off by default. **Selling
+their records, even aggregated, breaks that promise** -- the terms did not say
+so when the data arrived. What can be sold is what the network *computes*, which
+no contributor owns.
 
-The distinction is not legal hair-splitting. The product's only real asset is
-that its numbers are believable. Adoption counters that stay at zero, lab
-results published with their losing cohorts, a review's findings written down
-in full: that is the asset. Anything that makes a number worth inflating costs
-more than it earns.
+It is also the only thing worth money. A raw record is a commodity:
+`HTTP 429`, `connection reset`, `schema mismatch`. This is not:
+
+    tool X, operation Y, version Z
+    incident started 7 minutes ago
+    842 observations from 31 independent reporters
+    failure probability 31%
+    likely recovery: refresh_schema, observed 91.4% across 5 organizations
+
+That took a network to make.
 
 ## Why paying for error data is the wrong first move
 
-It is the obvious idea and it fails on its own terms:
-
 1. **It pays for what cannot be verified.** Once data is worth money, the
    cheapest way to earn is to invent plausible failures and confirm plausible
-   recoveries. Recovery rates are computed from exactly that input.
-2. **Buyers will ask how you stop it.** For a reliability feed, "we pay
-   contributors per report" is the wrong answer to "how do you know this is
-   real?".
-3. **It solves the wrong shortage.** The shortage is not volume; it is
-   *trusted* volume from agents doing real work.
+   recoveries -- the exact input recovery rates are computed from.
+2. **Buyers will ask how you stop it.** "We pay per report" ends the sale.
+3. **It solves the wrong shortage**: not volume, but *trusted* volume from
+   agents doing real work.
 
 If contributors are ever paid, pay per **verified recovery** -- failure and fix
-both confirmed by independent reporters, capped per reporter, paid after a
-delay -- which is an anti-fraud system to build and operate. That is a later,
-funded problem, not a first move.
+corroborated by independent reporters, capped per reporter, paid after a delay
+-- which is an anti-fraud system to build and run. Later, funded. Crypto is the
+same problem plus custody and regulation, and a token would make every counter
+look like an incentive to inflate it.
 
-Crypto belongs in the same bucket, harder: custody and regulatory work, and a
-token would make every counter look like an incentive to inflate it.
+## What could sell
 
-## What could actually sell
-
-| Product | Buyer | Why they would pay | Needs first |
+| Product | Buyer | Why they pay | Needs first |
 |---|---|---|---|
-| **Provider reliability feed** (which model provider or API is degraded now; what recovery works) | Model routers, agent platforms, gateways | They route real traffic on this and have no cross-vendor view. It is closest to our strongest measured result: provider failures recovered 78% vs 17% | Incidents, reliability history, reputation |
-| **Private/team network** (your own agents' evidence, not shared) | Teams with repeatable API workflows | The reviewer's own verdict: useful today *for teams with their own recovery history*. Needs no public network at all | Auth and tenancy; the smallest build |
-| **Hosted or supported self-host** | Companies that cannot send anything outside | No data leaves; they pay for the thing running and staying patched | Packaging, upgrade path |
-| **Vendor reliability profile** (an API vendor's own failure and recovery picture, and the right to correct it) | API vendors, model providers | Their incentive is aligned: they want the profile accurate. They will not fabricate failures against themselves | The feed above |
+| **Private team network** | Teams with repeatable API workflows | Useful at zero independent reporters; their own evidence, private | Auth, tenancy, namespaces |
+| **Incidents** (free) | Everyone | Most shareable signal; makes the network visible | Corroboration across independent reporters |
+| **Provider reliability API** | Routers, agent platforms, gateways | They route real traffic and have no cross-vendor view | Denominator coverage, history, provenance |
+| **Vendor claim profile** | API vendors, model providers | Their incentive is aligned: they want the profile accurate | The above |
+| **Hosted or supported self-host** | Companies that send nothing outside | Runs and stays patched | Packaging, upgrade path |
 
-Note which one is first to build and last to be glamorous: the **private team
-network**. It is the only line that works at zero independent reporters,
-because a team's own history is useful on its own -- five recoveries and the
-network starts recommending what worked.
+**On the vendor product, "the right to correct it" was wrong.** A vendor must
+never edit observed history. They get a claim profile: identify official
+versions, mark deprecated operations, explain an incident, post a resolution
+notice, publish a status endpoint, challenge an obviously invalid
+classification. The two stay separate and both are shown:
+
+    Network observed: failure spike, 28%, since 18:05 UTC
+    Vendor statement: "regression in v2.7.1, fixed in v2.7.2 at 18:42 UTC"
+
+That is more trustworthy than either alone.
 
 ## The order
 
-1. **Independent reporters.** Still 0. Nothing above has value until this
-   moves, and the honest way to move it is the automatic paths (plugin,
-   wrapper, proxy) plus a launch that says plainly where FailEcho helps and
-   where it does not.
-2. **Reputation and provenance**, so the numbers survive the question "who
-   says?".
-3. **Incidents**, free, because it is the most useful shareable signal and it
-   makes the network visible.
-4. **Private team networks**, the first paid thing.
-5. **Provider reliability feed**, once 2 and 3 exist.
+    0. Private mode: one team's own evidence, useful immediately
+    1. Persistent reporter identity (persist, then sign)
+    2. Independent reporters: plugin, wrapper, proxy -- count organizations
+    3. Denominator coverage: aggregate counters, and a coverage flag
+    4. Incident engine, free and public
+    5. Recovery intelligence under conditions (version, region, time)
+    6. Private team product -- charge here first
+    7. Reliability history per provider/operation/version/environment
+    8. Provider reliability API
+    9. Routing intelligence, as data, not as a router
+
+Revenue arrives at 6, long before the moat at 8.
+
+## The next milestone, deliberately narrow
+
+**Prove that a failure reported by one independent agent helps a different
+independent agent recover.** Not revenue, not dashboards, not more
+integrations. The demonstration has to show:
+
+- reporter A != reporter B, in different organizations;
+- the same failure fingerprint matched;
+- the recommendation derived from A's evidence;
+- B recovered after following it;
+- no request content needed at any point.
+
+Early measures, as evidence rather than targets:
+
+| | Now | Wanted |
+|---|---|---|
+| Independent organizations | 0 | 5 |
+| Persistent reporters | 0 | 20 |
+| Independent observations | 0 | 500+ |
+| Failures corroborated by 2+ reporters | 0 | >20% |
+| Failures where FailEcho helped another reporter recover | 0 | 10 |
+| Recovery suggestions confirmed by a second organization | 0 | 5 |
+
+Those are the numbers that show the network doing something a local error log
+cannot.
 
 ## What would kill it
 
-- Selling contributor data, or being seen to.
-- Paying per report.
-- A token.
-- Any claim the measurements do not support: general task-completion uplift,
-  guaranteed secret exclusion, verified independent consensus. The review
-  listed these; `docs/review-2026-09-20.md` keeps the list.
+Selling contributor records, or being seen to. Paying per report. A token.
+Publishing a reliability percentage without the denominator behind it. Any
+claim the measurements do not support -- general task-completion uplift,
+guaranteed secret exclusion, verified independent consensus
+(`docs/review-2026-09-20.md` keeps that list).
