@@ -41,6 +41,8 @@ from app.db.models import (
     HourlyRecoveryStat,
     HourlyStat,
     Observation,
+    PrivateObservation,
+    PrivateRecoveryOutcome,
     RecoveryOutcome,
 )
 
@@ -56,6 +58,8 @@ class PruneReport:
     recovery_buckets: int = 0
     observations_deleted: int = 0
     recovery_outcomes_deleted: int = 0
+    private_observations_deleted: int = 0
+    private_outcomes_deleted: int = 0
     dry_run: bool = False
     notes: list[str] = field(default_factory=list)
 
@@ -328,6 +332,22 @@ async def aggregate_and_prune(
     )
     report.observations_deleted = deleted_observations.rowcount or 0
     report.recovery_outcomes_deleted = deleted_recovery.rowcount or 0
+
+    # ---- private rows: deleted, never aggregated ------------------------
+    # A team's evidence is not part of the public network, so there is nothing
+    # to fold it into, and folding it anywhere shared is precisely what
+    # private mode promises not to do. It lives longer than 48 hours because a
+    # team's own history is the entire product; it does not live forever
+    # because nobody asked us to hold it forever.
+    private_cutoff = (now or utcnow()) - timedelta(days=settings.private_retention_days)
+    deleted_private = await session.execute(
+        delete(PrivateObservation).where(PrivateObservation.created_at < private_cutoff)
+    )
+    deleted_private_outcomes = await session.execute(
+        delete(PrivateRecoveryOutcome).where(PrivateRecoveryOutcome.created_at < private_cutoff)
+    )
+    report.private_observations_deleted = deleted_private.rowcount or 0
+    report.private_outcomes_deleted = deleted_private_outcomes.rowcount or 0
 
     # One commit: aggregates and deletions land together or not at all.
     await session.commit()

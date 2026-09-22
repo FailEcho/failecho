@@ -140,10 +140,39 @@ classification. The two stay separate and both are shown:
 
 That is more trustworthy than either alone.
 
+## Built since this was written (22 September 2026)
+
+Items 0 and 1 of the order below exist, and the pricing decision on 0 is made:
+
+* **Private mode** ships. `X-FailEcho-Team: <secret>` stores a report for one
+  team, in its own tables, out of every public count and aggregate, answered
+  back only to that token; a query gets the public answer plus
+  `team_evidence`, with the team's own recommendation held to the same bar.
+  No account, no billing, no tenancy service: the token is self-chosen and
+  stored as a salted hash, which is the same trick `reporter_id` already used.
+  Kept 30 days rather than 48 hours. `app/core/private.py`,
+  `tests/test_private.py`.
+* **Signed reporter identity** ships. A reporter id can be an Ed25519 public
+  key, with each request signed; `verified_reporters` counts those that have
+  proven it. Keys are free, so it rules out impersonation and does not pretend
+  to be Sybil resistance. `app/core/identity.py`, `tests/test_identity.py`.
+
+**The pricing decision: private mode is free for early teams.** It is worth
+money and it is not worth charging for yet. Charging at zero independent
+reporters would mean selling the consolation prize for a network that does not
+have the network effect, to the few people willing to try an unknown service
+first -- exactly the people whose evidence, usage and complaints are worth more
+than their subscription. `FIN_PRIVATE_MODE_OPEN` is the switch for when that
+stops being true, and the offer is stated as bootstrapping rather than
+permanent, so closing it later is not a broken promise.
+
+What is still missing before item 6 (charging) is honest: nothing measures
+whether private mode helps a team, because no team uses it yet.
+
 ## The order
 
-    0. Private mode: one team's own evidence, useful immediately
-    1. Persistent reporter identity (persist, then sign)
+    0. Private mode: one team's own evidence, useful immediately  [BUILT, free]
+    1. Persistent reporter identity (persist, then sign)          [BUILT]
     2. Independent reporters: plugin, wrapper, proxy -- count organizations
     3. Denominator coverage: aggregate counters, and a coverage flag
     4. Incident engine, free and public

@@ -208,6 +208,71 @@ class HourlyRecoveryStat(Base):
     )
 
 
+class PrivateObservation(Base):
+    """One tool-call outcome that belongs to a team and to nobody else.
+
+    A separate table rather than a column on `observations`, and that is the
+    whole design: every public count, rollup, fingerprint and adoption number
+    reads `observations`, so a private row cannot reach them by being
+    forgotten about. Making privacy a flag would mean auditing a dozen
+    aggregation paths forever; making it a table means the default is right.
+
+    These rows are never pooled, never counted as adoption, never visible to
+    another team, and never folded into the hourly aggregates the public
+    network is built from.
+    """
+
+    __tablename__ = "private_observations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    # PRIVACY: a salted hash of the team's token. The token itself is never
+    # stored, exactly like a reporter id.
+    team_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    service: Mapped[str] = mapped_column(String(128), nullable=False)
+    operation: Mapped[str] = mapped_column(String(128), nullable=False)
+    version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    schema_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    outcome: Mapped[str] = mapped_column(String(16), nullable=False)
+    fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # PRIVACY: normalized only, exactly as on the public table.
+    normalized_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    mutates: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    reporter_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    __table_args__ = (
+        Index("ix_private_obs_team_fingerprint", "team_hash", "fingerprint", "created_at"),
+        Index("ix_private_obs_team_scope", "team_hash", "service", "operation", "created_at"),
+        Index("ix_private_obs_created", "created_at"),
+    )
+
+
+class PrivateRecoveryOutcome(Base):
+    """What a team's agent tried after one of its own failures."""
+
+    __tablename__ = "private_recovery_outcomes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    team_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    successful: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    reporter_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    __table_args__ = (
+        Index("ix_private_rec_team_fingerprint", "team_hash", "fingerprint", "action"),
+        Index("ix_private_rec_created", "created_at"),
+    )
+
+
 class ReporterKey(Base):
     """A reporter that has proven it holds the private key for its id.
 

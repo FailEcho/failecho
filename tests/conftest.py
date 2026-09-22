@@ -72,6 +72,8 @@ TABLES = (
     "hourly_recovery_stats",
     "daily_counters",
     "reporter_keys",
+    "private_observations",
+    "private_recovery_outcomes",
 )
 
 

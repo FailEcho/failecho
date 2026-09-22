@@ -262,6 +262,44 @@ class ServiceEvidence(BaseModel):
     )
 
 
+class TeamRecommendation(StrictModel):
+    """A recommendation made from one team's own evidence."""
+
+    action: str
+    confidence: float
+    scope: str = Field(default="team", description="Always 'team': this is your own history.")
+    from_other_agents: bool = Field(
+        default=False,
+        description="Always false here. Your own evidence is never somebody else's.",
+    )
+
+
+class TeamAction(StrictModel):
+    action: str
+    attempts: int
+    successes: int
+    confidence: float
+
+
+class TeamEvidence(StrictModel):
+    """What your own team has seen. Returned only to a caller holding the
+    team token, computed from rows no public number can see."""
+
+    private: bool = Field(default=True, description="Always true. Never pooled, never public.")
+    observations: int = Field(description="Your team's observations of this service+operation.")
+    failures: int = Field(description="How many of them failed.")
+    recovery_actions: list[TeamAction] = Field(default_factory=list)
+    recommendation: TeamRecommendation | None = Field(
+        default=None,
+        description=(
+            "Your team's own answer when its evidence clears the same bar the "
+            "public one does (5 attempts, 60% success). Null otherwise -- your "
+            "own history does not lower the bar."
+        ),
+    )
+    window_days: int = Field(description="How far back private evidence is kept.")
+
+
 class QueryResponse(StrictModel):
     """Everything the network knows about this failure right now."""
 
@@ -340,6 +378,16 @@ class QueryResponse(StrictModel):
         description=(
             "True when synthetic demo rows contribute to these numbers. Treat "
             "the recommendation as an illustration, not as field evidence."
+        ),
+    )
+    team_evidence: TeamEvidence | None = Field(
+        default=None,
+        description=(
+            "Present only when the request carried a team token, and only if "
+            "that team has evidence of its own. It is additional to the public "
+            "answer, never a replacement: the public recommendation is "
+            "computed from public evidence alone, and this is what your own "
+            "agents have learned."
         ),
     )
     evidence_sources: list[str] = Field(

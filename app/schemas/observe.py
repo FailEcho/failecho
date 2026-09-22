@@ -106,3 +106,11 @@ class ObserveResponse(StrictModel):
         default=None,
         description="What we actually stored, so you can audit the normalizer.",
     )
+    private: bool = Field(
+        default=False,
+        description=(
+            "True when this report was stored for your team only: kept apart "
+            "from the public network, never pooled, never counted as adoption "
+            "and answered back only to a caller with the same team token."
+        ),
+    )

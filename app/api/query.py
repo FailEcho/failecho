@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.deps import ReporterDep, SessionDep, SourceDep, VerifiedDep
-from app.core.service import query_intelligence
-from app.schemas.query import QueryRequest, QueryResponse
+from app.api.deps import ReporterDep, SessionDep, SourceDep, TeamDep, VerifiedDep
+from app.core.private import team_evidence
+from app.core.service import canonical_service, query_intelligence
+from app.schemas.query import QueryRequest, QueryResponse, TeamEvidence
 
 router = APIRouter(tags=["network"])
 
@@ -29,6 +30,9 @@ router = APIRouter(tags=["network"])
         "Not rate limited. When evidence is thin you get "
         "`status: INSUFFICIENT_DATA` and `recommendation: null` -- FailEcho "
         "does not guess.\n\n"
+        "Send `X-FailEcho-Team` to also get back what your own team has seen: "
+        "private evidence, never pooled, never public, and additional to the "
+        "public answer rather than a replacement for it.\n\n"
         "Send `X-Reporter-ID` if you have one: it is salted and hashed on "
         "arrival, never stored by this endpoint, and lets FailEcho tell "
         "whether the evidence you just received came from somebody else."
@@ -40,7 +44,18 @@ async def query(
     reporter: ReporterDep,
     source: SourceDep,
     verified: VerifiedDep,   # noqa: ARG001 - stores nothing; rejects a bad signature
+    team: TeamDep = None,
 ) -> QueryResponse:
-    return await query_intelligence(
+    answer = await query_intelligence(
         session, payload, reporter_hash=reporter, source=source
     )
+    if team is not None:
+        # Additional to the public answer, never a substitute for it: the
+        # public recommendation above was computed from public evidence
+        # alone, and stays exactly as it was.
+        evidence = await team_evidence(
+            session, team, answer.fingerprint,
+            canonical_service(payload.service), payload.operation,
+        )
+        answer.team_evidence = TeamEvidence.model_validate(evidence) if evidence else None
+    return answer

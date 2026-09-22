@@ -219,6 +219,7 @@ class FailEcho:
         operator_token: str | None = None,
         advise: bool | None = None,
         sign: bool | None = None,
+        team_token: str | None = None,
     ) -> None:
         self.endpoint = (endpoint or os.environ.get("FAILECHO_ENDPOINT")
                          or DEFAULT_ENDPOINT).rstrip("/")
@@ -255,6 +256,13 @@ class FailEcho:
         # agent we run that forgets it is counted as a stranger adopting us,
         # which is the one number on the front page that has to stay honest.
         self.operator_token = operator_token or os.environ.get("FAILECHO_OPERATOR_TOKEN") or None
+
+        #: Private mode. With a team token every report is stored for your
+        #: team alone -- never pooled, never public, never counted as
+        #: adoption -- and a query returns your own team's evidence as well as
+        #: the public answer. The token is the only thing that identifies the
+        #: team: keep it like a credential, and losing it loses the evidence.
+        self.team_token = team_token or os.environ.get("FAILECHO_TEAM") or None
 
         self.queued = 0
         self.dropped = 0
@@ -615,6 +623,8 @@ class FailEcho:
             "X-Reporter-ID": self.reporter_id,
             "User-Agent": f"failecho-autoreport/{__version__}",
         }
+        if self.team_token:
+            headers["X-FailEcho-Team"] = self.team_token
         if self.operator_token:
             # Bearer rather than X-FailEcho-Operator: the server accepts both,
             # and Bearer survives hosts that filter unknown header names.

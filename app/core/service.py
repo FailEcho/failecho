@@ -50,6 +50,8 @@ from app.db.models import (
     HourlyRecoveryStat,
     HourlyStat,
     Observation,
+    PrivateObservation,
+    PrivateRecoveryOutcome,
     RecoveryOutcome,
     ReporterKey,
 )
@@ -205,6 +207,112 @@ async def note_verified_reporter(session: AsyncSession, reporter_hash: str | Non
     else:
         row.last_verified = now
         row.signed_requests += 1
+
+
+async def record_private_observation(
+    session: AsyncSession,
+    payload: ObserveRequest,
+    team_hash: str,
+    reporter_hash: str | None = None,
+) -> ObserveResponse:
+    """Store one outcome for a team alone.
+
+    Deliberately not a branch inside `record_observation`: a private row must
+    not touch the fingerprint catalogue, the hourly rollups, the daily
+    counters or the adoption numbers, and the way to guarantee that is for it
+    never to enter the tables those are computed from. The fingerprint is
+    still computed -- the team needs it to file recovery outcomes and to be
+    told what fixed this before -- but the shared catalogue is not touched.
+    """
+    service = canonical_service(payload.service)
+    normalized = (
+        normalize_error(payload.error_message)
+        if payload.outcome == OUTCOME_FAILURE
+        else None
+    )
+    fingerprint = None
+    if payload.outcome == OUTCOME_FAILURE:
+        fingerprint = compute_fingerprint(
+            service=service,
+            operation=payload.operation,
+            version=payload.version,
+            schema_hash=payload.schema_hash,
+            error_type=payload.error_type,
+            error_code=payload.error_code,
+            normalized_error=normalized,
+        )
+    session.add(
+        PrivateObservation(
+            team_hash=team_hash,
+            service=service,
+            operation=payload.operation,
+            version=payload.version,
+            schema_hash=payload.schema_hash,
+            outcome=payload.outcome,
+            fingerprint=fingerprint,
+            error_type=payload.error_type,
+            error_code=payload.error_code,
+            normalized_error=normalized,
+            latency_ms=payload.latency_ms,
+            mutates=payload.mutates,
+            reporter_hash=reporter_hash,
+        )
+    )
+    await session.commit()
+
+    seen = int(
+        (
+            await session.execute(
+                select(func.count()).where(
+                    PrivateObservation.team_hash == team_hash,
+                    PrivateObservation.service == service,
+                    PrivateObservation.operation == payload.operation,
+                )
+            )
+        ).scalar_one()
+        or 0
+    )
+    known = False
+    if fingerprint:
+        known = int(
+            (
+                await session.execute(
+                    select(func.count()).where(
+                        PrivateObservation.team_hash == team_hash,
+                        PrivateObservation.fingerprint == fingerprint,
+                    )
+                )
+            ).scalar_one()
+            or 0
+        ) > 1
+    return ObserveResponse(
+        accepted=True,
+        fingerprint=fingerprint,
+        known=known,
+        observations=seen,
+        normalized_error=normalized,
+        private=True,
+    )
+
+
+async def record_private_outcome(
+    session: AsyncSession,
+    payload: OutcomeRequest,
+    team_hash: str,
+    reporter_hash: str | None = None,
+) -> OutcomeResponse:
+    """Store one recovery attempt for a team alone."""
+    session.add(
+        PrivateRecoveryOutcome(
+            team_hash=team_hash,
+            fingerprint=payload.fingerprint,
+            action=payload.action,
+            successful=payload.successful,
+            reporter_hash=reporter_hash,
+        )
+    )
+    await session.commit()
+    return OutcomeResponse(accepted=True)
 
 
 async def record_observation(

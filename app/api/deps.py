@@ -7,8 +7,14 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import OPERATOR_BEARER_HEADER, OPERATOR_HEADER
+from app.core.config import (
+    OPERATOR_BEARER_HEADER,
+    OPERATOR_HEADER,
+    TEAM_HEADER,
+    settings,
+)
 from app.core.identity import SIGNATURE_HEADER, TIMESTAMP_HEADER, is_key_id, verify
+from app.core.private import MIN_TOKEN_LENGTH, hash_team
 from app.core.privacy import hash_reporter_id
 from app.core.service import operator_token_from, source_from_kind
 from app.core.ratelimit import check_write_limit, client_key
@@ -141,6 +147,51 @@ async def reporter_source(
 
 
 SourceDep = Annotated[str, Depends(reporter_source)]
+
+
+async def team(
+    x_failecho_team: Annotated[
+        str | None,
+        Header(
+            alias=TEAM_HEADER,
+            description=(
+                "Optional. A secret your team generates (32 random bytes is "
+                "right; 16 characters is the minimum). With it, a report is "
+                "stored privately for your team alone: never pooled, never "
+                "counted as adoption, never visible to anyone else, and never "
+                "part of any public number. A query with the same token "
+                "returns the public answer plus your team's own evidence. "
+                "There is no account: the token is the only thing that "
+                "identifies the team, it is stored as a salted hash, and "
+                "losing it loses access to that evidence. Free while the "
+                "network is bootstrapping."
+            ),
+        ),
+    ] = None,
+) -> str | None:
+    """The team hash for this request, or None for the public network."""
+    if x_failecho_team is None or not x_failecho_team.strip():
+        return None
+    if not settings.private_mode_open:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Private mode is not open on this instance.",
+        )
+    if len(x_failecho_team.strip()) < MIN_TOKEN_LENGTH:
+        # Rejected rather than accepted-and-weak: a team that thinks its
+        # evidence is private deserves a token nobody can guess.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"A team token must be at least {MIN_TOKEN_LENGTH} characters. "
+                "It is the only thing separating your evidence from everyone "
+                "else's; generate a random one."
+            ),
+        )
+    return hash_team(x_failecho_team)
+
+
+TeamDep = Annotated[str | None, Depends(team)]
 
 
 async def enforce_write_rate_limit(request: Request) -> None:

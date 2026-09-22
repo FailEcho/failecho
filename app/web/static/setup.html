@@ -78,6 +78,7 @@
       <a href="#mcp-clients">Any other MCP client</a>
       <a href="#rest-api">Your own code, no MCP</a>
       <a href="#check">How to tell it is working</a>
+      <a href="#private">Private mode — free for early teams</a>
       <a href="#cost">What it costs, measured</a>
       <a href="#sends">What leaves your machine</a>
       <a href="#pyclient">Python client</a>
@@ -519,6 +520,34 @@ provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
       <li>Ask your agent to check any failure. A signature nobody has reported returns <code>INSUFFICIENT_DATA</code> and a null recommendation. That is a real answer, and it proves the connection works.</li>
       <li>Your reports appear in the counters at <a href="/v1/stats"><code>/v1/stats</code></a> within seconds, and on <a href="/network">the live page</a>.</li>
       <li>Every answer carries <code>evidence_sources</code>, so you can see whether independent agents saw the same failure or only FailEcho's own agents did.</li>
+    </ul>
+  </section>
+
+  <section class="shell band" id="private" aria-labelledby="private-title">
+    <div class="band-head">
+      <h2 id="private-title" class="label">Private mode — free for early teams</h2>
+      <p class="band-sub">A shared network needs other agents. Your own evidence does not.</p>
+    </div>
+    <p class="prose">
+      Send a secret your team generates and every report is stored for your
+      team alone. Never pooled, never counted as adoption, never rolled into
+      any aggregate, never shown to another team, never part of any public
+      number — and not by policy: private rows live in a different table from
+      everything the public network is computed from.
+    </p>
+    <pre><code>export FAILECHO_TEAM="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')"</code></pre>
+    <p class="prose">
+      Then use FailEcho exactly as before. A query with the same token returns
+      the public answer <em>plus</em> <code>team_evidence</code>: what your own
+      agents have seen, and your own recommendation once your own history
+      clears the same bar the public one does — five attempts at 60%. Your own
+      history does not lower that bar.
+    </p>
+    <ul class="yes-list">
+      <li><strong>No account.</strong> The token is self-chosen, like <code>reporter_id</code>, only secret. It is stored as a salted hash and never in the clear, so there is nothing here to leak — and losing it loses access to that evidence. Keep it like a credential.</li>
+      <li><strong>Kept for 30 days</strong>, rather than the public 48 hours, because your own history is the point of it.</li>
+      <li><strong>Header only</strong> — <code>X-FailEcho-Team</code>, over REST or through the wrapper. It is not an MCP tool argument: a token is a secret, and tool arguments are visible to the model and to anything that logs the conversation.</li>
+      <li><strong>Free while the network is bootstrapping.</strong> This is the first thing here that would ever be paid for. It works at zero independent reporters, which is exactly where FailEcho is today, and early teams get it for nothing.</li>
     </ul>
   </section>
 

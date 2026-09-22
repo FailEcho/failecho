@@ -55,6 +55,11 @@ COUNTER_CROSS_AGENT_HELP = "cross_agent_help"
 REPORTER_KIND_HEADER = "X-Reporter-Kind"
 REPORTER_KIND_DEMO = "demo"
 
+# Header a team sends to keep its evidence to itself. The value is a secret
+# the team generates; the server stores only a salted hash of it, exactly as
+# it does for a reporter id, and never issues, emails or bills anything.
+TEAM_HEADER = "X-FailEcho-Team"
+
 # Header the operator's own agents send, carrying FIN_FIRST_PARTY_TOKEN.
 OPERATOR_HEADER = "X-FailEcho-Operator"
 #: Some MCP hosts only forward an allowlist of header names, and a bespoke one
@@ -245,6 +250,20 @@ class Settings:
     # this many hours. Aggregates are kept indefinitely.
     retention_hours: int = field(
         default_factory=lambda: _env_int("FIN_RETENTION_HOURS", 48)
+    )
+
+    # Private (team) rows are not part of the public network and are not
+    # rolled into the hourly aggregates, so they are kept raw and pruned on
+    # their own clock. A team's whole reason to use private mode is that its
+    # own history survives; 48 hours would make it pointless.
+    private_retention_days: int = field(
+        default_factory=lambda: _env_int("FIN_PRIVATE_RETENTION_DAYS", 30)
+    )
+    # Private mode is free while the network bootstraps. This is the switch
+    # that says so -- and the one to turn off if it ever stops being free
+    # for new teams.
+    private_mode_open: bool = field(
+        default_factory=lambda: _env_str("FIN_PRIVATE_MODE_OPEN", "1") == "1"
     )
 
     # ---- MCP -------------------------------------------------------------

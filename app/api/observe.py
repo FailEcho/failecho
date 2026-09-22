@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from app.api.deps import RateLimitDep, ReporterDep, SessionDep, SourceDep, VerifiedDep
-from app.core.service import record_observation
+from app.api.deps import (
+    RateLimitDep,
+    ReporterDep,
+    SessionDep,
+    SourceDep,
+    TeamDep,
+    VerifiedDep,
+)
+from app.core.service import record_observation, record_private_observation
 from app.schemas.observe import ObserveRequest, ObserveResponse
 
 router = APIRouter(tags=["network"])
@@ -37,7 +44,13 @@ async def observe(
     reporter: ReporterDep,
     source: SourceDep,
     verified: VerifiedDep,
+    team: TeamDep,
 ) -> ObserveResponse:
+    if team is not None:
+        # Private mode: stored for this team alone and never for the network.
+        return await record_private_observation(
+            session, payload, team_hash=team, reporter_hash=reporter
+        )
     return await record_observation(
         session, payload, reporter_hash=reporter, source=source, verified=verified
     )

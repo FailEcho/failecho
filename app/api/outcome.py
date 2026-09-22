@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.deps import RateLimitDep, ReporterDep, SessionDep, SourceDep, VerifiedDep
-from app.core.service import record_recovery_outcome
+from app.api.deps import (
+    RateLimitDep,
+    ReporterDep,
+    SessionDep,
+    SourceDep,
+    TeamDep,
+    VerifiedDep,
+)
+from app.core.service import record_private_outcome, record_recovery_outcome
 from app.schemas.outcome import OutcomeRequest, OutcomeResponse
 
 router = APIRouter(tags=["network"])
@@ -33,7 +40,12 @@ async def outcome(
     reporter: ReporterDep,
     source: SourceDep,
     verified: VerifiedDep,
+    team: TeamDep,
 ) -> OutcomeResponse:
+    if team is not None:
+        return await record_private_outcome(
+            session, payload, team_hash=team, reporter_hash=reporter
+        )
     return await record_recovery_outcome(
         session, payload, reporter_hash=reporter, source=source, verified=verified
     )

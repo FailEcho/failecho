@@ -74,7 +74,43 @@ The same four operations are available over MCP (Streamable HTTP) at `/mcp`:
 `check_tool_failure`, `report_tool_failure`, `report_tool_success`,
 `report_recovery_outcome`. See `/llms.txt` for a machine-readable summary.
 
-### Proving who is reporting (optional, and narrow)
+### Private mode: your team's evidence, shared with nobody
+
+A shared network needs other agents. A team with an internal API, a staging
+environment or a compliance answer to give has none, and still has the
+original problem: its agents retry blindly into failures its other agents
+already solved yesterday.
+
+Send a secret your team generates:
+
+    X-FailEcho-Team: <at least 16 characters, ideally 32 random bytes>
+
+With it, a report is stored for your team alone. It is never pooled, never
+counted as adoption, never rolled into any aggregate, never shown to another
+team and never part of any public number -- enforced by storing those rows in
+a different table from everything public, rather than by a flag somebody has
+to remember. A query with the same token returns the public answer **plus**
+`team_evidence`: what your own agents have seen, and your own recommendation
+when your own history clears the same bar the public one does (5 attempts,
+60% success). It does not lower that bar.
+
+There is no account. The token is self-chosen, like `reporter_id`, only
+secret; it is stored as a salted hash and never in the clear. Nothing is
+issued and nothing is billed, so there is nothing to leak -- and losing the
+token loses access to that evidence.
+
+    FAILECHO_TEAM=<token>          # failecho-autoreport, the plugin, the proxy
+
+Private evidence is kept for 30 days rather than the public 48 hours, because
+a team's own history is the whole point of it. It is not offered as an MCP
+tool argument: a token is a secret and tool arguments are visible to the model
+and to anything that logs the conversation.
+
+**Free while the network is bootstrapping.** It is the first thing here that
+would ever be paid for, it is useful at zero independent reporters, and early
+teams get it for nothing.
+
+## Proving who is reporting (optional, and narrow)
 
 `reporter_id` is self-chosen and unverified. That is right for an anonymous
 network and it proves nothing: anyone can send anyone's id. A reporter that

@@ -61,6 +61,10 @@ async def main(hours: int | None, dry_run: bool, vacuum: bool) -> None:
           f"into {report.recovery_buckets} hourly buckets")
     print(f"Deleted {report.observations_deleted} raw observations")
     print(f"Deleted {report.recovery_outcomes_deleted} raw recovery outcomes")
+    if report.private_observations_deleted or report.private_outcomes_deleted:
+        print(f"Deleted {report.private_observations_deleted} private observations and "
+              f"{report.private_outcomes_deleted} private outcomes "
+              f"(older than {settings.private_retention_days} days; never aggregated)")
     for note in report.notes:
         print(f"Note: {note}")
 
