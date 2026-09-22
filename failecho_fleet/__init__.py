@@ -168,8 +168,12 @@ def local_plan(error_type: str, code: str | None, exc: BaseException, consecutiv
         return ["retry_without_tool_choice"]
     if error_type == "rate_limit":
         headers = getattr(exc, "headers", None)
+        # x-ratelimit-reset is GitHub's, and GitHub is where most of the
+        # fleet's rate limits come from: leaving it out meant the careful
+        # plan backed off blindly exactly where it should have waited
         has_reset = bool(headers and any(headers.get(h) for h in (
-            "retry-after", "x-ratelimit-reset-tokens", "x-ratelimit-reset-requests")))
+            "retry-after", "x-ratelimit-reset", "x-ratelimit-reset-tokens",
+            "x-ratelimit-reset-requests")))
         if _daily_quota(exc):
             return ["switch_model"]     # the day's pool is gone; waiting is pointless
         return (["wait_until_reset", "switch_model"] if has_reset
@@ -820,6 +824,17 @@ class Run:
             fingerprint = None
             action = {"rate_limit": "backoff", "server_error": "retry", "timeout": "retry",
                       "connection_error": "retry"}.get(et)
+            if self.reporter in LOCAL_PERSONAS:
+                # The local arm recovers like a careful engineer at the tool
+                # level too, not only when a model provider fails -- Mistral
+                # failed 0 times in its first 32 runs, so without this the arm
+                # was the ordinary comparison wearing a different name
+                # (22 Sep). The difference that bites here: GitHub sends
+                # x-ratelimit-reset, so a competent client waits for the reset
+                # instead of sleeping three seconds and trying again.
+                plan = [a for a in local_plan(et, code, exc, 0) if a != "switch_model"]
+                action = plan[0] if plan else None
+                rec["local_plan"] = plan
             advice = {}
             if self.asks:
                 rec["asked"] = True

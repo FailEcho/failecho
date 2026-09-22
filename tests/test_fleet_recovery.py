@@ -1233,3 +1233,36 @@ def test_the_local_blind_twin_never_asks_the_network(monkeypatch):
         p = {"host": "api.mistral.ai", "alt_models": ["b"], "url": "u", "key": "k"}
         run.recover_provider(p, RuntimeError("503 service unavailable"), lambda: {"choices": []}, {"model": "a"})
     assert asked == ["fleet-local-ask"], asked
+
+
+def test_the_local_arm_is_competent_at_the_tool_level_too(monkeypatch):
+    """Its provider (Mistral) failed 0 times in 32 runs, so if the careful
+    rules applied only to provider failures the arm measured nothing. A
+    GitHub 403 carries x-ratelimit-reset: the local twin waits for the reset,
+    the ordinary blind twin sleeps three seconds."""
+    import json
+
+    monkeypatch.setattr(F.FailEcho, "_post", lambda self, body: None)
+    monkeypatch.setattr(F.Run, "_ask", lambda self, *a, **k: {})
+
+    def blocked(**_):
+        err = urllib_error_http()
+        raise err
+
+    def urllib_error_http():
+        import time
+        import urllib.error
+        # the reset header must go in as the response headers, not be set
+        # afterwards: HTTPError.headers is a property over hdrs
+        headers = {"x-ratelimit-reset": str(int(time.time()) + 12)}
+        return urllib.error.HTTPError("https://api.github.com/repos/x/y", 403,
+                                      "rate limit exceeded", headers, None)
+
+    waits = {}
+    monkeypatch.setattr(F.Run, "_sleep", lambda self, seconds: waits.setdefault(self.reporter, []).append(seconds))
+    for reporter in ("fleet-local-blind", "fleet-decor-blind-a"):
+        run = F.Run(reporter, "decorator", "groq", False)
+        out, ok = run.call("github_repo", {}, fn=blocked, service="api.github.com")
+        assert not ok and json.loads(out)["error"] == "rate_limit"
+    assert waits["fleet-local-blind"][0] > 5, "the local twin waits for the stated reset"
+    assert waits["fleet-decor-blind-a"][0] == 3, "the ordinary control just backs off"
