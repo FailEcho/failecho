@@ -382,10 +382,10 @@ FailEcho: try backoff, worked n/m (confidence 0.61).</code></pre>
       server started locally; a remote server's messages are parsed and
       re-serialised. Each call's outcome is reported as its shape only
       &mdash; the server's name, the tool, an error class and code, the latency
-      &mdash; never arguments and never results. It does not send the error
-      text either, except that 0.2.1 still honours
-      <code>FAILECHO_SEND_ERRORS</code> from the environment if you have set it
-      for the wrapper; 0.2.2 ignores it here. A failed call repeated with the same arguments counts as
+      &mdash; never arguments, never results, and never the error
+      text: the proxy reads it to pick an error class and drops it, ignoring
+      <code>FAILECHO_SEND_ERRORS</code> even when you have set it for the
+      wrapper (0.2.2 and newer). A failed call repeated with the same arguments counts as
       a retry, compared as a hash that never leaves your machine. Advice waits
       at most 3 seconds, on failures only; if FailEcho is unreachable the error
       passes through as it was. <code>FAILECHO_DISABLED=1</code> makes it a
