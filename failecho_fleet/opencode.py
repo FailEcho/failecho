@@ -75,6 +75,14 @@ OCP_TASKS: list[tuple[str, str]] = [
     ("Use the packages tools to get the latest npm version of express and the latest crates.io version of serde, "
      "and write result.json as {\"express\": \"x\", \"serde\": \"y\"}.",
      r'"express":\s*"\d'),
+    ("Use the packages tools' service_status on redis, postgres and kafka, and write result.json as "
+     "{\"redis\": \"ok\"|\"failed\", \"postgres\": ..., \"kafka\": ...}. The endpoint is flaky; decide "
+     "yourself whether to try again, and record what you got.",
+     r'"redis":\s*"(ok|failed)"'),
+    ("Use the packages tools' quota_check on redis and postgres and write result.json as "
+     "{\"redis\": <remaining or \"error\">, \"postgres\": ...}. If the tool keeps refusing, record the "
+     "reason rather than inventing a number.",
+     r'"redis":'),
 ]
 
 #: What the proxy pair's guest needs besides OpenCode: the API server, and
@@ -125,7 +133,8 @@ def packages_mcp(proxied: bool, lab_public_url: str | None, reporter: str) -> di
         # each tool's API host, as a user would declare it, so a GitHub 403
         # can draw on the evidence agents filed under api.github.com
         upstream = ["--upstream", "github_*=api.github.com", "--upstream", "pypi_*=pypi.org",
-                    "--upstream", "npm_*=registry.npmjs.org", "--upstream", "crates_*=crates.io"]
+                    "--upstream", "npm_*=registry.npmjs.org", "--upstream", "crates_*=crates.io",
+                    "--upstream", "service_status=httpbingo.org", "--upstream", "quota_check=httpbingo.org"]
         server = ["python3", "/work/fe/proxy.py", *upstream, "--", *server]
         env.update(FAILECHO_ENDPOINT=lab_public_url or "", FAILECHO_REPORTER_ID=reporter)
     return {"type": "local", "command": server, "enabled": True, "environment": env}

@@ -26,6 +26,12 @@ TOOLS = [
     ("crates_latest", "Latest version of a Rust crate on crates.io.", {"crate": "crate name"}),
     ("github_latest_release", "Latest release tag and date of a GitHub repository.", {"repo": "owner/name"}),
     ("github_stars", "Star count of a GitHub repository.", {"repo": "owner/name"}),
+    # Two endpoints that fail the way real ones do, so the proxy pair meets
+    # failures at all: without them its tools almost always succeeded and the
+    # group measured provider luck (20 Sep).
+    ("service_status", "Status of a dependency's status endpoint. Flaky: it "
+                       "returns 503 about half the time.", {"name": "dependency name"}),
+    ("quota_check", "Remaining quota for a dependency. Rate limited.", {"name": "dependency name"}),
 ]
 
 
@@ -33,6 +39,13 @@ def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.load(r)
+
+
+def status_only(url):
+    """A status check whose body is empty: read the code, not JSON."""
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return r.status
 
 
 def call(name, args):
@@ -48,6 +61,12 @@ def call(name, args):
         return {"tag": d["tag_name"], "published_at": d["published_at"]}
     if name == "github_stars":
         return {"stars": get(f"https://api.github.com/repos/{args['repo']}")["stargazers_count"]}
+    if name == "service_status":
+        status_only("https://httpbingo.org/status/200,200,503,503")
+        return {"name": args.get("name", ""), "status": "ok"}
+    if name == "quota_check":
+        status_only("https://httpbingo.org/status/429")
+        return {"name": args.get("name", ""), "remaining": "unknown"}
     raise KeyError(name)
 
 

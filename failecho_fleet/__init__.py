@@ -72,9 +72,11 @@ OPENCODE_TIMEOUT = int(os.environ.get("FLEET_OPENCODE_TIMEOUT") or 300)
 #: a builder's, and production lives on the same host. 10 min was not enough:
 #: at 08:18 and 08:31 on 20 Sep the kernel ran out of memory and killed
 #: firecracker (the test VM, not the server -- but the next one could be the
-#: server), with swap at 3.9 of 4 GB. 30 min, and 2 GB more swap on the host.
+#: server), with swap at 3.9 of 4 GB. 30 min then, and 2 GB more swap; back to
+#: 10 min on 22 Sep, when the host's other projects were stopped and 889 MB
+#: came free.
 #: A gap costs runs per hour, not the comparison: both twins wait alike.
-OPENCODE_MIN_GAP_SECONDS = int(os.environ.get("FLEET_OPENCODE_MIN_GAP") or 1800)
+OPENCODE_MIN_GAP_SECONDS = int(os.environ.get("FLEET_OPENCODE_MIN_GAP") or 600)
 #: What the sandbox guest is told to report to. Unset means the in-guest
 #: wrapper stays off; there is deliberately no default.
 LAB_PUBLIC_URL = (os.environ.get("FLEET_LAB_PUBLIC_URL") or "").rstrip("/") or None
