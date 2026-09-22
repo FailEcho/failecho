@@ -1611,3 +1611,31 @@ def test_a_denial_is_an_answer_not_a_refusal(monkeypatch):
     g = grading.grade(prompt, "definitely-not-a-real-package-xyz-123 is not available on PyPI. uv is 0.12.17.",
                       answered=True)
     assert g["refused"] == 0 and g["correct"] is True
+
+
+def test_a_run_the_provider_refused_has_no_answer_to_grade(tmp_path, monkeypatch):
+    """`(provider failed: rate_limit)` is the harness speaking. On 22 Sep one
+    of them was scored as three wrong values and put the asking side at 75%
+    against 100% on four runs. The run still counts -- meeting a provider
+    failure is what the provider group is about -- it just has no answer."""
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+
+    def run(asks, answer, correct):
+        return {"at": "2026-09-23T00:00:00", "reporter": "fleet-gh-ask" if asks else "fleet-gh-blind",
+                "path": "decorator", "provider": "groq", "asks": asks, "tool_calls": 2, "model_calls": 1,
+                "seconds": 4.0, "failures": [], "answer": answer,
+                "graded": {"answered": True, "valid": True, "correct": correct, "checked": 3,
+                           "matched": 3 if correct else 0, "unknown": 0, "refused": 0, "missed": []},
+                "metrics": {"tokens_prompt": 60, "tokens_completion": 6, "asks": 0, "ask_seconds": 0,
+                            "wait_seconds": 0, "completed": True, "calls_first_try": 2,
+                            "calls_recovered": 0, "calls_failed": 0}}
+
+    F.write_report({"runs": [run(True, "requests 2.34.2", True),
+                             run(True, "(provider failed: rate_limit)", False),
+                             run(False, "requests 2.34.2", True)]})
+    rows = {r["metric"]: r for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]
+            if g["group"] == "real" for r in g["rows"]}
+    assert rows["runs where truth was checkable"]["ask"] == 1, "the refused run is not a graded run"
+    assert rows["every checked value correct"]["ask"] == 100.0

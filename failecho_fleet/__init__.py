@@ -1336,6 +1336,14 @@ def _save(state: dict) -> None:
 #: A run that never started because a cap said no is not a run.
 _NOT_A_RUN = ("daily cap reached; run skipped", "(no provider key)")
 
+#: Answers that are the harness speaking rather than the agent. A run whose
+#: provider refused it never produced an answer, so there is nothing to grade:
+#: on 22 Sep one `(provider failed: rate_limit)` was scored as three wrong
+#: values and put the asking side at 75% against 100% on four runs. The run
+#: itself still counts -- meeting a provider failure is the provider group's
+#: entire subject -- it just has no answer in it.
+_NO_ANSWER = _NOT_A_RUN + ("(provider failed", "(provider ", "(no answer")
+
 
 def _is_run(r: dict) -> bool:
     """False for a record of a run that never started. Records before
@@ -1458,6 +1466,8 @@ def write_report(state: dict) -> None:
         c["failure_seconds"] += sum(float(f.get("seconds") or 0) for f in r["failures"])
         c["model_retries_after_skip"] += m.get("model_retries_after_skip", 0)
         g = r.get("graded") or {} if r["at"] >= GRADING_SINCE else {}
+        if any(m in (r.get("answer") or "") for m in _NO_ANSWER):
+            g = {}          # the harness spoke, not the agent: nothing graded
         if g.get("valid") is not None:
             c["graded_runs"] = c.get("graded_runs", 0) + 1
             c["valid_runs"] = c.get("valid_runs", 0) + int(bool(g.get("valid")))
@@ -1941,7 +1951,9 @@ def main(argv: list[str] | None = None) -> int:
         # "completed" meant only that the model said something. Grade the
         # sentence against truth fetched from the same APIs the task names --
         # here, before the answer is truncated for storage.
-        graded = grade(task, answer, bool(run.completed))
+        graded = (grade(task, answer, bool(run.completed))
+                  if not any(m in (answer or "") for m in _NO_ANSWER)
+                  else {"checked": 0, "valid": None})
         if graded["checked"] or graded["valid"] is not None:
             record["graded"] = graded
             if graded.get("correct") is False:
