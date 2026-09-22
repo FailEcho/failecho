@@ -1185,3 +1185,47 @@ def test_grading_reads_a_truncated_result_file(monkeypatch):
     prompt = "Use the packages tools to get the latest npm version of express and the latest crates.io version of serde"
     prose = 'Here it is:\n{\n  "express": "5.2.1",\n  "serde": "1.0.229"\n'
     assert grading.grade(prompt, prose, answered=True)["correct"] is True
+
+
+def test_the_local_arm_recovers_like_a_careful_engineer():
+    """The old control retried once after 3 s, so every comparison answered
+    'better than retrying blindly'. This arm honours the reset header, backs
+    off, keeps a fallback model, stops on what never recovers, and breaks the
+    circuit after two failures on one model."""
+    class E(Exception):
+        pass
+
+    with_reset = E("429 rate limit exceeded")
+    with_reset.headers = {"retry-after": "30"}
+    assert F.local_plan("rate_limit", "429", with_reset, 0)[0] == "wait_until_reset"
+    assert F.local_plan("rate_limit", "429", E("429 rate limit"), 0)[0] == "backoff"
+    assert "switch_model" in F.local_plan("rate_limit", "429", E("429 rate limit"), 0)
+
+    # the day's pool, as the provider reports it: in the response body, which
+    # is where _daily_quota reads it from
+    daily = E("429 rate limit reached")
+    daily.failecho_body = '{"error":{"message":"Limit 200000, tokens per day (TPD)"}}'
+    assert F.local_plan("rate_limit", "429", daily, 0) == ["switch_model"], "waiting out a day is not recovery"
+
+    assert F.local_plan("server_error", "503", E("503"), 0)[0] == "backoff"
+    assert F.local_plan("server_error", "503", E("503"), 2)[0] == "switch_model", "circuit breaker"
+    assert F.local_plan("auth_error", "401", E("401 unauthorized"), 0) == [], "retrying a 401 is not engineering"
+    assert F.local_plan("not_found", "404", E("404"), 0) == []
+
+
+def test_the_local_pair_is_wired_and_kept_out_of_the_naive_comparison():
+    names = {p[0]: p for p in F.PERSONAS}
+    assert names["fleet-local-ask"][1:4] == ("decorator", "mistral", True)
+    assert ("fleet-local-ask", "fleet-local-blind") in F.TWINS
+    assert F.LOCAL_PERSONAS == {"fleet-local-ask", "fleet-local-blind"}
+
+
+def test_the_local_blind_twin_never_asks_the_network(monkeypatch):
+    asked = []
+    monkeypatch.setattr(F.Run, "_ask", lambda self, *a, **k: asked.append(self.reporter) or {})
+    monkeypatch.setattr(F.FailEcho, "_post", lambda self, body: None)
+    for reporter, asks in (("fleet-local-blind", False), ("fleet-local-ask", True)):
+        run = F.Run(reporter, "decorator", "mistral", asks)
+        p = {"host": "api.mistral.ai", "alt_models": ["b"], "url": "u", "key": "k"}
+        run.recover_provider(p, RuntimeError("503 service unavailable"), lambda: {"choices": []}, {"model": "a"})
+    assert asked == ["fleet-local-ask"], asked

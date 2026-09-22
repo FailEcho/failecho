@@ -155,6 +155,32 @@ PROVIDERS = {
 #: the network has nothing for, do what an agent without the network does:
 #: one plain retry after a short pause (since PROVIDER_CONTROL_SINCE; on the
 #: first day they gave up at once, which flattered the ask side).
+#: What a careful engineer does without any network: honour the reset header,
+#: back off with a rising delay, keep a fallback model list, stop retrying what
+#: never recovers, and break the circuit after two failures on one model. The
+#: old control was a single retry after 3 s, so every comparison answered "is
+#: FailEcho better than retrying blindly?" -- which is not the question a
+#: reader has (review, 20 Sep). Returns the actions to try, in order.
+def local_plan(error_type: str, code: str | None, exc: BaseException, consecutive: int) -> list[str]:
+    if error_type in ("auth_error", "not_found"):
+        return []                       # nothing retryable: stop, as one should
+    if error_type == "validation_error":
+        return ["retry_without_tool_choice"]
+    if error_type == "rate_limit":
+        headers = getattr(exc, "headers", None)
+        has_reset = bool(headers and any(headers.get(h) for h in (
+            "retry-after", "x-ratelimit-reset-tokens", "x-ratelimit-reset-requests")))
+        if _daily_quota(exc):
+            return ["switch_model"]     # the day's pool is gone; waiting is pointless
+        return (["wait_until_reset", "switch_model"] if has_reset
+                else ["backoff", "switch_model"])
+    if error_type in ("server_error", "timeout", "connection_error"):
+        # two failures on this model already: break the circuit rather than
+        # spend a third attempt on it
+        return ["switch_model", "backoff"] if consecutive >= 2 else ["backoff", "switch_model"]
+    return ["retry"]
+
+
 PROVIDER_ACTIONS = {
     "rate_limit": ["wait_until_reset", "backoff", "switch_model"],
     "validation_error": ["retry_without_tool_choice", "switch_model", "retry"],
@@ -327,6 +353,12 @@ PERSONAS = [
     # store nothing; reports still go to the lab.
     ("fleet-prod-ask",     "decorator", "nvidia", True,  MIXED),
     ("fleet-prod-blind",   "decorator", "nvidia", False, MIXED),
+    # The third arm (2026-09-22): competent local recovery with no network at
+    # all, against the same recovery plus FailEcho. The old control was one
+    # retry after 3 s, so "with vs without" only ever answered "better than
+    # retrying blindly". These two answer "better than doing it properly".
+    ("fleet-local-ask",    "decorator", "mistral", True,  MIXED),
+    ("fleet-local-blind",  "decorator", "mistral", False, MIXED),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
@@ -334,6 +366,9 @@ OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
 OCPROXY_PERSONAS = {"fleet-ocp-ask-n", "fleet-ocp-blind-n"}
 PROD_ADVICE_PERSONAS = {"fleet-prod-ask", "fleet-prod-blind"}
+#: Both sides recover like a careful engineer; only the ask twin also asks the
+#: network. The blind twin here is *not* the naive control.
+LOCAL_PERSONAS = {"fleet-local-ask", "fleet-local-blind"}
 #: The one production URL the fleet may call: the read path, which stores
 #: nothing. Sent with X-Reporter-Kind: demo, the label the server accepts
 #: only as a downgrade, so these reads stay out of its usage counters. The
@@ -362,7 +397,7 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-decor-ask-d", "fleet-decor-blind-d"), ("fleet-decor-ask-e", "fleet-decor-blind-e"),
          ("fleet-build-ask-x", "fleet-build-blind-x"), ("fleet-oc-ask-n", "fleet-oc-blind-n"),
          ("fleet-wrap-ask", "fleet-wrap-blind"), ("fleet-ocp-ask-n", "fleet-ocp-blind-n"),
-         ("fleet-prod-ask", "fleet-prod-blind")]
+         ("fleet-prod-ask", "fleet-prod-blind"), ("fleet-local-ask", "fleet-local-blind")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 
@@ -633,6 +668,9 @@ class Run:
             from failecho_autoreport import auto
             auto._fe = self.fe
             auto.enable()
+        #: consecutive provider failures per model, for the local arm's circuit
+        #: breaker. Per run: a fresh agent does not inherit a broken circuit.
+        self._consecutive: dict[str, int] = {}
         self.build: dict | None = None   # the builder's ledger, when this is one
         self.opencode: dict | None = None   # the OpenCode run's ledger, when this is one
         # Every cost a run pays, so ask and blind can be compared on more than
@@ -879,6 +917,8 @@ class Run:
         """
         host = p["host"]
         et, code = classify(exc)
+        model_now = state.get("model", "")
+        self._consecutive[model_now] = self._consecutive.get(model_now, 0) + 1
         rec = {"service": host, "operation": "chat.completions", "error_type": et, "error_code": code,
                "asked": False, "recommended": None, "attempts": 1, "recovered": False}
         self.failures.append(rec)
@@ -905,8 +945,18 @@ class Run:
                 if quota:
                     self.provider_dead_today = True
                 return None
+        local = self.reporter in LOCAL_PERSONAS
+        if local and action is None:
+            # no network answer (or the blind twin, which never asks): do what
+            # a careful engineer would, not a bare retry
+            plan = local_plan(et, code, exc, self._consecutive.get(state.get("model", ""), 0))
+            if not plan:
+                rec["skipped"] = True
+                return None
+            action = plan[0]
+            rec["local_plan"] = plan
         if action is None:
-            action = "retry"   # the control
+            action = "retry"   # the naive control
         # -- apply the action ---------------------------------------------
         if action in ("backoff", "retry"):
             self._sleep(3)
@@ -933,6 +983,7 @@ class Run:
         self.model_calls += 1
         try:
             resp = chat()
+            self._consecutive[state.get("model", "")] = 0
         except Exception as again:  # noqa: BLE001
             self.report_recovery(host, "chat.completions", action, False, fingerprint)
             # only a failed *switch* proves the provider has nothing left; a
@@ -1274,6 +1325,7 @@ def write_report(state: dict) -> None:
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
+                else "local" if r["reporter"] in LOCAL_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = cohorts.setdefault(key, blank())
@@ -1303,7 +1355,8 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
-                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS:
+                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS \
+                or r["reporter"] in LOCAL_PERSONAS:
             continue
         if r["at"] < FAIR_ORDER_SINCE:
             continue   # before the twins alternated order; see TWINS
@@ -1329,6 +1382,7 @@ def write_report(state: dict) -> None:
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
+                else "local" if r["reporter"] in LOCAL_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = costs.setdefault(key, {"cohort": key, "runs": 0, "completed": 0, "tokens": 0, "tokens_prompt": 0,
@@ -1366,6 +1420,7 @@ def write_report(state: dict) -> None:
     cost_rows = [costs[k] for k in ("real / ask", "real / blind", "test / ask", "test / blind",
                                     "build / ask", "build / blind", "opencode / ask", "opencode / blind",
                                     "wrapped / ask", "wrapped / blind", "ocproxy / ask", "ocproxy / blind", "prod / ask", "prod / blind",
+                                    "local / ask", "local / blind",
                                     "explore") if k in costs]
 
     # With FailEcho against without, the way a vendor benchmark table reads:
@@ -1389,7 +1444,8 @@ def write_report(state: dict) -> None:
                        ("opencode", "OpenCode, a real agent product, with FailEcho's MCP server and without"),
                        ("wrapped", "The shipped wrapper: advice in the tool error, the model decides (no harness help)"),
                        ("ocproxy", "OpenCode with an MCP server behind failecho-mcp proxy, and without"),
-                       ("prod", "Real APIs, advice read from production (what a new user gets today)")):
+                       ("prod", "Real APIs, advice read from production (what a new user gets today)"),
+                       ("local", "Both sides recover like a careful engineer; one also asks the network")):
         a, b = costs.get(f"{key} / ask"), costs.get(f"{key} / blind")
         ca, cb = cohorts.get(f"{key} / ask"), cohorts.get(f"{key} / blind")
         if not a or not b:
@@ -1462,7 +1518,7 @@ def write_report(state: dict) -> None:
             continue
         if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS or r["reporter"] in OPENCODE_PERSONAS \
                 or r["reporter"] in WRAPPED_PERSONAS or r["reporter"] in OCPROXY_PERSONAS \
-                or r["reporter"] in PROD_ADVICE_PERSONAS:
+                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS:
             continue
         side = "ask" if r["asks"] else "blind"
         c = prov.setdefault(side, {"runs": 0, "completed": 0, "failures": 0, "recovered": 0, "tokens": 0, "seconds": 0.0,
@@ -1534,7 +1590,8 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
-                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS:
+                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS \
+                or r["reporter"] in LOCAL_PERSONAS:
             continue
         if not r.get("metrics"):
             continue
