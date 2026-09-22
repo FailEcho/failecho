@@ -212,7 +212,10 @@ class Events:
                 self.tokens_in += int(tok.get("input") or 0)
                 self.tokens_out += int(tok.get("output") or 0)
             out = node.get("output")
-            if isinstance(out, str) and "FailEcho: " in out:
+            # "FailEcho: try ..." and "FailEcho (evidence from api.github.com): ..."
+            # are both advice; matching only the first counted zero while the
+            # proxy was in fact annotating every GitHub 403 (22 Sep)
+            if isinstance(out, str) and "FailEcho" in out:
                 self.advice_seen += 1
             if t == "text" and isinstance(node.get("text"), str):
                 self.text.append(node["text"])

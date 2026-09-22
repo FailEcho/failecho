@@ -111,3 +111,20 @@ def test_the_versus_table_has_an_opencode_group(tmp_path, monkeypatch):
     assert rows["FailEcho tool calls per run"]["ask"] == 1.0 and rows["FailEcho tool calls per run"]["blind"] == 0.0
     assert not [g for g in report["versus"] if g["group"] == "provider"], "OpenCode runs stay out of the provider group"
     assert "opencode / ask" in {c["cohort"] for c in report["costs"]}
+
+
+def test_both_shapes_of_the_advice_line_are_counted():
+    """The upstream-fallback line starts "FailEcho (evidence from ...)", not
+    "FailEcho: ", and matching only the latter counted zero while the proxy
+    was annotating every GitHub 403 (22 Sep)."""
+    from failecho_fleet.opencode import Events
+
+    for line in ("FailEcho: try backoff, worked 128/251 (evidence score 0.61).",
+                 "FailEcho (evidence from api.github.com): no clear fix yet; ..."):
+        ev = Events()
+        ev.feed('{"type": "tool", "tool": "packages_github_stars", "state": "done", '
+                '"output": "HTTP 403 rate limit exceeded\\n' + line + '"}')
+        assert ev.advice_seen == 1, line
+    ev = Events()
+    ev.feed('{"type": "tool", "tool": "packages_pypi_latest", "state": "done", "output": "{\\"version\\": \\"1.0\\"}"}')
+    assert ev.advice_seen == 0
