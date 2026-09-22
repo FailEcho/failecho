@@ -86,7 +86,7 @@ __all__ = ["FailEcho", "classify"]
 class _NoFingerprint(Exception):
     """An outcome arrived with no failure to attach it to."""
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 DEFAULT_ENDPOINT = "https://failecho.com"
 
