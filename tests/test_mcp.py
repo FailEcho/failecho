@@ -315,3 +315,38 @@ def test_an_explicit_null_is_still_accepted(client):
     result = mcp_call(client, "check_tool_failure", {"service": "x.example", "operation": "op", "error_type": None,
                                                       "error_code": None, "reporter_id": None})
     assert result["known"] is False
+
+
+def test_a_client_that_hangs_up_is_not_an_error_here(client):
+    """A peer that disconnects mid-request raises ClientDisconnect out of the
+    SDK's body read, through every middleware, and prints a full traceback in
+    production -- roughly hourly, from probes and restarted clients. There is
+    nobody left to answer, so there is nothing to report. A log full of
+    tracebacks that mean nothing is how one that means something gets missed.
+    """
+    import asyncio
+
+    from starlette.requests import ClientDisconnect
+
+    from app.mcp_server import mcp_endpoint
+
+    class Hangup:
+        async def __call__(self, scope, receive, send):
+            raise ClientDisconnect()
+
+    real, mcp_endpoint.app = mcp_endpoint.app, Hangup()
+    try:
+        scope = {"type": "http", "method": "POST", "path": "/mcp", "headers": []}
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        sent = []
+
+        async def send(message):
+            sent.append(message)
+
+        asyncio.run(mcp_endpoint(scope, receive, send))   # must not raise
+        assert sent == [], "nothing is sent to a client that is already gone"
+    finally:
+        mcp_endpoint.app = real

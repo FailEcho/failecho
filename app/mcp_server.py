@@ -20,6 +20,7 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
+from starlette.requests import ClientDisconnect
 from starlette.routing import Route
 
 from app.core.config import (
@@ -475,7 +476,17 @@ class _MCPEndpoint:
             )
             await response(scope, receive, send)
             return
-        await self.app(scope, receive, send)
+        try:
+            await self.app(scope, receive, send)
+        except ClientDisconnect:
+            # A client that hangs up mid-request is not an error on this
+            # side: there is nobody left to answer, and the SDK's read of
+            # the body raises out through every middleware, printing a full
+            # traceback in production. It happens roughly hourly (probes,
+            # scanners, a restarted client) and a log full of tracebacks
+            # that mean nothing is how a traceback that means something
+            # gets missed.
+            return
 
 
 #: Registered once on the FastAPI app; wired up by :func:`mcp_lifespan`.
