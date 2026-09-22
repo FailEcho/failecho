@@ -1464,6 +1464,7 @@ def write_report(state: dict) -> None:
         if g.get("correct") is not None:
             c["checkable_runs"] = c.get("checkable_runs", 0) + 1
             c["correct_runs"] = c.get("correct_runs", 0) + int(bool(g.get("correct")))
+        c["refused_values"] = c.get("refused_values", 0) + int(g.get("refused") or 0)
     for c in costs.values():
         n = c["runs"] or 1
         c.update(completed_rate=round(c["completed"] / n, 3), tokens_per_run=round(c["tokens"] / n),
@@ -1572,6 +1573,9 @@ def write_report(state: dict) -> None:
                          "better": _better(correct[0], correct[1], lower_is_better=False)})
             rows.append({"metric": "runs where truth was checkable", "unit": "",
                          "ask": a.get("checkable_runs", 0), "blind": b.get("checkable_runs", 0), "better": "tie"})
+            rows.append({"metric": "values declined rather than invented", "unit": "",
+                         "ask": a.get("refused_values", 0), "blind": b.get("refused_values", 0),
+                         "better": "tie"})
         if key == "wrapped":
             # nothing retries for the model here, so attempts and skips are
             # the harness's numbers and mean nothing; what the model did is
@@ -1599,6 +1603,9 @@ def write_report(state: dict) -> None:
                          "better": _better(correct[0], correct[1], lower_is_better=False)})
             rows.append({"metric": "runs where truth was checkable", "unit": "",
                          "ask": a.get("checkable_runs", 0), "blind": b.get("checkable_runs", 0), "better": "tie"})
+            rows.append({"metric": "values declined rather than invented", "unit": "",
+                         "ask": a.get("refused_values", 0), "blind": b.get("refused_values", 0),
+                         "better": "tie"})
         versus.append({"group": key, "label": label, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": rows})
     # Model providers under their real quotas: the model-driven personas
     # (not builders, not explorers) since blind started retrying once. A
