@@ -1126,3 +1126,62 @@ def test_the_opencode_personas_take_turns_on_their_own_cursor(tmp_path, monkeypa
     assert set(ran) == set(opencode_personas), f"starved: {set(opencode_personas) - set(ran)}"
     counts = {name: ran.count(name) for name in opencode_personas}
     assert max(counts.values()) - min(counts.values()) <= 1, counts
+
+
+def test_grading_checks_the_values_not_the_shape(monkeypatch):
+    """A file that matches the task's pattern can still be wrong: three
+    versions, one of them invented, used to count as a completed task."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        ("pypi", "requests"): "2.34.2", ("pypi", "httpx"): "0.28.1", ("pypi", "urllib3"): "2.8.0",
+    }.get((kind, arg)))
+    prompt = "Use the packages tools to find the latest PyPI versions of requests, httpx and urllib3, and write..."
+
+    right = '{"requests": "2.34.2", "httpx": "0.28.1", "urllib3": "2.8.0"}'
+    g = grading.grade(prompt, right, answered=True)
+    assert (g["valid"], g["correct"], g["checked"], g["matched"]) == (True, True, 3, 3)
+
+    one_wrong = '{"requests": "2.34.2", "httpx": "0.28.1", "urllib3": "1.0.0"}'
+    g = grading.grade(prompt, one_wrong, answered=True)
+    assert g["answered"] is True and g["valid"] is True and g["correct"] is False, g
+
+    placeholders = '{"requests": "unknown", "httpx": "unknown", "urllib3": "unknown"}'
+    g = grading.grade(prompt, placeholders, answered=True)
+    assert g["valid"] is False and g["correct"] is False
+
+    missing_key = '{"requests": "2.34.2"}'
+    g = grading.grade(prompt, missing_key, answered=True)
+    assert g["valid"] is False
+
+
+def test_grading_abstains_when_the_service_will_not_answer(monkeypatch):
+    """GitHub rate-limits this host most of the day. A grader that guesses
+    then is worse than one that says it does not know."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: None)
+    prompt = "Use the packages tools to get the latest release tag of astral-sh/uv and astral-sh/ruff and write..."
+    g = grading.grade(prompt, '{"astral-sh/uv": "0.12.17", "astral-sh/ruff": "0.14.1"}', answered=True)
+    assert g["correct"] is None and g["unknown"] == 2 and g["valid"] is True
+
+
+def test_grading_tolerates_a_star_count_moving(monkeypatch):
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {"pallets/flask": 74000, "psf/requests": 54000,
+                                                             "encode/httpx": 15000}.get(arg))
+    prompt = "Use the packages tools to get the GitHub star counts of pallets/flask, psf/requests and encode/httpx"
+    close = '{"pallets/flask": 74100, "psf/requests": 54050, "encode/httpx": 15010}'
+    assert grading.grade(prompt, close, answered=True)["correct"] is True
+    far = '{"pallets/flask": 74100, "psf/requests": 54050, "encode/httpx": 9000}'
+    assert grading.grade(prompt, far, answered=True)["correct"] is False
+
+
+def test_grading_reads_a_truncated_result_file(monkeypatch):
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {"express": "5.2.1", "serde": "1.0.229"}.get(arg))
+    prompt = "Use the packages tools to get the latest npm version of express and the latest crates.io version of serde"
+    prose = 'Here it is:\n{\n  "express": "5.2.1",\n  "serde": "1.0.229"\n'
+    assert grading.grade(prompt, prose, answered=True)["correct"] is True

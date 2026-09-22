@@ -41,6 +41,7 @@ import urllib.request
 from failecho_autoreport import FailEcho, classify
 
 from .builder import BUILDER_SCHEMAS, BUILDER_TASKS, DOC_HOSTS, SYSTEM_PROMPT as BUILDER_PROMPT, Builder, fetch_doc
+from .grading import grade
 from .opencode import OC_PROVIDERS, OC_TASKS, OCP_TASKS, run_opencode
 
 __version__ = "0.1.0"
@@ -1345,6 +1346,13 @@ def write_report(state: dict) -> None:
         c["calls_failed"] += m.get("calls_failed", 0)
         c["failure_seconds"] += sum(float(f.get("seconds") or 0) for f in r["failures"])
         c["model_retries_after_skip"] += m.get("model_retries_after_skip", 0)
+        g = r.get("graded") or {}
+        if g.get("valid") is not None:
+            c["graded_runs"] = c.get("graded_runs", 0) + 1
+            c["valid_runs"] = c.get("valid_runs", 0) + int(bool(g.get("valid")))
+        if g.get("correct") is not None:
+            c["checkable_runs"] = c.get("checkable_runs", 0) + 1
+            c["correct_runs"] = c.get("correct_runs", 0) + int(bool(g.get("correct")))
     for c in costs.values():
         n = c["runs"] or 1
         c.update(completed_rate=round(c["completed"] / n, 3), tokens_per_run=round(c["tokens"] / n),
@@ -1419,6 +1427,20 @@ def write_report(state: dict) -> None:
                          "unit": "", "ask": a["asks_per_run"], "blind": b["asks_per_run"], "better": "tie"})
             rows.append({"metric": "runs lost to guest memory (not counted above)", "unit": "",
                          "ask": lost["ask"], "blind": lost["blind"], "better": "tie"})
+            # graded against truth fetched independently, not against a pattern
+            def _rate(side, num, den):
+                n, d = side.get(num, 0), side.get(den, 0)
+                return _pct(n / d) if d else None
+            valid = (_rate(a, "valid_runs", "graded_runs"), _rate(b, "valid_runs", "graded_runs"))
+            correct = (_rate(a, "correct_runs", "checkable_runs"), _rate(b, "correct_runs", "checkable_runs"))
+            rows.append({"metric": "result complete and not a placeholder", "unit": "%",
+                         "ask": valid[0], "blind": valid[1],
+                         "better": _better(valid[0], valid[1], lower_is_better=False)})
+            rows.append({"metric": "every checked value correct", "unit": "%",
+                         "ask": correct[0], "blind": correct[1],
+                         "better": _better(correct[0], correct[1], lower_is_better=False)})
+            rows.append({"metric": "runs where truth was checkable", "unit": "",
+                         "ask": a.get("checkable_runs", 0), "blind": b.get("checkable_runs", 0), "better": "tie"})
         if key == "wrapped":
             # nothing retries for the model here, so attempts and skips are
             # the harness's numbers and mean nothing; what the model did is
@@ -1744,6 +1766,10 @@ def main(argv: list[str] | None = None) -> int:
     if any(m in answer for m in _NOT_A_RUN):
         record["answer"] = answer[:200]
     if run.opencode is not None:
+        # what it actually produced, checked against truth fetched from the
+        # same public APIs the task names (see grading.py)
+        record["graded"] = grade(task[0] if task else "", run.opencode.get("result_head") or "",
+                                 bool(run.opencode.get("completed")))
         record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "advice_seen", "idle_after_result", "guest_oom_kills",
                                                                 "mcp_log", "steps", "exit",
                                                                 "error", "tool_names", "result_head", "timed_out")}
