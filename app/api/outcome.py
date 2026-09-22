@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.deps import RateLimitDep, ReporterDep, SessionDep, SourceDep
+from app.api.deps import RateLimitDep, ReporterDep, SessionDep, SourceDep, VerifiedDep
 from app.core.service import record_recovery_outcome
 from app.schemas.outcome import OutcomeRequest, OutcomeResponse
 
@@ -32,7 +32,8 @@ async def outcome(
     session: SessionDep,
     reporter: ReporterDep,
     source: SourceDep,
+    verified: VerifiedDep,
 ) -> OutcomeResponse:
     return await record_recovery_outcome(
-        session, payload, reporter_hash=reporter, source=source
+        session, payload, reporter_hash=reporter, source=source, verified=verified
     )

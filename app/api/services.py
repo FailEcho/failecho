@@ -39,6 +39,7 @@ from app.db.models import (
     HourlyStat,
     Observation,
     RecoveryOutcome,
+    ReporterKey,
 )
 from app.schemas.services import NetworkStats, RecoveryIntelligence, ServiceStatus
 
@@ -272,6 +273,12 @@ async def stats(session: SessionDep) -> NetworkStats:
     # Every agent row is evidence; only rows from reporters that have met the
     # adoption threshold (app/core/adoption.py) are counted as adoption here.
     established = await established_reporters(session)
+    # Reporters that proved they hold their key. Independent of the adoption
+    # threshold on purpose: signing says "this is really me", the threshold
+    # says "this is really an agent", and neither implies the other.
+    verified = int(
+        (await session.execute(select(func.count()).select_from(ReporterKey))).scalar_one() or 0
+    )
     is_established = (Observation.source == SOURCE_AGENT,
                       Observation.reporter_hash.in_(sorted(established)) if established else false())
 
@@ -415,6 +422,7 @@ async def stats(session: SessionDep) -> NetworkStats:
         real_reporters_24h=int(real_day.reporters or 0),
         real_failure_fingerprints=int(real_day.fingerprints or 0),
         sparse_observations=sparse_total,
+        verified_reporters=verified,
         adoption_threshold=threshold_description(),
         archived_observations=archived_total,
         generated_at=isoformat_z(utcnow()) or "",

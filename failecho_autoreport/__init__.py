@@ -218,10 +218,21 @@ class FailEcho:
         timeout: float = TIMEOUT_SECONDS,
         operator_token: str | None = None,
         advise: bool | None = None,
+        sign: bool | None = None,
     ) -> None:
         self.endpoint = (endpoint or os.environ.get("FAILECHO_ENDPOINT")
                          or DEFAULT_ENDPOINT).rstrip("/")
+        #: Signing, when enabled, replaces the reporter id with the key's own
+        #: id: an identity that cannot be proven is not an identity, and one
+        #: that is proven must be the key itself or the proof means nothing.
+        #: Off by default -- turning it on starts this installation's history
+        #: over, so it is a decision rather than something that happens to you.
+        self.identity = None
+        if _truthy(os.environ.get("FAILECHO_SIGN"), False) if sign is None else sign:
+            from .identity import Identity
+            self.identity = Identity.load_or_create()
         self.reporter_id = (reporter_id or os.environ.get("FAILECHO_REPORTER_ID")
+                            or (self.identity.reporter_id if self.identity else None)
                             or installation_id())
         disabled = _truthy(os.environ.get("FAILECHO_DISABLED"), False)
         self.enabled = (not disabled) if enabled is None else enabled
@@ -385,9 +396,10 @@ class FailEcho:
             body["error_type"] = error_type
         if error_code:
             body["error_code"] = str(error_code)
+        encoded = json.dumps(body).encode()
         request = urllib.request.Request(
-            f"{self.endpoint}/v1/query", data=json.dumps(body).encode(),
-            headers=self._headers(), method="POST")
+            f"{self.endpoint}/v1/query", data=encoded,
+            headers=self._headers("/v1/query", encoded), method="POST")
         try:
             with urllib.request.urlopen(request, timeout=timeout or ADVICE_TIMEOUT_SECONDS) as response:
                 answer = json.loads(response.read())
@@ -597,7 +609,7 @@ class FailEcho:
             finally:
                 self._queue.task_done()
 
-    def _headers(self) -> dict:
+    def _headers(self, path: str = "", body: bytes = b"") -> dict:
         headers = {
             "Content-Type": "application/json",
             "X-Reporter-ID": self.reporter_id,
@@ -607,13 +619,23 @@ class FailEcho:
             # Bearer rather than X-FailEcho-Operator: the server accepts both,
             # and Bearer survives hosts that filter unknown header names.
             headers["Authorization"] = f"Bearer {self.operator_token}"
+        if self.identity is not None and path:
+            # Signing a request we could not sign is worse than not signing:
+            # the server rejects a bad signature outright, so a failure here
+            # would lose the report. It cannot fail, but it is not worth the
+            # report either way.
+            try:
+                headers.update(self.identity.headers("POST", path, body))
+            except Exception:  # noqa: BLE001
+                pass
         return headers
 
     def _post(self, body: dict) -> None:
+        encoded = json.dumps(body).encode()
         request = urllib.request.Request(
             f"{self.endpoint}/v1/observe",
-            data=json.dumps(body).encode(),
-            headers=self._headers(),
+            data=encoded,
+            headers=self._headers("/v1/observe", encoded),
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=self.timeout) as response:
@@ -648,12 +670,13 @@ class FailEcho:
             # never reported. Silently inventing a fingerprint would put the
             # outcome on the wrong failure, which is worse than losing it.
             raise _NoFingerprint(key)
+        encoded = json.dumps({"fingerprint": fingerprint,
+                              "action": body["action"],
+                              "successful": body["successful"]}).encode()
         request = urllib.request.Request(
             f"{self.endpoint}/v1/outcome",
-            data=json.dumps({"fingerprint": fingerprint,
-                             "action": body["action"],
-                             "successful": body["successful"]}).encode(),
-            headers=self._headers(),
+            data=encoded,
+            headers=self._headers("/v1/outcome", encoded),
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=self.timeout) as response:

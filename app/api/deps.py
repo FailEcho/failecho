@@ -8,6 +8,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import OPERATOR_BEARER_HEADER, OPERATOR_HEADER
+from app.core.identity import SIGNATURE_HEADER, TIMESTAMP_HEADER, is_key_id, verify
 from app.core.privacy import hash_reporter_id
 from app.core.service import operator_token_from, source_from_kind
 from app.core.ratelimit import check_write_limit, client_key
@@ -35,6 +36,63 @@ async def reporter_hash(
 
 
 ReporterDep = Annotated[str | None, Depends(reporter_hash)]
+
+
+async def reporter_verified(
+    request: Request,
+    x_reporter_id: Annotated[str | None, Header(alias="X-Reporter-ID", include_in_schema=False)] = None,
+    x_reporter_signature: Annotated[
+        str | None,
+        Header(
+            alias=SIGNATURE_HEADER,
+            description=(
+                "Optional. A reporter whose id is an Ed25519 public key "
+                "(`ed25519:<base64url>`) can sign each request, proving the "
+                "report is really from that reporter rather than from anyone "
+                "who knows its id. Signed over "
+                "`failecho-sig-v1 \\n timestamp \\n METHOD \\n path \\n "
+                "sha256(body)` and sent with X-Reporter-Timestamp. A signature "
+                "that does not verify is rejected, never downgraded: a "
+                "reporter that thinks it is signing should find out."
+            ),
+        ),
+    ] = None,
+    x_reporter_timestamp: Annotated[
+        str | None, Header(alias=TIMESTAMP_HEADER, include_in_schema=False)
+    ] = None,
+) -> bool:
+    """Whether this request carried a signature that checks out.
+
+    Unsigned is the normal case and stays fully supported -- this returns
+    False and nothing changes. It does not decide whether a report is stored
+    or whether it counts as adoption; the threshold does that.
+    """
+    if not x_reporter_signature:
+        return False
+    if not is_key_id(x_reporter_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "A signed request needs X-Reporter-ID to be the key that "
+                "signed it: 'ed25519:<base64url public key>'."
+            ),
+        )
+    body = await request.body()
+    if not verify(x_reporter_id, x_reporter_timestamp, x_reporter_signature,
+                  request.method, request.url.path, body):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Signature did not verify. Check the clock (5 minutes of skew "
+                "allowed), that the signature covers this exact body, and that "
+                "the id is the public key that signed it. Send no signature at "
+                "all to report anonymously."
+            ),
+        )
+    return True
+
+
+VerifiedDep = Annotated[bool, Depends(reporter_verified)]
 
 
 async def reporter_source(

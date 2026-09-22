@@ -74,7 +74,40 @@ The same four operations are available over MCP (Streamable HTTP) at `/mcp`:
 `check_tool_failure`, `report_tool_failure`, `report_tool_success`,
 `report_recovery_outcome`. See `/llms.txt` for a machine-readable summary.
 
-### Privacy
+### Proving who is reporting (optional, and narrow)
+
+`reporter_id` is self-chosen and unverified. That is right for an anonymous
+network and it proves nothing: anyone can send anyone's id. A reporter that
+wants its evidence to be attributable can make its id an Ed25519 public key
+and sign each request:
+
+    X-Reporter-ID         ed25519:<base64url public key>
+    X-Reporter-Timestamp  <unix seconds>
+    X-Reporter-Signature  <base64url signature>
+
+over `failecho-sig-v1 \n <timestamp> \n POST \n <path> \n sha256(body)`.
+Five minutes of clock skew is allowed. A signature that does not verify is
+**rejected with 400**, never silently downgraded -- a reporter that believes
+it is signing should find out.
+
+`python -m failecho_autoreport identity` creates the key and prints the id;
+`FAILECHO_SIGN=1` turns signing on. The private key stays on your machine and
+is never sent. Signing replaces that installation's reporter id with the key
+id, so its history starts over: it is opt-in for that reason.
+
+What this buys: a report attributed to a key was made by the holder of that
+key, and nobody can take over a reporter's history by guessing its id.
+`verified_reporters` in `/v1/stats` counts those reporters.
+
+What it does not buy, and no page here will claim otherwise: keys are free to
+generate, so this is **not Sybil resistance and not a count of people**. What
+makes a reporter count as an independent agent is the adoption threshold, not
+a signature. A captured signed request can also be replayed inside its five
+minute window, which duplicates one metadata row and cannot forge a new one.
+
+Unsigned is still the normal case and stays fully supported.
+
+## Privacy
 
 Only structured failure metadata is accepted. No prompts, no tool arguments,
 no tool results, no request/response bodies, no headers, no keys, no customer

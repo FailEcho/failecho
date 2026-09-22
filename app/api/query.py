@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.deps import ReporterDep, SessionDep, SourceDep
+from app.api.deps import ReporterDep, SessionDep, SourceDep, VerifiedDep
 from app.core.service import query_intelligence
 from app.schemas.query import QueryRequest, QueryResponse
 
@@ -39,6 +39,7 @@ async def query(
     session: SessionDep,
     reporter: ReporterDep,
     source: SourceDep,
+    verified: VerifiedDep,   # noqa: ARG001 - stores nothing; rejects a bad signature
 ) -> QueryResponse:
     return await query_intelligence(
         session, payload, reporter_hash=reporter, source=source

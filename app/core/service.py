@@ -51,6 +51,7 @@ from app.db.models import (
     HourlyStat,
     Observation,
     RecoveryOutcome,
+    ReporterKey,
 )
 from app.schemas.observe import ObserveRequest, ObserveResponse
 from app.schemas.outcome import OutcomeRequest, OutcomeResponse
@@ -187,11 +188,31 @@ async def _touch_fingerprint(
     return False
 
 
+async def note_verified_reporter(session: AsyncSession, reporter_hash: str | None) -> None:
+    """Remember that this reporter proved it holds its key.
+
+    Kept beside the reporter, not on the row: a reporter signs or it does not,
+    and the observation columns stay exactly as they were -- which is also why
+    this can be added to a live database without a migration.
+    """
+    if not reporter_hash:
+        return
+    row = await session.get(ReporterKey, reporter_hash)
+    now = utcnow()
+    if row is None:
+        session.add(ReporterKey(reporter_hash=reporter_hash, first_verified=now,
+                                last_verified=now, signed_requests=1))
+    else:
+        row.last_verified = now
+        row.signed_requests += 1
+
+
 async def record_observation(
     session: AsyncSession,
     payload: ObserveRequest,
     reporter_hash: str | None = None,
     source: str = SOURCE_AGENT,
+    verified: bool = False,
 ) -> ObserveResponse:
     """Store one tool-call outcome. Backs POST /v1/observe and the MCP tools."""
     # One name for one service, decided once at the edge, so the fingerprint,
@@ -238,6 +259,8 @@ async def record_observation(
             source=source,
         )
     )
+    if verified:
+        await note_verified_reporter(session, reporter_hash)
     await session.commit()
 
     if fingerprint is not None:
@@ -272,6 +295,7 @@ async def record_recovery_outcome(
     payload: OutcomeRequest,
     reporter_hash: str | None = None,
     source: str = SOURCE_AGENT,
+    verified: bool = False,
 ) -> OutcomeResponse:
     """Store one recovery attempt. Backs POST /v1/outcome and the MCP tool."""
     session.add(
@@ -283,6 +307,8 @@ async def record_recovery_outcome(
             source=source,
         )
     )
+    if verified:
+        await note_verified_reporter(session, reporter_hash)
     await session.commit()
     return OutcomeResponse(accepted=True)
 

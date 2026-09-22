@@ -120,6 +120,16 @@ class NetworkStats(BaseModel):
             "threshold. One scanner cannot write the adoption number."
         ),
     )
+    verified_reporters: int = Field(
+        default=0,
+        description=(
+            "Reporters that have proven they hold the Ed25519 key their "
+            "reporter id names, so their evidence cannot be impersonated. "
+            "Signing is optional and this is not Sybil resistance -- keys are "
+            "free to make. It is a floor under identity, not a count of "
+            "people."
+        ),
+    )
     adoption_threshold: dict = Field(
         default_factory=dict,
         description=(

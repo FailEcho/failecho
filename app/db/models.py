@@ -208,6 +208,28 @@ class HourlyRecoveryStat(Base):
     )
 
 
+class ReporterKey(Base):
+    """A reporter that has proven it holds the private key for its id.
+
+    Verification is a property of the reporter, not of a row: a reporter signs
+    or it does not, and rows stay exactly as they were. That also means this
+    table can be added to a live database without touching `observations`.
+
+    PRIVACY: the stored id is the same salted hash as everywhere else. The
+    public key is not kept -- it is in the reporter id the client sends with
+    every request, and keeping a copy here would make the hash reversible.
+    """
+
+    __tablename__ = "reporter_keys"
+
+    reporter_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    first_verified: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    last_verified: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    signed_requests: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    __table_args__ = (Index("ix_reporter_keys_last", "last_verified"),)
+
+
 class DailyCounter(Base):
     """Small aggregate counters, one row per (UTC day, name).
 

@@ -6,6 +6,10 @@
     python -m failecho_autoreport check <service> <operation> [error_type] [code]
         Ask the network what it knows about a failure, and print the answer
         the way an agent would read it. Stores nothing.
+
+    python -m failecho_autoreport identity
+        Show this installation's signing key, creating one on first use, and
+        print how to turn signing on. The private key never leaves the machine.
 """
 
 from __future__ import annotations
@@ -77,6 +81,27 @@ def _check(argv: list[str]) -> int:
     return 0
 
 
+def _identity(_argv: list[str]) -> int:
+    from .identity import Identity, key_path
+
+    identity = Identity.load_or_create()
+    if identity is None:
+        print(f"could not write a key to {key_path()} -- reports stay unsigned, "
+              f"which is a fully supported way to use FailEcho.", file=sys.stderr)
+        return 1
+    print(f"reporter id : {identity.reporter_id}")
+    print(f"private key : {key_path()}  (never sent anywhere)")
+    print()
+    print("Signing proves a report really came from this key, so nobody else can")
+    print("report under your id. It is not proof of a person: keys are free to")
+    print("make, and what makes a reporter count is the adoption threshold.")
+    print()
+    print("Turn it on with FAILECHO_SIGN=1, or FailEcho(sign=True). Note that")
+    print("signing replaces this installation's reporter id with the key id,")
+    print("so its history starts over.")
+    return 0
+
+
 def _run(argv: list[str]) -> int:
     if not argv:
         print(USAGE, file=sys.stderr)
@@ -114,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run(argv[1:])
     if argv[0] == "check":
         return _check(argv[1:])
+    if argv[0] == "identity":
+        return _identity(argv[1:])
     print(USAGE, file=sys.stderr)
     return 2
 
