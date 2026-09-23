@@ -4,6 +4,7 @@ with FailEcho's MCP server in its config (ask) or without (blind)."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import failecho_fleet as F
 from failecho_fleet import opencode as OC
@@ -167,3 +168,77 @@ def test_the_opencode_group_splits_on_the_stricter_rules(tmp_path, monkeypatch):
     assert rows["FailEcho tool calls per run, since the rules"]["ask"] == 3.0, "2 and 4 calls -> 3.0"
     assert rows["FailEcho tool calls per run"]["ask"] == 2.0, "the all-time average keeps the polite runs"
     assert rows["runs marked completed, since the rules"]["ask"] == 50.0
+
+
+# -- the hook pair (2026-09-23) -------------------------------------------------
+
+
+def test_the_hook_pair_runs_the_same_tasks_as_the_mcp_pair():
+    """The two arms answer the same question from opposite ends -- ask the
+    model to call a tool, or hook every tool it already calls -- so they have
+    to be asked the same things."""
+    import failecho_fleet as F
+    from failecho_fleet.opencode import OC_TASKS
+
+    by_name = {p[0]: p for p in F.PERSONAS}
+    for name in F.OCHOOK_PERSONAS:
+        assert by_name[name][1] == "opencode"
+        assert by_name[name][4] is OC_TASKS, f"{name} must run the MCP pair's tasks"
+    assert by_name["fleet-och-ask-n"][3] is True and by_name["fleet-och-blind-n"][3] is False
+
+
+def test_only_the_asking_twin_gets_the_plugin_and_the_endpoint():
+    """The blind twin must be plain OpenCode: no plugin file, and no endpoint
+    in its environment. A twin that reports is not a control."""
+    from failecho_fleet.opencode import guest_env
+
+    asking = guest_env("nvidia", "k", "fleet-och-ask-n", True, "https://lab.failecho.com")
+    blind = guest_env("nvidia", "k", "fleet-och-blind-n", False, "https://lab.failecho.com")
+    assert asking["FAILECHO_ENDPOINT"] == "https://lab.failecho.com"
+    assert asking["FAILECHO_REPORTER_ID"] == "fleet-och-ask-n"
+    assert "FAILECHO_ENDPOINT" not in blind and "FAILECHO_REPORTER_ID" not in blind
+
+
+def test_the_guest_never_falls_back_to_production():
+    """The plugin's default endpoint is failecho.com, and a guest started with
+    a minimal environment is exactly how eight rows of test traffic reached
+    production on 19 Sep. With no lab to point at, it gets a dead port."""
+    from failecho_fleet.opencode import guest_env
+
+    env = guest_env("nvidia", "k", "fleet-och-ask-n", True, None)
+    assert env["FAILECHO_ENDPOINT"] == "http://127.0.0.1:9"
+    assert "failecho.com" not in json.dumps(env)
+
+
+def test_the_lab_installs_the_plugin_it_ships():
+    """No second copy: the file the fleet puts in the guest is the file in the
+    npm package, or the experiment tests something nobody can install."""
+    from failecho_fleet.opencode import PLUGIN_FILE
+
+    shipped = Path(__file__).resolve().parents[1] / "opencode-plugin" / "plugin" / "failecho.js"
+    assert PLUGIN_FILE == shipped and PLUGIN_FILE.exists()
+    assert "tool.execute.after" in PLUGIN_FILE.read_text()
+
+
+def test_the_hook_group_is_on_the_scoreboard(tmp_path, monkeypatch):
+    import failecho_fleet as F
+
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+
+    def run(reporter, asks, advice_seen):
+        return {"at": "2026-09-23T01:00:00", "reporter": reporter, "path": "opencode", "provider": "nvidia",
+                "asks": asks, "tool_calls": 9, "model_calls": 5, "seconds": 200.0, "failures": [],
+                "opencode": {"completed": True, "tool_calls": 9, "failecho_calls": 0,
+                             "advice_seen": advice_seen, "guest_oom_kills": 0, "steps": 5},
+                "metrics": {"tokens_prompt": 40000, "tokens_completion": 900, "asks": advice_seen,
+                            "ask_seconds": 0, "wait_seconds": 0, "completed": True,
+                            "calls_first_try": 9, "calls_recovered": 0, "calls_failed": 0}}
+
+    F.write_report({"runs": [run("fleet-och-ask-n", True, 2), run("fleet-och-blind-n", False, 0)]})
+    groups = {g["group"]: g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]}
+    assert "ochook" in groups, "the fourth arm has to be readable next to the other three"
+    rows = {r["metric"]: r for r in groups["ochook"]["rows"]}
+    assert rows["tool outputs carrying advice, per run"]["ask"] == 2.0
+    assert rows["tool outputs carrying advice, per run"]["blind"] == 0.0

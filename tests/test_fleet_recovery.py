@@ -813,7 +813,8 @@ def test_two_lanes_round_robin_their_own_personas_and_share_one_state(tmp_path, 
         assert F.lane_of(by[a]) == F.lane_of(by[b])
     vm = [F.PERSONAS[i][0] for i in F.lane_personas("vm")]
     light = [F.PERSONAS[i][0] for i in F.lane_personas("light")]
-    assert set(vm) == F.BUILD_PERSONAS | F.OPENCODE_PERSONAS | F.OCPROXY_PERSONAS and not (set(vm) & set(light))
+    assert set(vm) == (F.BUILD_PERSONAS | F.OPENCODE_PERSONAS | F.OCPROXY_PERSONAS
+                       | F.OCHOOK_PERSONAS) and not (set(vm) & set(light))
     assert len(vm) + len(light) == len(F.PERSONAS)
     # the vm lane's odd cycle swaps twins inside the lane
     assert F.PERSONAS[F.persona_index(0, "vm")][0] == vm[0]

@@ -89,6 +89,10 @@ OCP_TASKS: list[tuple[str, str]] = [
 #: for the ask twin the proxy and the wrapper it reports with -- the shipped
 #: source files, read from this checkout, so the lab runs what users install.
 _REPO = Path(__file__).resolve().parents[1]
+#: The hook pair's guest needs the shipped plugin file, read from this
+#: checkout so the lab runs what users would install.
+PLUGIN_FILE = _REPO / "opencode-plugin" / "plugin" / "failecho.js"
+
 PROXY_FILES = {
     "fe/packages_mcp.py": _REPO / "failecho_fleet" / "guest_packages_mcp.py",
     "fe/proxy.py": _REPO / "failecho_mcp" / "proxy.py",
@@ -258,8 +262,27 @@ class Events:
 OC_MEM_MIB = 896
 
 
+def guest_env(provider: str, key: str, reporter: str, reporting: bool,
+               lab_public_url: str | None) -> dict:
+    """The environment the guest runs with.
+
+    The endpoint is always explicit when the plugin is installed. A client
+    library that starts a process with a minimal environment is how eight rows
+    of test traffic reached production as independent adoption on 19 Sep, and
+    the plugin's default is production. Where there is no lab URL to point at,
+    it gets a dead local port rather than a guess.
+    """
+    env = {OC_PROVIDERS[provider]["env"]: key, "OPENCODE_DISABLE_AUTOUPDATE": "1", "CI": "1",
+           "TERM": "dumb", "NO_COLOR": "1"}
+    if reporting:
+        env["FAILECHO_ENDPOINT"] = lab_public_url or "http://127.0.0.1:9"
+        env["FAILECHO_REPORTER_ID"] = reporter
+    return env
+
+
 def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: str, model: str, key: str,
-                 lab_public_url: str | None, timeout: int = 300, proxy: bool = False) -> dict:
+                 lab_public_url: str | None, timeout: int = 300, proxy: bool = False,
+                 hook: bool = False) -> dict:
     """One headless OpenCode run in a fresh VM. Returns the ledger entry."""
     out: dict = {"reporter": reporter, "asks": asks, "provider": provider, "model": model, "task": task[0][:160],
                  "completed": False, "tool_calls": 0, "failecho_calls": 0, "steps": 0, "tokens_in": 0, "tokens_out": 0,
@@ -269,7 +292,16 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
         out["error"] = f"sandbox unavailable: {why}"
         return out
     prompt, check = task
-    if proxy:
+    if hook:
+        # The hook pair: no FailEcho tools and no FailEcho paragraph, because
+        # the whole point is that the model is never asked to do anything.
+        # The ask twin's only difference is a plugin file in the project, and
+        # OpenCode fires it around every tool the agent runs.
+        cfg = opencode_config(provider, model, None, reporter)
+        files = {"project/opencode.json": json.dumps(cfg, indent=2), "project/AGENTS.md": AGENTS_MD}
+        if asks:
+            files["project/.opencode/plugin/failecho.js"] = PLUGIN_FILE.read_text(encoding="utf-8")
+    elif proxy:
         # the proxy pair: no FailEcho tools, no FailEcho paragraph -- the ask
         # twin's only difference is the proxy in front of its API server
         cfg = opencode_config(provider, model, None, reporter)
@@ -281,8 +313,7 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
         cfg = opencode_config(provider, model, lab_mcp, reporter)
         files = {"project/opencode.json": json.dumps(cfg, indent=2),
                  "project/AGENTS.md": AGENTS_MD_FAILECHO if asks else AGENTS_MD}
-    env = {OC_PROVIDERS[provider]["env"]: key, "OPENCODE_DISABLE_AUTOUPDATE": "1", "CI": "1", "TERM": "dumb",
-           "NO_COLOR": "1"}
+    env = guest_env(provider, key, reporter, hook and asks, lab_public_url)
     # `timeout` inside too: after a stream error OpenCode has been seen to
     # sit rather than exit, and the harness timeout would lose the output
     # -k: OpenCode has ignored the TERM before, and then the guest's own

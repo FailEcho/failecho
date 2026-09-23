@@ -351,6 +351,14 @@ PERSONAS = [
     # neither has FailEcho's tools or a FailEcho paragraph in AGENTS.md.
     ("fleet-ocp-ask-n",    "opencode",  "nvidia", True,  OCP_TASKS),
     ("fleet-ocp-blind-n",  "opencode",  "nvidia", False, OCP_TASKS),
+    # The fourth arm (2026-09-23): OpenCode with the shipped plugin against
+    # OpenCode with nothing. Same tasks as the MCP pair, so the two answer the
+    # same question from opposite ends -- ask the model to call a tool, or
+    # hook every tool it already calls. The MCP twin chose to call FailEcho
+    # 0.19 times a run, and the first run under the strictest instruction we
+    # could write used bash thirteen times and the tool zero.
+    ("fleet-och-ask-n",    "opencode",  "nvidia", True,  OC_TASKS),
+    ("fleet-och-blind-n",  "opencode",  "nvidia", False, OC_TASKS),
     # What a new user of failecho.com gets today (2026-09-19): the same
     # harness as the real-API twins, but the ask twin's advice is read from
     # production, whose evidence is only our one first-party agent's. Reads
@@ -410,6 +418,10 @@ GRADING_SINCE = "2026-09-22T21:55:00"
 MCP_RULES_SINCE = "2026-09-22T18:00:00"
 WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
 OCPROXY_PERSONAS = {"fleet-ocp-ask-n", "fleet-ocp-blind-n"}
+
+#: OpenCode with the plugin, which reports and advises around every tool the
+#: agent runs without the model deciding anything.
+OCHOOK_PERSONAS = {"fleet-och-ask-n", "fleet-och-blind-n"}
 PROD_ADVICE_PERSONAS = {"fleet-prod-ask", "fleet-prod-blind"}
 #: Both sides recover like a careful engineer; only the ask twin also asks the
 #: network. The blind twin here is *not* the naive control.
@@ -442,6 +454,7 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-decor-ask-d", "fleet-decor-blind-d"), ("fleet-decor-ask-e", "fleet-decor-blind-e"),
          ("fleet-build-ask-x", "fleet-build-blind-x"), ("fleet-oc-ask-n", "fleet-oc-blind-n"),
          ("fleet-wrap-ask", "fleet-wrap-blind"), ("fleet-ocp-ask-n", "fleet-ocp-blind-n"),
+         ("fleet-och-ask-n", "fleet-och-blind-n"),
          ("fleet-prod-ask", "fleet-prod-blind"), ("fleet-local-ask", "fleet-local-blind"),
          ("fleet-local-ask-2", "fleet-local-blind-2")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
@@ -1153,14 +1166,16 @@ class Run:
         model = OPENCODE_MODELS[self.provider]
         self.model = f"opencode:{model}"
         proxied = self.reporter in OCPROXY_PERSONAS
+        hooked = self.reporter in OCHOOK_PERSONAS
         out = run_opencode(reporter=self.reporter, asks=self.asks, task=task, provider=self.provider, model=model,
-                           key=p["key"], lab_public_url=LAB_PUBLIC_URL, timeout=OPENCODE_TIMEOUT, proxy=proxied)
+                           key=p["key"], lab_public_url=LAB_PUBLIC_URL, timeout=OPENCODE_TIMEOUT, proxy=proxied,
+                           hook=hooked)
         self.opencode = out
         self.model_calls += int(out.get("steps") or 0)
         self.tool_calls += int(out.get("tool_calls") or 0)
         # the proxy pair never calls a FailEcho tool; what it got is advice in
         # a tool's error, counted as the tool outputs that carried the line
-        self.asks_made += int(out.get("advice_seen" if proxied else "failecho_calls") or 0)
+        self.asks_made += int(out.get("advice_seen" if (proxied or hooked) else "failecho_calls") or 0)
         self.tokens_prompt += int(out.get("tokens_in") or 0)
         self.tokens_completion += int(out.get("tokens_out") or 0)
         if out.get("error") and not out.get("completed"):
@@ -1388,6 +1403,7 @@ def write_report(state: dict) -> None:
         p["runs"] += 1; p["tool_calls"] += r["tool_calls"]; p["failures"] += len(r["failures"]); p["last"] = r["at"]
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
+                else "ochook" if r["reporter"] in OCHOOK_PERSONAS
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
                 else "local" if r["reporter"] in LOCAL_PERSONAS
@@ -1420,8 +1436,8 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
-                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS \
-                or r["reporter"] in LOCAL_PERSONAS:
+                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in OCHOOK_PERSONAS \
+                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS:
             continue
         if r["at"] < FAIR_ORDER_SINCE:
             continue   # before the twins alternated order; see TWINS
@@ -1445,6 +1461,7 @@ def write_report(state: dict) -> None:
             continue
         kind = ("test" if r["reporter"] in TEST_PERSONAS else "build" if r["reporter"] in BUILD_PERSONAS
                 else "opencode" if r["reporter"] in OPENCODE_PERSONAS
+                else "ochook" if r["reporter"] in OCHOOK_PERSONAS
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
                 else "local" if r["reporter"] in LOCAL_PERSONAS
@@ -1510,6 +1527,7 @@ def write_report(state: dict) -> None:
                        ("real", "Real APIs (PyPI, npm, GitHub, crates.io, Stack Exchange)"),
                        ("build", "Coding agents (write and run code in a VM)"),
                        ("opencode", "OpenCode, a real agent product, with FailEcho's MCP server and without"),
+                       ("ochook", "OpenCode with the FailEcho plugin (no tool for the model to choose) and without"),
                        ("wrapped", "The shipped wrapper: advice in the tool error, the model decides (no harness help)"),
                        ("ocproxy", "OpenCode with an MCP server behind failecho-mcp proxy, and without"),
                        ("prod", "Real APIs, advice read from production (what a new user gets today)"),
@@ -1539,15 +1557,16 @@ def write_report(state: dict) -> None:
         if key == "build":
             rows.append({"metric": "seconds waiting on rate limits, per run", "unit": "s", "ask": a["wait_seconds_per_run"],
                          "blind": b["wait_seconds_per_run"], "better": _better(a["wait_seconds_per_run"], b["wait_seconds_per_run"])})
-        if key in ("opencode", "ocproxy"):
-            members = OPENCODE_PERSONAS if key == "opencode" else OCPROXY_PERSONAS
+        if key in ("opencode", "ocproxy", "ochook"):
+            members = {"opencode": OPENCODE_PERSONAS, "ocproxy": OCPROXY_PERSONAS,
+                       "ochook": OCHOOK_PERSONAS}[key]
             lost = {side: sum(n for rep, n in lost_memory[side].items() if rep in members) for side in ("ask", "blind")}
             # the agent's own failures are inside OpenCode; what is visible is the
             # artefact, the steps, the tokens, and whether it reached for FailEcho
             rows = [r for r in rows if r["metric"] in ("runs marked completed (see grading)", "tokens per completed task", "seconds per run")]
             rows.append({"metric": "model steps per run", "unit": "", "ask": a["model_calls_per_run"], "blind": b["model_calls_per_run"],
                          "better": _better(a["model_calls_per_run"], b["model_calls_per_run"])})
-            rows.append({"metric": "FailEcho tool calls per run" if key == "opencode" else "tool errors carrying advice, per run",
+            rows.append({"metric": "FailEcho tool calls per run" if key == "opencode" else "tool outputs carrying advice, per run",
                          "unit": "", "ask": a["asks_per_run"], "blind": b["asks_per_run"], "better": "tie"})
             if key == "opencode":
                 # the same two numbers since the instruction became a rule
@@ -1595,7 +1614,7 @@ def write_report(state: dict) -> None:
                          "better": _better(a["tool_calls_per_run"], b["tool_calls_per_run"])})
             rows.append({"metric": "failures with advice attached", "unit": "", "ask": ca["asked"] if ca else 0,
                          "blind": cb["asked"] if cb else 0, "better": "tie"})
-        if key not in ("opencode", "ocproxy") and (a.get("graded_runs") or b.get("graded_runs")):
+        if key not in ("opencode", "ocproxy", "ochook") and (a.get("graded_runs") or b.get("graded_runs")):
             # The light lane answers in prose and was graded on a pattern
             # until 22 Sep: "completed" meant the model said something. These
             # three rows say what it actually got right, on far more runs than
@@ -1628,6 +1647,7 @@ def write_report(state: dict) -> None:
             continue
         if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS or r["reporter"] in OPENCODE_PERSONAS \
                 or r["reporter"] in WRAPPED_PERSONAS or r["reporter"] in OCPROXY_PERSONAS \
+                or r["reporter"] in OCHOOK_PERSONAS \
                 or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS:
             continue
         side = "ask" if r["asks"] else "blind"
@@ -1700,8 +1720,8 @@ def write_report(state: dict) -> None:
     for r in runs:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
-                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in PROD_ADVICE_PERSONAS \
-                or r["reporter"] in LOCAL_PERSONAS:
+                or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in OCHOOK_PERSONAS \
+                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS:
             continue
         if not r.get("metrics"):
             continue
