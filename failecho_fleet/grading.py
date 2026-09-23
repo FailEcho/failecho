@@ -502,8 +502,14 @@ def _grade_prose(checks, text: str, out: dict, resolve, prompt: str = "") -> dic
         # network argues for. Counted apart from both right and wrong. That
         # includes a line that names the repo but gives no value at all while
         # the answer says elsewhere that it could not fetch one.
-        refused = _is_refusal(line, text, kind) or (
-            not any(_has_value(candidate, kind) for candidate in lines) and _is_refusal("", text, kind))
+        # ...but only when no line states a value outside a refusal. "Data
+        # unavailable due to rate limits. Last known release: v1.0.0" gives a
+        # tag (a wrong one) after the disclaimer; with no line naming the repo
+        # every line is a candidate, and the disclaimer came first, so it was
+        # filed as declined (23 Sep, fleet-local-blind 11:20).
+        valued = [c for c in lines if _has_value(c, kind) and not _is_refusal(c, "", kind)]
+        refused = not valued and (_is_refusal(line, text, kind) or (
+            not any(_has_value(candidate, kind) for candidate in lines) and _is_refusal("", text, kind)))
         want = resolve(kind, arg)
         if refused:
             out["refused"] += 1

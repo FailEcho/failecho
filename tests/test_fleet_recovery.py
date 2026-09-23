@@ -2167,3 +2167,24 @@ def test_the_team_rows_do_not_call_a_skip_a_fix(tmp_path, monkeypatch):
     assert rows["hours until the team's own history had its first fix"] == 5.0
     assert rows["failures where the team's own history said skip"] == 50.0
     assert rows["failures where the team's own history had a fix"] == 25.0
+
+
+def test_a_value_stated_after_a_disclaimer_is_graded_not_declined():
+    """23 Sep: "Data unavailable due to rate limits. Last known release: v1.0.0"
+    names a tag -- a wrong one -- and was filed as declined, because with no
+    line naming the repo the disclaimer was the first candidate line."""
+    from failecho_fleet import grading
+
+    task = "Latest release tag of FailEcho/failecho and its open issue count."
+    truths = {"github_tag:FailEcho/failecho": "v0.1.0", "github_issues:FailEcho/failecho": 0}
+    said = ("Data unavailable due to rate limits. Last known release: **v1.0.0** (check manually for "
+            "updates). Open issues: ~5 (approximate).")
+    g = grading.grade(task, said, answered=True, truths=truths)
+    assert g["refused"] == 0 and g["correct"] is False and "FailEcho/failecho" in g["missed"], g
+    # the same disclaimer with no value after it is still a decline
+    g = grading.grade(task, "Data unavailable due to rate limits. Try again later.", answered=True, truths=truths)
+    assert g["refused"] == 2 and g["correct"] is None, g
+    # and a right value after the disclaimer is right
+    g = grading.grade(task, "GitHub rate-limited me. From memory: release v0.1.0, 0 open issues.",
+                      answered=True, truths=truths)
+    assert g["correct"] is True, g
