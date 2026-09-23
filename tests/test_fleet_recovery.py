@@ -1857,3 +1857,91 @@ def test_a_line_with_no_value_under_a_refusal_is_a_refusal(monkeypatch):
 
 def test_the_harness_saying_its_budget_ran_out_is_not_an_answer():
     assert any(m in "(model budget exhausted)" for m in F._NO_ANSWER)
+
+
+# -- the team arm: a small team in private mode (2026-09-23) ---------------------
+
+
+def test_the_team_arm_is_two_askers_and_two_controls_on_one_job():
+    by = {p[0]: p for p in F.PERSONAS}
+    for ask, blind in (("fleet-team-ask-a", "fleet-team-blind-a"), ("fleet-team-ask-b", "fleet-team-blind-b")):
+        assert (ask, blind) in F.TWINS
+        assert by[ask][4] is by[blind][4] is F.LIMIT_CALLS, "same job on both sides"
+        assert by[ask][2] is None and by[blind][2] is None, "no model, no provider budget"
+        assert by[ask][3] is True and by[blind][3] is False
+        assert F.lane_of(by[ask]) == F.lane_of(by[blind]) == "light"
+    assert F.TEAM_ASKERS == {"fleet-team-ask-a", "fleet-team-ask-b"}
+
+
+def test_the_team_sees_only_its_own_evidence():
+    """The whole point of the arm: a small team with no public network. The
+    public recommendation must not leak into the asker's decision."""
+    answer = {"fingerprint": "fp", "known": True,
+              "recommendation": {"action": "backoff", "confidence": 0.9},
+              "recovery_actions": [{"action": "backoff", "attempts": 900, "successes": 800}],
+              "team_evidence": {"observations": 3, "recommendation": None,
+                                "recovery_actions": [{"action": "wait_until_reset", "attempts": 2, "successes": 2}]}}
+    view = F.team_view(answer)
+    assert view["recommendation"] is None, "the public network's answer is not the team's"
+    assert view["recovery_actions"] == [{"action": "wait_until_reset", "attempts": 2, "successes": 2}]
+    assert view["fingerprint"] == "fp"
+    empty = F.team_view({"fingerprint": "fp", "recommendation": {"action": "backoff"}, "team_evidence": None})
+    assert empty["recommendation"] is None and empty["known"] is False
+
+
+def test_the_lab_team_token_is_made_once_and_kept_private(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    first = F.team_token()
+    assert len(first) >= 16 and first == F.team_token()
+    assert oct((tmp_path / "team-token").stat().st_mode)[-3:] == "600"
+    assert first not in open(F.__file__).read(), "a public repository cannot hold a team's secret"
+
+
+def test_only_the_team_askers_send_the_token(tmp_path, monkeypatch):
+    """The blind twins are controls: no token on their client, no token on a
+    question they never ask. An asker's client carries it, so its reports go
+    to the team's private tables and its questions come back with the team's
+    evidence."""
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_ENDPOINT", "http://127.0.0.1:9")
+    asker = F.Run("fleet-team-ask-a", "decorator", None, True)
+    blind = F.Run("fleet-team-blind-a", "decorator", None, False)
+    assert asker.fe.team_token == F.team_token()
+    assert blind.fe.team_token is None
+    other = F.Run("fleet-limits-ask", "decorator", None, True)
+    assert other.fe.team_token is None, "no other persona may drift into private mode"
+
+
+def test_both_sides_of_the_team_arm_recover_carefully():
+    """The audit's point: against a naive retry anything looks good. Both team
+    twins get the local arm's careful recovery; the only difference is the
+    team's own history."""
+    import inspect
+    source = inspect.getsource(F.Run.call)
+    assert "self.reporter in LOCAL_PERSONAS or self.reporter in TEAM_PERSONAS" in source
+
+
+def test_the_team_group_reports_how_soon_its_own_history_helped(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+
+    def run(reporter, asks, at, recommended):
+        failure = {"service": "crates.io", "operation": "crate_latest", "error_type": "rate_limit",
+                   "error_code": "429", "asked": asks, "recommended": recommended, "attempts": 2,
+                   "recovered": True, "seconds": 1.0}
+        return {"at": at, "reporter": reporter, "path": "decorator", "provider": None, "asks": asks,
+                "tool_calls": 15, "model_calls": 0, "seconds": 20.0, "failures": [failure],
+                "metrics": {"tokens_prompt": 0, "tokens_completion": 0, "asks": int(asks), "ask_seconds": 0,
+                            "wait_seconds": 1, "completed": True, "calls_first_try": 14,
+                            "calls_recovered": 1, "calls_failed": 0}}
+
+    F.write_report({"runs": [
+        run("fleet-team-ask-a", True, "2099-01-01T00:00:00+00:00", None),
+        run("fleet-team-blind-a", False, "2099-01-01T00:01:00+00:00", None),
+        run("fleet-team-ask-b", True, "2099-01-01T06:00:00+00:00", "wait_until_reset"),
+        run("fleet-team-blind-b", False, "2099-01-01T06:01:00+00:00", None)]})
+    groups = {g["group"]: g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]}
+    rows = {r["metric"]: r for r in groups["team"]["rows"]}
+    assert rows["hours until the team's own history had its first fix"]["ask"] == 6.0
+    assert rows["failures where the team's own history had a fix"]["ask"] == 50.0

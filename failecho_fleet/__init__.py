@@ -377,6 +377,16 @@ PERSONAS = [
     # differing only in sample size, not in the model's behaviour.
     ("fleet-local-ask-2",  "decorator", "mistral", True,  MIXED),
     ("fleet-local-blind-2", "decorator", "mistral", False, MIXED),
+    # The team arm (2026-09-23): a small team in private mode. Two agents share
+    # one team token and read only their team's own evidence -- no public
+    # network, no rest of the fleet -- against two that read nothing. Both
+    # sides recover carefully, like the local arm, so the only difference is
+    # the team's own history. Tool calls only, no model: the job a small
+    # team's failures come from, and no provider budget.
+    ("fleet-team-ask-a",   "decorator", None,     True,  LIMIT_CALLS),
+    ("fleet-team-ask-b",   "decorator", None,     True,  LIMIT_CALLS),
+    ("fleet-team-blind-a", "decorator", None,     False, LIMIT_CALLS),
+    ("fleet-team-blind-b", "decorator", None,     False, LIMIT_CALLS),
 ]
 BUILD_PERSONAS = {"fleet-build-ask", "fleet-build-blind", "fleet-build-ask-n", "fleet-build-blind-n",
                   "fleet-build-ask-x", "fleet-build-blind-x"}
@@ -445,6 +455,46 @@ PROD_ADVICE_PERSONAS = {"fleet-prod-ask", "fleet-prod-blind"}
 #: Both sides recover like a careful engineer; only the ask twin also asks the
 #: network. The blind twin here is *not* the naive control.
 LOCAL_PERSONAS = {"fleet-local-ask", "fleet-local-blind", "fleet-local-ask-2", "fleet-local-blind-2"}
+
+#: A small team in private mode: see the persona rows. The askers share one
+#: team token and read only the team's own evidence.
+TEAM_PERSONAS = {"fleet-team-ask-a", "fleet-team-ask-b", "fleet-team-blind-a", "fleet-team-blind-b"}
+TEAM_ASKERS = {"fleet-team-ask-a", "fleet-team-ask-b"}
+
+
+def team_token() -> str:
+    """The lab team's secret, made once and kept beside the fleet's state.
+
+    Not in the code: the repository is public, and a token anybody can read is
+    not a team's. It only ever goes to the lab endpoint.
+    """
+    path = os.path.join(STATE_DIR, "team-token")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            value = fh.read().strip()
+        if len(value) >= 16:
+            return value
+    except OSError:
+        pass
+    import secrets
+    value = "lab-team-" + secrets.token_urlsafe(24)
+    os.makedirs(STATE_DIR, exist_ok=True)
+    handle = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(handle, "w", encoding="utf-8") as fh:
+        fh.write(value)
+    os.replace(path + ".tmp", path)
+    return value
+
+
+def team_view(answer: dict | None) -> dict | None:
+    """What a team sees when it has only itself: the team's own evidence in
+    place of the network's. The fingerprint stays -- it is the same shape."""
+    if not isinstance(answer, dict):
+        return answer
+    team = answer.get("team_evidence") or {}
+    return {"fingerprint": answer.get("fingerprint"), "known": bool(team.get("observations")),
+            "recommendation": team.get("recommendation"),
+            "recovery_actions": team.get("recovery_actions") or [], "team": True}
 #: The one production URL the fleet may call: the read path, which stores
 #: nothing. Sent with X-Reporter-Kind: demo, the label the server accepts
 #: only as a downgrade, so these reads stay out of its usage counters. The
@@ -475,7 +525,8 @@ TWINS = [("fleet-decor-ask-a", "fleet-decor-blind-a"), ("fleet-decor-ask-b", "fl
          ("fleet-wrap-ask", "fleet-wrap-blind"), ("fleet-ocp-ask-n", "fleet-ocp-blind-n"),
          ("fleet-och-ask-n", "fleet-och-blind-n"),
          ("fleet-prod-ask", "fleet-prod-blind"), ("fleet-local-ask", "fleet-local-blind"),
-         ("fleet-local-ask-2", "fleet-local-blind-2")]
+         ("fleet-local-ask-2", "fleet-local-blind-2"),
+         ("fleet-team-ask-a", "fleet-team-blind-a"), ("fleet-team-ask-b", "fleet-team-blind-b")]
 FAIR_ORDER_SINCE = "2026-09-17T06:30:00"
 
 
@@ -728,7 +779,8 @@ class Run:
 
     def __init__(self, reporter: str, path: str, provider: str | None, asks: bool):
         self.reporter, self.path, self.provider, self.asks = reporter, path, provider, asks
-        self.fe = FailEcho(endpoint=LAB_ENDPOINT, reporter_id=reporter)
+        self.fe = FailEcho(endpoint=LAB_ENDPOINT, reporter_id=reporter,
+                           team_token=team_token() if reporter in TEAM_ASKERS else None)
         self.tool_calls = 0
         self.model_calls = 0
         self.model: str | None = None
@@ -817,12 +869,16 @@ class Run:
         if self.reporter in PROD_ADVICE_PERSONAS:
             url = PROD_READ_URL
             headers["X-Reporter-Kind"] = "demo"
+        team = self.reporter in TEAM_ASKERS
+        if team:
+            headers["X-FailEcho-Team"] = team_token()
         req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST", headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
-                return json.load(r)
+                answer = json.load(r)
         except Exception:
             return None
+        return team_view(answer) if team else answer
 
     def _count_tokens(self, resp: dict) -> dict:
         usage = resp.get("usage") if isinstance(resp, dict) else None
@@ -891,7 +947,7 @@ class Run:
             fingerprint = None
             action = {"rate_limit": "backoff", "server_error": "retry", "timeout": "retry",
                       "connection_error": "retry"}.get(et)
-            if self.reporter in LOCAL_PERSONAS:
+            if self.reporter in LOCAL_PERSONAS or self.reporter in TEAM_PERSONAS:
                 # The local arm recovers like a careful engineer at the tool
                 # level too, not only when a model provider fails -- Mistral
                 # failed 0 times in its first 32 runs, so without this the arm
@@ -1365,7 +1421,8 @@ ARCHIVE_DAYS = 30
 
 def _slow_arms() -> set[str]:
     """Personas whose runs are too rare to survive the ledger's cap."""
-    return OPENCODE_PERSONAS | OCPROXY_PERSONAS | OCHOOK_PERSONAS | LOCAL_PERSONAS | PROD_ADVICE_PERSONAS
+    return (OPENCODE_PERSONAS | OCPROXY_PERSONAS | OCHOOK_PERSONAS | LOCAL_PERSONAS | PROD_ADVICE_PERSONAS
+            | TEAM_PERSONAS)
 
 
 def _archive_path() -> str:
@@ -1480,6 +1537,7 @@ def write_report(state: dict) -> None:
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
                 else "local" if r["reporter"] in LOCAL_PERSONAS
+                else "team" if r["reporter"] in TEAM_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         c = cohorts.setdefault(key, blank())
@@ -1510,7 +1568,8 @@ def write_report(state: dict) -> None:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
                 or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in OCHOOK_PERSONAS \
-                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS:
+                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS \
+                or r["reporter"] in TEAM_PERSONAS:
             continue
         if r["at"] < FAIR_ORDER_SINCE:
             continue   # before the twins alternated order; see TWINS
@@ -1540,6 +1599,7 @@ def write_report(state: dict) -> None:
                 else "ocproxy" if r["reporter"] in OCPROXY_PERSONAS
                 else "prod" if r["reporter"] in PROD_ADVICE_PERSONAS
                 else "local" if r["reporter"] in LOCAL_PERSONAS
+                else "team" if r["reporter"] in TEAM_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
         span = spans.setdefault(key, [r["at"], r["at"]])
@@ -1608,7 +1668,8 @@ def write_report(state: dict) -> None:
                        ("wrapped", "The shipped wrapper: advice in the tool error, the model decides (no harness help)"),
                        ("ocproxy", "OpenCode with an MCP server behind failecho-mcp proxy, and without"),
                        ("prod", "Real APIs, advice read from production (what a new user gets today)"),
-                       ("local", "Both sides recover like a careful engineer; one also asks the network")):
+                       ("local", "Both sides recover like a careful engineer; one also asks the network"),
+                       ("team", "A small team in private mode: two agents with only their own evidence, against two without")):
         a, b = costs.get(f"{key} / ask"), costs.get(f"{key} / blind")
         ca, cb = cohorts.get(f"{key} / ask"), cohorts.get(f"{key} / blind")
         if not a or not b:
@@ -1710,6 +1771,23 @@ def write_report(state: dict) -> None:
                          "better": _better(a["tool_calls_per_run"], b["tool_calls_per_run"])})
             rows.append({"metric": "failures with advice attached", "unit": "", "ask": ca["asked"] if ca else 0,
                          "blind": cb["asked"] if cb else 0, "better": "tie"})
+        if key == "team":
+            # The question a paying team asks: if we switch this on, when does
+            # it start helping? A recommendation needs five recovered attempts
+            # on one failure shape, and a small team produces those slowly.
+            asked = sorted((r for r in runs if r["reporter"] in TEAM_ASKERS), key=lambda r: r["at"])
+            with_fix = [r for r in asked if any(f.get("recommended") for f in r.get("failures") or [])]
+            hours = None
+            if asked and with_fix:
+                start = dt.datetime.fromisoformat(asked[0]["at"])
+                hours = round((dt.datetime.fromisoformat(with_fix[0]["at"]) - start).total_seconds() / 3600, 1)
+            failures_met = sum(len(r.get("failures") or []) for r in asked)
+            advised = sum(1 for r in asked for f in r.get("failures") or [] if f.get("recommended"))
+            rows.append({"metric": "hours until the team's own history had its first fix", "unit": "h",
+                         "ask": hours, "blind": None, "better": "tie"})
+            rows.append({"metric": "failures where the team's own history had a fix", "unit": "%",
+                         "ask": _pct(advised / failures_met) if failures_met else None, "blind": None,
+                         "better": "tie"})
         if key not in ("opencode", "ocproxy", "ochook") and (a.get("graded_runs") or b.get("graded_runs")):
             # The light lane answers in prose and was graded on a pattern
             # until 22 Sep: "completed" meant the model said something. These
@@ -1747,7 +1825,8 @@ def write_report(state: dict) -> None:
         if r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS or r["reporter"] in OPENCODE_PERSONAS \
                 or r["reporter"] in WRAPPED_PERSONAS or r["reporter"] in OCPROXY_PERSONAS \
                 or r["reporter"] in OCHOOK_PERSONAS \
-                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS:
+                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS \
+                or r["reporter"] in TEAM_PERSONAS:
             continue
         side = "ask" if r["asks"] else "blind"
         c = prov.setdefault(side, {"runs": 0, "completed": 0, "failures": 0, "recovered": 0, "tokens": 0, "seconds": 0.0,
@@ -1820,7 +1899,8 @@ def write_report(state: dict) -> None:
         if r["reporter"] in TEST_PERSONAS or r["reporter"] in BUILD_PERSONAS or r["reporter"] in EXPLORER_PERSONAS \
                 or r["reporter"] in OPENCODE_PERSONAS or r["reporter"] in WRAPPED_PERSONAS \
                 or r["reporter"] in OCPROXY_PERSONAS or r["reporter"] in OCHOOK_PERSONAS \
-                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS:
+                or r["reporter"] in PROD_ADVICE_PERSONAS or r["reporter"] in LOCAL_PERSONAS \
+                or r["reporter"] in TEAM_PERSONAS:
             continue
         if not r.get("metrics"):
             continue

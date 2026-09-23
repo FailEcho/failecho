@@ -408,3 +408,24 @@ with the safeguards tested first; then 48 hours of watching.
    answer question 2 weakly.
 
 Say go, and which, and the build starts with the safeguards.
+
+## Change during the run: the team arm, 2026-09-23
+
+Four personas at the end of the list, so no existing row or rotation cursor
+moved: `fleet-team-ask-a` and `-b` share one team token and read **only their
+team's own evidence** (private mode, `X-FailEcho-Team`), with the public
+network's answer removed before they decide; `fleet-team-blind-a` and `-b` run
+the same job and read nothing. Both sides recover carefully, like the local
+arm, because against a naive retry anything looks good. The job is
+`LIMIT_CALLS` -- crates.io's one-a-second policy, Stack Exchange's daily
+quota, GitHub search's ten a minute -- tool calls only, no model, no provider
+budget.
+
+It answers the question a team asks before paying: if we switch this on, when
+does it start helping, and by how much? A recommendation needs five recovered
+attempts on one failure shape, and two agents running every ~45 minutes
+produce those slowly, so the group carries "hours until the team's own
+history had its first fix" and "failures where the team's own history had a
+fix" next to the usual rows. The team token is generated on first use and
+kept in the fleet's state directory, never in the repository. The arm's runs
+are archived past the ledger cap, like the other slow arms.
