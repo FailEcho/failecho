@@ -1586,6 +1586,25 @@ def write_report(state: dict) -> None:
                 rows.append({"metric": "runs marked completed, since the rules", "unit": "%",
                              "ask": _done(sides[True]), "blind": _done(sides[False]),
                              "better": _better(_done(sides[True]), _done(sides[False]), lower_is_better=False)})
+            # Whether the run gave FailEcho anything to do. A run that met no
+            # failing tool cannot show an instruction being obeyed or ignored,
+            # and before 23 Sep nothing counted them -- the only failures on
+            # record were the provider's.
+            def _met(rs):
+                counted = [r for r in rs if "tool_failures" in (r.get("opencode") or {})]
+                if not counted:
+                    return None, None
+                met = [r for r in counted if (r["opencode"].get("tool_failures") or 0) > 0]
+                calls = sum(int(r["opencode"].get("failecho_calls") or 0)
+                            + int(r["opencode"].get("advice_seen") or 0) for r in met)
+                return len(met), (round(calls / len(met), 2) if met else None)
+            group_runs = [r for r in runs if r["reporter"] in members]
+            met_a = _met([r for r in group_runs if r["asks"]])
+            met_b = _met([r for r in group_runs if not r["asks"]])
+            rows.append({"metric": "runs that met a failing tool", "unit": "",
+                         "ask": met_a[0], "blind": met_b[0], "better": "tie"})
+            rows.append({"metric": "FailEcho calls or advice lines, per run that met one", "unit": "",
+                         "ask": met_a[1], "blind": met_b[1], "better": "tie"})
             rows.append({"metric": "runs lost to guest memory (not counted above)", "unit": "",
                          "ask": lost["ask"], "blind": lost["blind"], "better": "tie"})
             # graded against truth fetched independently, not against a pattern
@@ -1988,7 +2007,7 @@ def main(argv: list[str] | None = None) -> int:
         record["graded"] = grade(task[0] if task else "",
                                  run.opencode.get("result_text") or run.opencode.get("result_head") or "",
                                  bool(run.opencode.get("completed")))
-        record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "advice_seen", "idle_after_result", "guest_oom_kills",
+        record["opencode"] = {k: run.opencode.get(k) for k in ("completed", "tool_calls", "failecho_calls", "advice_seen", "tool_failures", "idle_after_result", "guest_oom_kills",
                                                                 "mcp_log", "steps", "exit",
                                                                 "error", "tool_names", "result_head", "timed_out")}
         record["task"] = task[0][:160]

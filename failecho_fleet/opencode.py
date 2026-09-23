@@ -190,6 +190,29 @@ def opencode_config(provider: str, model: str, lab_mcp_url: str | None, reporter
     return cfg
 
 
+_HTTP_ERROR = re.compile(r"\b(40[13]|404|429|5\d\d)\b|rate.?limit|too many requests")
+_NETWORK_TOOLS = ("bash", "webfetch", "fetch")
+
+
+def _tool_failed(name: str, state) -> bool:
+    """Whether one tool call in OpenCode's event stream failed.
+
+    Exit status and error state first; for a network tool with neither, an
+    HTTP error in its output -- `curl -s` exits 0 on a 429.
+    """
+    if not isinstance(state, dict):
+        return False
+    if state.get("status") == "error":
+        return True
+    meta = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+    exit_code = meta.get("exit")
+    if isinstance(exit_code, int) and exit_code != 0:
+        return True
+    output = state.get("output")
+    return (name in _NETWORK_TOOLS and isinstance(output, str)
+            and bool(_HTTP_ERROR.search(output[:4000])))
+
+
 class Events:
     """What ``opencode run --format json`` printed, reduced to counts."""
 
@@ -199,6 +222,12 @@ class Events:
         self.failecho_calls = 0
         #: tool outputs that carried the proxy's advice line
         self.advice_seen = 0
+        #: tool calls that failed inside OpenCode: a bash exit code, an error
+        #: state, or an HTTP error in a network tool's output. Until 23 Sep
+        #: nothing counted these, so "the run met no failure" was read off a
+        #: field that only ever held the *provider's* failures -- and the
+        #: stricter MCP rules could not be told apart from rules never tested.
+        self.tool_failures = 0
         self.tool_names: dict[str, int] = {}
         self.steps = 0
         self.tokens_in = 0
@@ -228,6 +257,8 @@ class Events:
                 self.tool_names[name] = self.tool_names.get(name, 0) + 1
                 if "failecho" in name:
                     self.failecho_calls += 1
+                elif _tool_failed(name, node.get("state")):
+                    self.tool_failures += 1
             if depth == 0 and t == "step_finish":   # the part inside says "step-finish" too
                 self.steps += 1
             tok = node.get("tokens")
@@ -363,7 +394,7 @@ def run_opencode(*, reporter: str, asks: bool, task: tuple[str, str], provider: 
     end, mtime = re.search(r"END=(\d+)", body), re.search(r"RESULT_MTIME=(\d+)", body)
     out["idle_after_result"] = int(end.group(1)) - int(mtime.group(1)) if end and mtime else None
     out.update(exit=int(m.group(1)) if m else None, tool_calls=ev.tool_calls, failecho_calls=ev.failecho_calls,
-               advice_seen=ev.advice_seen,
+               advice_seen=ev.advice_seen, tool_failures=ev.tool_failures,
                steps=ev.steps, tokens_in=ev.tokens_in, tokens_out=ev.tokens_out, tool_names=ev.tool_names,
                answer=("\n".join(ev.text))[-300:], timed_out=bool(r.get("timed_out")))
     result = result.strip()

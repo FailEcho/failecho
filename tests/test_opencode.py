@@ -242,3 +242,61 @@ def test_the_hook_group_is_on_the_scoreboard(tmp_path, monkeypatch):
     rows = {r["metric"]: r for r in groups["ochook"]["rows"]}
     assert rows["tool outputs carrying advice, per run"]["ask"] == 2.0
     assert rows["tool outputs carrying advice, per run"]["blind"] == 0.0
+
+
+# -- tool failures inside OpenCode (2026-09-23) ---------------------------------
+
+
+def test_a_failing_tool_inside_opencode_is_counted():
+    """Until 23 Sep the only failures on an OpenCode run's record were the
+    provider's, so "the run met no failure" could not be told apart from "the
+    agent met a 403 and ignored the rules". `curl -s` exits 0 on a 429, so a
+    network tool's output is read for the status as well."""
+    ev = OC.Events()
+    for state in (
+        {"status": "completed", "output": "HTTP/2 403\nrate limit exceeded", "metadata": {"exit": 0}},
+        {"status": "completed", "output": "done", "metadata": {"exit": 2}},
+        {"status": "error", "output": "boom"},
+        {"status": "completed", "output": '{"version": "2.34.2"}', "metadata": {"exit": 0}},
+    ):
+        ev.feed(json.dumps({"type": "tool", "tool": "bash", "state": state}))
+    assert (ev.tool_calls, ev.tool_failures) == (4, 3)
+
+
+def test_a_failecho_call_is_not_a_tool_failure():
+    ev = OC.Events()
+    ev.feed(json.dumps({"type": "tool", "tool": "failecho_check_tool_failure",
+                        "state": {"status": "completed", "output": "status: 429 known"}}))
+    assert ev.failecho_calls == 1 and ev.tool_failures == 0
+
+
+def test_the_scoreboard_separates_runs_that_met_a_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+
+    def run(asks, failures, calls):
+        return {"at": "2026-09-23T05:00:00", "reporter": "fleet-oc-ask-n" if asks else "fleet-oc-blind-n",
+                "path": "opencode", "provider": "nvidia", "asks": asks, "tool_calls": 9, "model_calls": 5,
+                "seconds": 200.0, "failures": [],
+                "opencode": {"completed": True, "tool_calls": 9, "failecho_calls": calls, "advice_seen": 0,
+                             "tool_failures": failures, "guest_oom_kills": 0, "steps": 5},
+                "metrics": {"tokens_prompt": 40000, "tokens_completion": 900, "asks": calls,
+                            "ask_seconds": 0, "wait_seconds": 0, "completed": True,
+                            "calls_first_try": 9, "calls_recovered": 0, "calls_failed": 0}}
+
+    F.write_report({"runs": [run(True, 2, 1), run(True, 0, 0), run(False, 1, 0)]})
+    rows = {r["metric"]: r for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]
+            if g["group"] == "opencode" for r in g["rows"]}
+    assert rows["runs that met a failing tool"]["ask"] == 1
+    assert rows["runs that met a failing tool"]["blind"] == 1
+    assert rows["FailEcho calls or advice lines, per run that met one"]["ask"] == 1.0
+
+
+def test_runs_recorded_before_the_counter_existed_are_not_read_as_clean():
+    """An old record has no tool_failures field at all. That is "unknown", not
+    "met nothing" -- the mistake this counter exists to stop."""
+    import inspect
+
+    source = inspect.getsource(F.write_report)
+    assert '"tool_failures" in (r.get("opencode") or {})' in source

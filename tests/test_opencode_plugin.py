@@ -292,3 +292,36 @@ def test_the_three_implementations_share_one_error_table():
         return re.findall(r'\["(\w+)"', block)
 
     assert classes(plugin) == classes(relay), "the classification tables have drifted"
+
+
+class SlowNetwork(Network):
+    """Answers /v1/observe late, so a success can arrive before the failure's
+    fingerprint does -- the race the recovery path used to lose."""
+
+    def __init__(self):
+        super().__init__()
+        handler = self.server.RequestHandlerClass
+        original = handler.do_POST
+
+        def slow(inner):
+            if inner.path == "/v1/observe":
+                import time
+                time.sleep(0.3)
+            return original(inner)
+
+        handler.do_POST = slow
+
+
+def test_a_recovery_is_not_lost_when_the_success_arrives_first():
+    net = SlowNetwork()
+    try:
+        drive([
+            CURL_429,
+            {"tool": "bash", "callID": "2",
+             "args": {"command": "curl -s https://api.github.com/repos/foo/bar/issues"},
+             "result": {"output": "HTTP/2 200", "metadata": {"exit": 0}}},
+        ], net.endpoint, env={"FAILECHO_ADVISE": "0"}, answer_wait_ms=1500)
+        outcomes = net.sent_to("/v1/outcome")
+        assert outcomes and outcomes[0]["fingerprint"] == "abc123", outcomes
+    finally:
+        net.stop()

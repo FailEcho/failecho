@@ -246,13 +246,19 @@ export default async function failecho() {
 
       if (!failed(output, text)) {
         const previous = lastFailure.get(key);
-        if (previous && Date.now() - previous.at < RECOVERY_WINDOW_MS && previous.fingerprint) {
+        if (previous && Date.now() - previous.at < RECOVERY_WINDOW_MS) {
           // It failed, the agent did something, it worked. That sequence is
           // the only evidence the network has about what fixes anything.
           lastFailure.delete(key);
-          post("/v1/outcome", {
-            fingerprint: previous.fingerprint, action: "retry", successful: true,
-          }, REPORT_TIMEOUT_MS);
+          // The fingerprint comes back with the failure's own report, and the
+          // success can arrive first. Waiting on the promise, not on a value
+          // that may not be set yet, is what keeps the recovery from being
+          // lost to timing -- a test caught exactly that race.
+          previous.fingerprint.then((fingerprint) => {
+            if (fingerprint) {
+              post("/v1/outcome", { fingerprint, action: "retry", successful: true }, REPORT_TIMEOUT_MS);
+            }
+          });
         }
         post("/v1/observe", {
           service: where.service, operation: where.operation, outcome: "success",
@@ -268,11 +274,15 @@ export default async function failecho() {
         ...(latency === null ? {} : { latency_ms: latency }),
       }, REPORT_TIMEOUT_MS);
 
-      report.then((answer) => {
-        if (answer && answer.fingerprint && TRANSIENT.has(errorType)) {
-          lastFailure.set(key, { at: Date.now(), fingerprint: answer.fingerprint, type: errorType });
-        }
-      });
+      if (TRANSIENT.has(errorType)) {
+        // Recorded now, with the fingerprint still on its way: see the
+        // success path above.
+        lastFailure.set(key, {
+          at: Date.now(),
+          fingerprint: report.then((answer) => (answer && answer.fingerprint) || null),
+          type: errorType,
+        });
+      }
 
       if (!advise) return;
       const answer = await post("/v1/query", {
