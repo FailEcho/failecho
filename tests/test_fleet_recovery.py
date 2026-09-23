@@ -2076,3 +2076,23 @@ def test_a_correctness_row_needs_its_own_sample_for_a_winner():
     better = {r["metric"]: r["better"] for r in versus[0]["rows"]}
     assert better == {"runs marked completed (see grading)": "blind", "every checked value correct": "tie",
                       "result complete and not a placeholder": "ask"}
+
+
+def test_a_denial_after_a_semicolon_is_still_a_denial():
+    """23 Sep 12:01: "I couldn't find a repository `FailEcho/failecho-does-not-exist`;
+    it does not exist." -- the right answer, graded wrong, because the line
+    naming the repo stopped at the semicolon."""
+    from failecho_fleet import grading
+
+    task = "Latest release tag of FailEcho/failecho-does-not-exist. If it does not exist, say so."
+    truths = {"github_absent:FailEcho/failecho-does-not-exist": True}
+    said = "I couldn’t find a repository `FailEcho/failecho-does-not-exist`; it does not exist."
+    assert grading.grade(task, said, answered=True, truths=truths)["correct"] is True
+    # an invented tag is still wrong, semicolon or not
+    invented = "FailEcho/failecho-does-not-exist; latest release is v1.2.0."
+    assert grading.grade(task, invented, answered=True, truths=truths)["correct"] is False
+    # and the semicolon still separates two packages' values
+    two = grading.grade("Latest versions of the PyPI packages requests, httpx and fastapi, one line each.",
+                        "requests 2.34.2; httpx 0.0.1; fastapi 0.141.1", answered=True,
+                        truths={"pypi:requests": "2.34.2", "pypi:httpx": "0.28.1", "pypi:fastapi": "0.141.1"})
+    assert two["correct"] is False and two["missed"] == ["httpx"], two

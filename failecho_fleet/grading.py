@@ -322,7 +322,7 @@ def _matches(got, want, kind: str, arg: str = "") -> bool:
     return str(got).strip().lstrip("v=^~") == str(want).strip().lstrip("v")
 
 
-def _lines_for(text: str, label: str) -> list[str]:
+def _lines_for(text: str, label: str, clauses: bool = True) -> list[str]:
     """Every line of a prose answer that talks about this package or repo.
 
     A model asked for three versions writes three lines, so the whole answer
@@ -343,7 +343,12 @@ def _lines_for(text: str, label: str) -> list[str]:
     # sides before the comparison.
     flat = [re.sub(r"[^a-z0-9]", "", n) for n in needles]
     found = []
-    for line in re.split(r"[\n;]|(?<=[.!])\s", text or ""):
+    # A semicolon separates two packages' values ("requests 2.34.2; httpx
+    # 0.28.1"), but it can also join a name to what is said about it: "I
+    # couldn't find FailEcho/x; it does not exist." With clauses=False the
+    # whole sentence is the line.
+    split = r"[\n;]|(?<=[.!])\s" if clauses else r"\n|(?<=[.!?])\s"
+    for line in re.split(split, text or ""):
         low = line.lower()
         squashed = re.sub(r"[^a-z0-9]", "", low)
         if any(n in low for n in needles) or any(n and n in squashed for n in flat):
@@ -432,7 +437,10 @@ def _grade_prose(checks, text: str, out: dict, resolve) -> dict:
     answered_lines = 0
     kinds = [kind for _, kind, _ in checks]
     for label, kind, arg in checks:
-        lines = _lines_for(text, label)
+        # a denial is read in the sentence that names the package, past any
+        # semicolon (23 Sep: "...`FailEcho/failecho-does-not-exist`; it does
+        # not exist." graded wrong)
+        lines = _lines_for(text, label, clauses=kind not in ("pypi_absent", "github_absent"))
         if not lines and kinds.count(kind) == 1 and kind not in ("pypi_absent", "github_absent"):
             # A task about one repository gets an answer that never repeats
             # its name -- "Latest release tag: v0.1.0" -- and that is still an
