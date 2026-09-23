@@ -32,6 +32,9 @@
  * file path, an environment variable or a token. The failure text is read
  * here, in this process, to pick the class -- and then dropped.
  *
+ * FAILECHO_TEAM=<secret> is private mode: reports are stored for your team
+ * alone, and your team's own evidence comes back in the same line.
+ *
  * FAILECHO_DISABLED=1 turns everything off. FAILECHO_ADVISE=0 reports without
  * annotating. FAILECHO_ENDPOINT points somewhere else (a local instance, a
  * self-hosted one). FAILECHO_REPORTER_ID names this installation.
@@ -208,6 +211,18 @@ export default async function failecho() {
       const warn = rec.warning ? ` Note: ${rec.warning}` : "";
       return `FailEcho: try ${rec.action}${counts}${who}.${warn}`;
     }
+    // Private mode: the team's own recommendation when the public network
+    // has none, labelled as the team's -- the same words as the wrapper's.
+    const team = answer.team_evidence;
+    if (team && typeof team === "object") {
+      const teamActions = (team.recovery_actions || []).filter((a) => a && a.action);
+      const teamRec = team.recommendation;
+      if (teamRec && teamRec.action) {
+        const stats = teamActions.find((a) => a.action === teamRec.action);
+        const counts = stats ? `, worked ${stats.successes}/${stats.attempts}` : "";
+        return `FailEcho (your team's own history): try ${teamRec.action}${counts}.`;
+      }
+    }
     if (answer.status === "MAJOR" || answer.status === "DEGRADED") {
       const rate = answer.failure_rate && answer.failure_rate.last_5m;
       return `FailEcho: ${answer.service || "this service"} is ${answer.status.toLowerCase()} right now`
@@ -217,6 +232,13 @@ export default async function failecho() {
     if (actions.length) {
       const tried = actions.slice(0, 3).map((a) => `${a.action} worked ${a.successes}/${a.attempts}`).join(", ");
       return `FailEcho: no clear fix yet; other agents tried ${tried}.`;
+    }
+    if (team && typeof team === "object") {
+      const seen = (team.recovery_actions || []).filter((a) => a && a.action && a.attempts);
+      if (seen.length) {
+        const tried = seen.slice(0, 3).map((a) => `${a.action} worked ${a.successes || 0}/${a.attempts}`).join(", ");
+        return `FailEcho (your team's own history): no clear fix yet; your agents tried ${tried}.`;
+      }
     }
     return null;
   }

@@ -74,74 +74,9 @@ The same four operations are available over MCP (Streamable HTTP) at `/mcp`:
 `check_tool_failure`, `report_tool_failure`, `report_tool_success`,
 `report_recovery_outcome`. See `/llms.txt` for a machine-readable summary.
 
-### Private mode: your team's evidence, shared with nobody
+### Private mode and signed reporters
 
-A shared network needs other agents. A team with an internal API, a staging
-environment or a compliance answer to give has none, and still has the
-original problem: its agents retry blindly into failures its other agents
-already solved yesterday.
-
-Send a secret your team generates:
-
-    X-FailEcho-Team: <at least 16 characters, ideally 32 random bytes>
-
-With it, a report is stored for your team alone. It is never pooled, never
-counted as adoption, never rolled into any aggregate, never shown to another
-team and never part of any public number -- enforced by storing those rows in
-a different table from everything public, rather than by a flag somebody has
-to remember. A query with the same token returns the public answer **plus**
-`team_evidence`: what your own agents have seen, and your own recommendation
-when your own history clears the same bar the public one does (5 attempts,
-60% success). It does not lower that bar.
-
-There is no account. The token is self-chosen, like `reporter_id`, only
-secret; it is stored as a salted hash and never in the clear. Nothing is
-issued and nothing is billed, so there is nothing to leak -- and losing the
-token loses access to that evidence.
-
-    FAILECHO_TEAM=<token>          # failecho-autoreport, the plugin, the proxy
-
-Private evidence is kept for 30 days rather than the public 48 hours, because
-a team's own history is the whole point of it. It is not offered as an MCP
-tool argument: a token is a secret and tool arguments are visible to the model
-and to anything that logs the conversation.
-
-**Free while the network is bootstrapping.** It is the first thing here that
-would ever be paid for, it is useful at zero independent reporters, and early
-teams get it for nothing.
-
-## Proving who is reporting (optional, and narrow)
-
-`reporter_id` is self-chosen and unverified. That is right for an anonymous
-network and it proves nothing: anyone can send anyone's id. A reporter that
-wants its evidence to be attributable can make its id an Ed25519 public key
-and sign each request:
-
-    X-Reporter-ID         ed25519:<base64url public key>
-    X-Reporter-Timestamp  <unix seconds>
-    X-Reporter-Signature  <base64url signature>
-
-over `failecho-sig-v1 \n <timestamp> \n POST \n <path> \n sha256(body)`.
-Five minutes of clock skew is allowed. A signature that does not verify is
-**rejected with 400**, never silently downgraded -- a reporter that believes
-it is signing should find out.
-
-`python -m failecho_autoreport identity` creates the key and prints the id;
-`FAILECHO_SIGN=1` turns signing on. The private key stays on your machine and
-is never sent. Signing replaces that installation's reporter id with the key
-id, so its history starts over: it is opt-in for that reason.
-
-What this buys: a report attributed to a key was made by the holder of that
-key, and nobody can take over a reporter's history by guessing its id.
-`verified_reporters` in `/v1/stats` counts those reporters.
-
-What it does not buy, and no page here will claim otherwise: keys are free to
-generate, so this is **not Sybil resistance and not a count of people**. What
-makes a reporter count as an independent agent is the adoption threshold, not
-a signature. A captured signed request can also be replayed inside its five
-minute window, which duplicates one metadata row and cannot forge a new one.
-
-Unsigned is still the normal case and stays fully supported.
+`X-FailEcho-Team: <secret>` keeps a team's reports to the team and returns its own evidence as `team_evidence`; `X-Reporter-Signature` proves a reporter holds its key. Both are optional. The full rules, including which integrations support each today, are in `/llms.txt`.
 
 ## Privacy
 
@@ -847,6 +782,91 @@ on a service whose other masks share a fix is exactly when it helps.
 
 All three came from one Reddit thread, from people who had been burned by
 exactly these cases.
+
+## Private mode: your team's evidence, shared with nobody
+
+A shared network needs other agents. A team with an internal API, a staging
+environment or a compliance answer to give has none, and still has the
+original problem: its agents retry blindly into failures its other agents
+already solved yesterday.
+
+Send a secret your team generates:
+
+    X-FailEcho-Team: <at least 16 characters, ideally 32 random bytes>
+
+With it, a report is stored for your team alone. It is never pooled, never
+counted as adoption, never rolled into any aggregate, never shown to another
+team and never part of any public number -- enforced by storing those rows in
+a different table from everything public, rather than by a flag somebody has
+to remember. A query with the same token returns the public answer **plus**
+`team_evidence`: what your own agents have seen, and your own recommendation
+when your own history clears the same bar the public one does (5 attempts,
+60% success). It does not lower that bar.
+
+There is no account. The token is self-chosen, like `reporter_id`, only
+secret; it is stored as a salted hash and never in the clear. Nothing is
+issued and nothing is billed, so there is nothing to leak -- and losing the
+token loses access to that evidence.
+
+    FAILECHO_TEAM=<token>
+
+Where that variable works today, and where it does not yet -- a team that
+sets it on an integration that ignores it reports to the public network:
+
+- REST: send `X-FailEcho-Team` yourself. Works.
+- Claude Code plugin 0.2.0 and newer (`/plugin update failecho`). Works.
+- OpenCode plugin file from the repository. Works.
+- `failecho-autoreport` and `failecho-mcp proxy` (PyPI, npm): in the
+  repository, **not in the published packages yet**. Until their next
+  release, installing them from a registry does not give you private mode.
+- The MCP tools: never. A secret does not belong in a tool argument the model
+  and every conversation log can see.
+
+Every one of those that works also brings the team's own evidence back: when
+the public network has no answer and your team does, the advice line says
+"FailEcho (your team's own history): try ...".
+
+Private evidence is kept for 30 days rather than the public 48 hours, because
+a team's own history is the whole point of it. It is not offered as an MCP
+tool argument: a token is a secret and tool arguments are visible to the model
+and to anything that logs the conversation.
+
+**Free while the network is bootstrapping.** It is the first thing here that
+would ever be paid for, it is useful at zero independent reporters, and early
+teams get it for nothing.
+
+## Proving who is reporting (optional, and narrow)
+
+`reporter_id` is self-chosen and unverified. That is right for an anonymous
+network and it proves nothing: anyone can send anyone's id. A reporter that
+wants its evidence to be attributable can make its id an Ed25519 public key
+and sign each request:
+
+    X-Reporter-ID         ed25519:<base64url public key>
+    X-Reporter-Timestamp  <unix seconds>
+    X-Reporter-Signature  <base64url signature>
+
+over `failecho-sig-v1 \n <timestamp> \n POST \n <path> \n sha256(body)`.
+Five minutes of clock skew is allowed. A signature that does not verify is
+**rejected with 400**, never silently downgraded -- a reporter that believes
+it is signing should find out.
+
+`python -m failecho_autoreport identity` creates the key and prints the id;
+`FAILECHO_SIGN=1` turns signing on. The private key stays on your machine and
+is never sent. Signing replaces that installation's reporter id with the key
+id, so its history starts over: it is opt-in for that reason.
+
+What this buys: a report attributed to a key was made by the holder of that
+key, and nobody can take over a reporter's history by guessing its id.
+`verified_reporters` in `/v1/stats` counts those reporters.
+
+What it does not buy, and no page here will claim otherwise: keys are free to
+generate, so this is **not Sybil resistance and not a count of people**. What
+makes a reporter count as an independent agent is the adoption threshold, not
+a signature. A captured signed request can also be replayed inside its five
+minute window, which duplicates one metadata row and cannot forge a new one.
+
+Unsigned is still the normal case and stays fully supported.
 
 ## Privacy
 

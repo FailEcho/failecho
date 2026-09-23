@@ -35,6 +35,9 @@ Environment:
     FAILECHO_DISABLED=1             do nothing at all
     FAILECHO_REPORTER_ID            stable id; default: a random one kept locally
     FAILECHO_OPERATOR_TOKEN         FailEcho's own agents only
+    FAILECHO_TEAM                   private mode: a secret your team shares (16+
+                                    characters). Reports are stored for your team
+                                    alone and your team's own evidence comes back
     FAILECHO_HOOK_SEND_ERRORS=1     also send the error text (normalized server-side)
     FAILECHO_HOOK_REPORT_SUCCESS=0  do not report successful calls
     FAILECHO_HOOK_SERVICE_NAMES     JSON map from a server alias to a public name,
@@ -383,10 +386,36 @@ def _recovery_action(previous: dict, input_digest: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _team_note(answer: dict) -> str | None:
+    """The team's own evidence, in private mode. Always said to be the team's."""
+    team = answer.get("team_evidence")
+    if not isinstance(team, dict):
+        return None
+    actions = {a.get("action"): a for a in team.get("recovery_actions") or [] if isinstance(a, dict)}
+    rec = team.get("recommendation") or {}
+    if rec.get("action"):
+        a = actions.get(rec["action"]) or {}
+        counts = (f" ({a.get('successes')}/{a.get('attempts')} attempts)"
+                  if "successes" in a and "attempts" in a else "")
+        return f"Your team's own history: {rec['action']} worked{counts}."
+    tried = [f"{a['action']} {a.get('successes', 0)}/{a['attempts']}" for a in actions.values() if a.get("attempts")]
+    if tried:
+        return "Your team's own history, no clear fix yet: " + ", ".join(tried[:3]) + "."
+    if team.get("failures"):
+        return (f"Your team has hit this {team['failures']} time(s) in the last "
+                f"{team.get('window_days', 30)} days; no recovery recorded yet.")
+    return None
+
+
 def context_note(service: str, operation: str, answer: dict | None) -> str | None:
     """A short, factual note for Claude -- only when there is evidence."""
-    if not answer or not answer.get("known"):
+    if not answer:
         return None
+    team = _team_note(answer)
+    if not answer.get("known"):
+        # Nobody else has seen it; the team may have. Private evidence is
+        # never passed off as the network's.
+        return f"FailEcho: {team} Counts are observed outcomes; no model produced them." if team else None
     observed = answer.get("observations") or {}
     sources = ", ".join(answer.get("evidence_sources") or []) or "unknown"
     # Status needs ten observations an hour; below that it says nothing, and
@@ -429,6 +458,8 @@ def context_note(service: str, operation: str, answer: dict | None) -> str | Non
         ]
         if tried:
             lines.append("Recoveries tried so far: " + ", ".join(tried) + ".")
+    if team:
+        lines.append(team)
     lines.append("Counts are observed outcomes; no model produced them.")
     return " ".join(lines)
 
@@ -442,6 +473,10 @@ def _client() -> Client:
     headers = {"X-Reporter-ID": reporter_id()}
     if os.environ.get("FAILECHO_OPERATOR_TOKEN"):
         headers[OPERATOR_HEADER] = os.environ["FAILECHO_OPERATOR_TOKEN"]
+    if os.environ.get("FAILECHO_TEAM"):
+        # Private mode. Without this line the documented variable did nothing
+        # here and a team's reports went to the public network (23 Sep).
+        headers["X-FailEcho-Team"] = os.environ["FAILECHO_TEAM"]
     return Client(os.environ.get("FAILECHO_ENDPOINT") or DEFAULT_ENDPOINT, headers)
 
 

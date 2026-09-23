@@ -325,3 +325,30 @@ def test_a_recovery_is_not_lost_when_the_success_arrives_first():
         assert outcomes and outcomes[0]["fingerprint"] == "abc123", outcomes
     finally:
         net.stop()
+
+
+# -- private mode (2026-09-23) --------------------------------------------------
+
+
+def test_private_mode_sends_the_team_token_and_returns_the_teams_own_fix():
+    team = {"private": True, "observations": 6, "failures": 6,
+            "recovery_actions": [{"action": "wait_and_retry", "attempts": 5, "successes": 5}],
+            "recommendation": {"action": "wait_and_retry", "scope": "team", "from_other_agents": False}}
+    net = Network(answer={"known": False, "status": "INSUFFICIENT_DATA", "recommendation": None,
+                          "recovery_actions": [], "fingerprint": "abc123", "team_evidence": team})
+    try:
+        results = drive([CURL_429], net.endpoint, env={"FAILECHO_TEAM": "team-token-eeeeeeeeeeeeeeee"})
+        headers = [{k.lower(): v for k, v in h.items()} for _, _, h in net.posts]
+        assert headers and all(h.get("x-failecho-team") == "team-token-eeeeeeeeeeeeeeee" for h in headers)
+        assert "FailEcho (your team's own history): try wait_and_retry, worked 5/5." in results[0]["output"]
+    finally:
+        net.stop()
+
+
+def test_without_a_team_token_nothing_says_team():
+    net = Network()
+    try:
+        drive([CURL_429], net.endpoint)
+        assert all("x-failecho-team" not in {k.lower() for k in h} for _, _, h in net.posts)
+    finally:
+        net.stop()

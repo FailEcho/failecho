@@ -149,6 +149,10 @@ function adviceText(answer) {
     const tail = marks.length ? ` -- ${marks.join("; ")}` : "";
     return `FailEcho: try ${rec.action}${evidence}${conf}${tail}.`;
   }
+  // Private mode: the team's own recommendation, when the public network has
+  // none. Same rule and same words as failecho_autoreport.advice_text.
+  const team = teamLine(answer, false);
+  if (team) return team;
   for (const [lead, source] of [["other agents tried", tried], ["on this service's other operations, agents tried", pooled]]) {
     const seen = [...source.values()].filter((a) => "successes" in a && "attempts" in a && a.attempts);
     if (seen.length) {
@@ -157,6 +161,29 @@ function adviceText(answer) {
       const parts = seen.slice(0, 3).map((a) => `${a.action} worked ${a.successes}/${a.attempts}`).join(", ");
       return `FailEcho: no clear fix yet; ${lead} ${parts}.`;
     }
+  }
+  return teamLine(answer, true);
+}
+
+/** One line from a private team's own evidence, always labelled as such. */
+function teamLine(answer, triedOnly) {
+  const team = answer && answer.team_evidence;
+  if (!team || typeof team !== "object") return null;
+  const actions = new Map();
+  for (const a of team.recovery_actions || []) {
+    if (a && typeof a === "object") actions.set(a.action, a);
+  }
+  const rec = team.recommendation || {};
+  if (rec.action && !triedOnly) {
+    const a = actions.get(rec.action) || {};
+    const evidence = "successes" in a && "attempts" in a ? `, worked ${a.successes}/${a.attempts}` : "";
+    return `FailEcho (your team's own history): try ${rec.action}${evidence}.`;
+  }
+  const seen = [...actions.values()].filter((a) => a.attempts);
+  if (triedOnly && seen.length) {
+    seen.sort((x, y) => (y.successes || 0) / y.attempts - (x.successes || 0) / x.attempts);
+    const parts = seen.slice(0, 3).map((a) => `${a.action} worked ${a.successes || 0}/${a.attempts}`).join(", ");
+    return `FailEcho (your team's own history): no clear fix yet; your agents tried ${parts}.`;
   }
   return null;
 }
@@ -208,6 +235,11 @@ class Network {
     };
     if (process.env.FAILECHO_OPERATOR_TOKEN) {
       this.headers.Authorization = `Bearer ${process.env.FAILECHO_OPERATOR_TOKEN}`;
+    }
+    // Private mode: this team's reports stay the team's. The wrapper, the
+    // Claude Code hook and the OpenCode plugin read the same variable.
+    if (process.env.FAILECHO_TEAM) {
+      this.headers["X-FailEcho-Team"] = process.env.FAILECHO_TEAM;
     }
     this.fingerprints = new Map();
     // one chain, in order, so an outcome finds the fingerprint of the
@@ -550,4 +582,4 @@ function main(argv) {
 }
 
 module.exports = { main, classify, adviceText, annotate, errorText, ERROR_CLASSES, parseUpstreams, upstreamFor,
-                   installationId };
+                   installationId, Network };

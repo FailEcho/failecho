@@ -518,7 +518,16 @@ def test_both_proxies_classify_and_advise_exactly_alike(impl):
         {"recommendation": {"action": "skip", "confidence": 0.7}},
         {"recommendation": None, "recovery_actions": [{"action": "retry", "successes": 49, "attempts": 98},
                                                       {"action": "backoff", "successes": 128, "attempts": 251}]},
-        {"known": False, "recommendation": None}]
+        {"known": False, "recommendation": None},
+        # private mode: the team's own evidence, when the public network has none
+        {"recommendation": None, "recovery_actions": [],
+         "team_evidence": {"private": True, "recommendation": {"action": "wait_and_retry", "scope": "team"},
+                           "recovery_actions": [{"action": "wait_and_retry", "successes": 5, "attempts": 5}]}},
+        {"recommendation": None, "recovery_actions": [],
+         "team_evidence": {"private": True, "recommendation": None,
+                           "recovery_actions": [{"action": "retry", "successes": 1, "attempts": 3}]}},
+        {"recommendation": {"action": "backoff", "confidence": 0.7},
+         "team_evidence": {"private": True, "recommendation": {"action": "retry"}, "recovery_actions": []}}]
     script = ("const p=require(process.argv[1]);const d=JSON.parse(require('fs').readFileSync(0,'utf8'));"
               "process.stdout.write(JSON.stringify({c:d.s.map(t=>p.classify(t)),a:d.a.map(x=>p.adviceText(x))}))")
     out = subprocess.run(["node", "-e", script, str(ROOT / "npm-relay" / "bin" / "proxy.js")],
@@ -628,3 +637,31 @@ def test_both_clients_share_one_installation_id(tmp_path):
                         capture_output=True, timeout=30, env=env).stdout.decode()
     assert node and node == py, (node, py)
     assert (tmp_path / "failecho" / "installation").read_text().strip() == node
+
+
+# -- private mode (2026-09-23) --------------------------------------------------
+
+
+def test_the_node_proxy_sends_the_team_token_only_when_set():
+    """The Python proxy reports through failecho_autoreport, which reads
+    FAILECHO_TEAM; the Node twin builds its own headers and did not."""
+    import shutil
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+    script = ("const p=require(process.argv[1]);const n=new p.Network();"
+              "process.stdout.write(JSON.stringify(n.headers))")
+    relay = str(ROOT / "npm-relay" / "bin" / "proxy.js")
+    base = {"PATH": os.environ["PATH"], "FAILECHO_ENDPOINT": "http://127.0.0.1:9", "HOME": "/tmp"}
+    with_team = json.loads(subprocess.run(["node", "-e", script, relay], capture_output=True, timeout=30,
+                                          env={**base, "FAILECHO_TEAM": "team-token-cccccccccccccccc"}).stdout)
+    without = json.loads(subprocess.run(["node", "-e", script, relay], capture_output=True, timeout=30,
+                                        env=base).stdout)
+    assert with_team.get("X-FailEcho-Team") == "team-token-cccccccccccccccc"
+    assert "X-FailEcho-Team" not in without
+
+
+def test_the_python_proxy_reports_privately_through_the_wrapper(monkeypatch):
+    monkeypatch.setenv("FAILECHO_TEAM", "team-token-dddddddddddddddd")
+    from failecho_autoreport import FailEcho
+    headers = FailEcho(endpoint="http://127.0.0.1:9")._headers("/v1/observe", b"{}")
+    assert headers["X-FailEcho-Team"] == "team-token-dddddddddddddddd"

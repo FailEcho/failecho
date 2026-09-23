@@ -417,3 +417,42 @@ def test_the_note_says_skip_as_an_instruction():
     pooled = dict(answer, recommendation={"action": "wait_until_reset", "confidence": 0.7, "based_on_attempts": 6,
                                           "based_on_successes": 6, "scope": "service"})
     assert "pooled from other operation names" in hook.context_note("api.github.com", "GET /repos", pooled)
+
+
+# -- private mode through the hook (2026-09-23) ---------------------------------
+
+TEAM = "hook-team-token-aaaaaaaaaaaaaaaa"
+
+
+def test_private_mode_keeps_the_teams_reports_out_of_the_public_network(server, run_hook):
+    """FAILECHO_TEAM used to do nothing in the hook, so a team that set it had
+    its reports go to the public network while the docs said otherwise."""
+    before = get(server, "/v1/stats")["observations_total"]
+    code, _, _ = run_hook(failure(tool="mcp__gh__close_issue", error="HTTP 503 service unavailable"),
+                          FAILECHO_TEAM=TEAM)
+    assert code == 0
+    assert get(server, "/v1/stats")["observations_total"] == before, "a private report reached a public number"
+    public = ask(server, "close_issue", "server_error", "503")
+    assert public["observations"]["total"] == 0 and public["team_evidence"] is None
+
+
+def test_a_team_gets_its_own_fix_back_through_the_hook(server, run_hook):
+    """The whole loop, private end to end: fail, retry, succeed -- five times,
+    so the team's own history clears the bar -- and the sixth failure comes
+    back with the team's answer in the note Claude reads. Nobody else's
+    evidence is involved, and the note says whose it is."""
+    tool = "mcp__gh__reopen_issue"
+    for i in range(5):
+        run_hook(failure(tool=tool, error="HTTP 503 service unavailable", session=f"team-{i}"),
+                 FAILECHO_TEAM=TEAM)
+        run_hook(success(tool=tool, session=f"team-{i}"), FAILECHO_TEAM=TEAM)
+    code, out, _ = run_hook(failure(tool=tool, error="HTTP 503 service unavailable", session="team-6"),
+                            FAILECHO_TEAM=TEAM)
+    assert code == 0
+    note = json.loads(out)["hookSpecificOutput"]["additionalContext"]
+    assert "Your team's own history" in note, note
+    assert "retry" in note
+
+    # and a stranger, or the same machine without the token, sees none of it
+    code, out, _ = run_hook(failure(tool=tool, error="HTTP 503 service unavailable", session="stranger"))
+    assert "team" not in (out or "").lower()

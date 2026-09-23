@@ -284,3 +284,67 @@ def test_private_mode_is_not_offered_over_mcp_tool_arguments():
     source = __import__("pathlib").Path("app/mcp_server.py").read_text()
     assert "team_token" not in source
     assert mcp_server.name == "failecho"
+
+
+# -- the shipped wrapper, against a real server ----------------------------------
+
+
+def test_the_wrapper_runs_the_whole_private_loop_against_a_real_server():
+    """Not the pieces, the loop: a team's agent fails, recovers, reports it,
+    five times -- and then asks, and gets its own fix back in the one line an
+    agent reads, labelled as its own. The public network sees none of it."""
+    import json as _json
+    import urllib.request
+
+    from failecho_autoreport import FailEcho
+    from tests.live_server import running_failecho
+
+    token = "wrapper-team-token-ffffffffffff"
+    with running_failecho(FIN_RATE_LIMIT_WRITES_PER_MINUTE="10000") as live:
+        fe = FailEcho(endpoint=live.base, team_token=token, report_success=False)
+        for _ in range(5):
+            fe.record_failure("billing.internal", "charge", RuntimeError("503 service unavailable"), 40)
+            assert fe.flush(timeout=10)
+            fe.recovered("billing.internal", "charge", "wait_and_retry", True,
+                         error_type="server_error", error_code="503")
+            assert fe.flush(timeout=10)
+
+        line = FailEcho.advice_text(fe.check("billing.internal", "charge", "server_error", "503"))
+        assert line == "FailEcho (your team's own history): try wait_and_retry, worked 5/5."
+
+        stranger = FailEcho(endpoint=live.base, report_success=False)
+        assert FailEcho.advice_text(stranger.check("billing.internal", "charge", "server_error", "503")) is None
+        with urllib.request.urlopen(f"{live.base}/v1/stats", timeout=5) as r:
+            assert _json.load(r)["observations_total"] == 0, "a private report reached a public number"
+
+
+def test_the_pages_do_not_promise_private_mode_where_it_does_not_work(client):
+    """On 23 Sep llms.txt said FAILECHO_TEAM worked with the plugin and the
+    proxy when neither read it: a team following the docs would have reported
+    to the public network believing otherwise. Every page that offers private
+    mode says which integrations it works with, and which not yet."""
+    for path in ("/llms.txt", "/setup"):
+        flat = " ".join(client.get(path).text.split())
+        assert "not in the published packages yet" in flat or "not yet in their published packages" in flat, path
+        assert "failecho-autoreport, the plugin, the proxy" not in flat, path
+
+
+def test_every_integration_that_is_documented_actually_reads_the_token():
+    """The variable is named in each of these; the behaviour behind it is
+    tested in the integration's own test file."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    for path in ("plugin/hooks/failecho_hook.py", "opencode-plugin/plugin/failecho.js",
+                 "npm-relay/bin/proxy.js", "failecho_autoreport/__init__.py"):
+        assert "FAILECHO_TEAM" in (root / path).read_text(), path
+
+
+def test_llms_txt_itself_documents_private_mode_and_signing(client):
+    """Both sections were written on 22 Sep into the API description by
+    mistake -- the anchor they were inserted before exists in both strings --
+    so agents reading llms.txt were never told either existed."""
+    body = client.get("/llms.txt").text
+    assert "## Private mode: your team's evidence, shared with nobody" in body
+    assert "## Proving who is reporting" in body
+    assert "X-FailEcho-Team" in body and "X-Reporter-Signature" in body

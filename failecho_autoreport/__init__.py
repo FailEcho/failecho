@@ -204,6 +204,31 @@ def _truthy(value: str | None, default: bool) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _team_line(answer: dict, tried_only: bool = False) -> str | None:
+    """One line from a private team's own evidence, or None.
+
+    Always labelled as the team's own history: it is never somebody else's
+    experience, and a line that let it read as the network's would be the one
+    lie this project cannot afford.
+    """
+    team = answer.get("team_evidence") if isinstance(answer, dict) else None
+    if not isinstance(team, dict):
+        return None
+    actions = {a.get("action"): a for a in team.get("recovery_actions") or [] if isinstance(a, dict)}
+    rec = team.get("recommendation") or {}
+    if rec.get("action") and not tried_only:
+        a = actions.get(rec["action"]) or {}
+        evidence = (f", worked {a['successes']}/{a['attempts']}"
+                    if "successes" in a and "attempts" in a else "")
+        return f"FailEcho (your team's own history): try {rec['action']}{evidence}."
+    seen = [a for a in actions.values() if a.get("attempts")]
+    if tried_only and seen:
+        seen.sort(key=lambda a: -a.get("successes", 0) / a["attempts"])
+        parts = ", ".join(f"{a['action']} worked {a.get('successes', 0)}/{a['attempts']}" for a in seen[:3])
+        return f"FailEcho (your team's own history): no clear fix yet; your agents tried {parts}."
+    return None
+
+
 class FailEcho:
     """Reports the shape of failures, from inside somebody else's program."""
 
@@ -474,6 +499,12 @@ class FailEcho:
                 marks.append("your own history only")
             tail = f" -- {'; '.join(marks)}" if marks else ""
             return f"FailEcho: try {action}{evidence}{conf}{tail}."
+        # Private mode: the team's own recommendation, when the public network
+        # has none. Until 23 Sep no integration read it, so a team's evidence
+        # went in and never came back out.
+        team = _team_line(answer)
+        if team:
+            return team
         # No recommendation, but evidence: say what others tried and how it
         # went, and that it is not a recommendation. Withholding it left a
         # model with nothing where the network knew backoff worked 128/251.
@@ -483,28 +514,7 @@ class FailEcho:
                 seen.sort(key=lambda a: -a["successes"] / a["attempts"])
                 parts = ", ".join(f"{a['action']} worked {a['successes']}/{a['attempts']}" for a in seen[:3])
                 return f"FailEcho: no clear fix yet; {lead} {parts}."
-        return None
-        rec = answer.get("recommendation") or {}
-        action = rec.get("action")
-        tried = {a.get("action"): a for a in answer.get("recovery_actions") or [] if isinstance(a, dict)}
-        if action == "skip":
-            return "FailEcho: skip -- nothing other agents tried recently has fixed this failure."
-        if action:
-            a = tried.get(action) or {}
-            evidence = (f", worked {a['successes']}/{a['attempts']}"
-                        if "successes" in a and "attempts" in a else "")
-            conf = rec.get("confidence")
-            conf = f" (confidence {conf:.2f})" if isinstance(conf, (int, float)) else ""
-            return f"FailEcho: try {action}{evidence}{conf}."
-        # No recommendation, but evidence: say what others tried and how it
-        # went, and that it is not a recommendation. Withholding it left a
-        # model with nothing where the network knew backoff worked 128/251.
-        seen = [a for a in tried.values() if "successes" in a and "attempts" in a and a["attempts"]]
-        if seen:
-            seen.sort(key=lambda a: -a["successes"] / a["attempts"])
-            parts = ", ".join(f"{a['action']} worked {a['successes']}/{a['attempts']}" for a in seen[:3])
-            return f"FailEcho: no clear fix yet; other agents tried {parts}."
-        return None
+        return _team_line(answer, tried_only=True)
 
     # -- recording ---------------------------------------------------------
 

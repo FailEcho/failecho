@@ -39,6 +39,7 @@ moves gets re-checked here before it is repeated.
 | "Just add the MCP endpoint and your agent gets smarter" | That path is the **weakest**: agents given the tools used them 0.19-0.24 times per run. Every public page now ranks it last and says so. Lead with the plugin (Claude Code, OpenCode), the proxy, or the wrapper |
 | "The OpenCode plugin improves results" | Its lab arm started 23 Sep and has **no runs** yet. Built, tested end to end, unmeasured |
 | "Install from npm: `failecho-opencode`" | Not published. The single-file install from GitHub is the only real path until the user publishes it |
+| "Private mode works with every FailEcho integration" | The published `failecho-autoreport` (0.1.6) and `failecho-mcp` packages do not read `FAILECHO_TEAM`; a team using them reports **publicly**. Say which integrations work (REST, Claude Code plugin 0.2.0+, OpenCode plugin file) until the next release |
 | "Proven to raise task completion" | Grading is shallow and the control is weak; see the qualifiers |
 | "Independent agents confirm this" | Independent reporters: 0 |
 | "Your secrets can never leak" | Defaults are narrow, but a URL path or an error string can carry an identifier. Say what is sent, not what cannot happen |
