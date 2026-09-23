@@ -413,7 +413,26 @@ OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 #: model writes "LlamaIndex" where the task names run-llama/llama_index. The
 #: answers behind those grades were not kept, so they cannot be re-graded --
 #: and a rate that silently mixes two graders is worse than a shorter one.
-GRADING_SINCE = "2026-09-22T21:55:00"
+GRADING_SINCE = "2026-09-23T03:32:00"   # moved from 21:55 when the zero and summary-line fixes went live
+
+#: How much of a prose answer the ledger keeps for regrading.
+ANSWER_KEEP = 600
+
+
+def _current_grade(r: dict) -> dict:
+    """The grade this run gets from the grader as it is *now*.
+
+    A run that kept its task, its answer and the truth its grade was computed
+    against is graded again, so a grader fix applies to every such run instead
+    of only to the ones after it. Anything else -- OpenCode results, whose
+    files are not kept, and runs from before 23 Sep -- keeps its frozen grade.
+    """
+    g = r.get("graded") or {}
+    answer, task, truths = r.get("answer"), r.get("task"), g.get("truth")
+    if (not g or not truths or not isinstance(task, str) or not isinstance(answer, str)
+            or r.get("opencode") or r.get("build") or len(answer) >= ANSWER_KEEP):
+        return g
+    return grade(task, answer, bool(g.get("answered")), truths=truths)
 
 MCP_RULES_SINCE = "2026-09-22T18:00:00"
 WRAPPED_PERSONAS = {"fleet-wrap-ask", "fleet-wrap-blind"}
@@ -1334,6 +1353,58 @@ def _state_lock():
             fcntl.flock(fh, fcntl.LOCK_UN)
 
 
+#: The ledger (state.json) keeps the last LEDGER_CAP runs, and the light lane
+#: fills that in about two and a half days. That was fine for groups that run
+#: every minute and quietly fatal for the ones that run every few hours: the
+#: OpenCode pairs could never hold more than ~25 runs a side, because older
+#: runs fell off the end as fast as new ones arrived. Their records now go to
+#: an archive when the cap would drop them, and are kept ARCHIVE_DAYS.
+LEDGER_CAP = 5000
+ARCHIVE_DAYS = 30
+
+
+def _slow_arms() -> set[str]:
+    """Personas whose runs are too rare to survive the ledger's cap."""
+    return OPENCODE_PERSONAS | OCPROXY_PERSONAS | OCHOOK_PERSONAS | LOCAL_PERSONAS | PROD_ADVICE_PERSONAS
+
+
+def _archive_path() -> str:
+    return os.path.join(STATE_DIR, "archive.jsonl")
+
+
+def _archived() -> list[dict]:
+    """Every archived record, oldest first. Unreadable lines are skipped: an
+    archive that half-wrote once must not take the scoreboard down with it."""
+    out = []
+    try:
+        with open(_archive_path(), encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    continue
+    except OSError:
+        return []
+    return out
+
+
+def _archive(evicted: list[dict]) -> None:
+    """Keep the slow arms' records the ledger cap is about to drop."""
+    keep = [r for r in evicted if r.get("reporter") in _slow_arms()]
+    if not keep:
+        return
+    cutoff = (dt.datetime.now(dt.UTC) - dt.timedelta(days=ARCHIVE_DAYS)).isoformat(timespec="seconds")
+    records = [r for r in _archived() if str(r.get("at", "")) >= cutoff] + keep
+    tmp = _archive_path() + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        for r in records:
+            fh.write(json.dumps(r) + "\n")
+    os.replace(tmp, _archive_path())
+
+
 def _state() -> dict:
     os.makedirs(STATE_DIR, exist_ok=True)
     try:
@@ -1357,7 +1428,7 @@ _NOT_A_RUN = ("daily cap reached; run skipped", "(no provider key)")
 #: values and put the asking side at 75% against 100% on four runs. The run
 #: itself still counts -- meeting a provider failure is the provider group's
 #: entire subject -- it just has no answer in it.
-_NO_ANSWER = _NOT_A_RUN + ("(provider failed", "(provider ", "(no answer")
+_NO_ANSWER = _NOT_A_RUN + ("(provider failed", "(provider ", "(no answer", "(model budget exhausted")
 
 
 def _is_run(r: dict) -> bool:
@@ -1382,12 +1453,14 @@ def _lost_to_guest_memory(r: dict) -> bool:
 
 
 def write_report(state: dict) -> None:
+    archived = _archived()
+    everything = archived + state["runs"]
     lost_memory = {"ask": {}, "blind": {}}
-    for r in state["runs"]:
+    for r in everything:
         if _lost_to_guest_memory(r):
             side = lost_memory["ask" if r.get("asks") else "blind"]
             side[r["reporter"]] = side.get(r["reporter"], 0) + 1
-    runs = [r for r in state["runs"] if _is_run(r) and not _lost_to_guest_memory(r)]
+    runs = [r for r in everything if _is_run(r) and not _lost_to_guest_memory(r)]
     by_persona: dict[str, dict] = {}
     blank = lambda: {"runs": 0, "failures": 0, "attempts": 0, "recovered": 0, "asked": 0, "recommended": 0, "skipped": 0,
                      "provider_failures": 0, "provider_recovered": 0, "explored": 0}
@@ -1455,6 +1528,8 @@ def write_report(state: dict) -> None:
     # to the product can be judged on all of them, not on the one it moved.
     # Only runs that carry metrics (recorded since 2026-09-17 10:30 UTC).
     costs: dict[str, dict] = {}
+    #: first and last run per cohort, so every table can say what it covers
+    spans: dict[str, list[str]] = {}
     for r in runs:
         m = r.get("metrics")
         if not m:
@@ -1467,6 +1542,8 @@ def write_report(state: dict) -> None:
                 else "local" if r["reporter"] in LOCAL_PERSONAS
                 else "wrapped" if r["reporter"] in WRAPPED_PERSONAS else "real")
         key = "explore" if r["reporter"] in EXPLORER_PERSONAS else kind + (" / ask" if r["asks"] else " / blind")
+        span = spans.setdefault(key, [r["at"], r["at"]])
+        span[0], span[1] = min(span[0], r["at"]), max(span[1], r["at"])
         c = costs.setdefault(key, {"cohort": key, "runs": 0, "completed": 0, "tokens": 0, "tokens_prompt": 0,
                                    "tokens_completion": 0, "model_calls": 0, "tool_calls": 0, "seconds": 0.0,
                                    "asks": 0, "ask_seconds": 0.0, "wait_seconds": 0.0, "calls_first_try": 0,
@@ -1482,7 +1559,7 @@ def write_report(state: dict) -> None:
         c["calls_failed"] += m.get("calls_failed", 0)
         c["failure_seconds"] += sum(float(f.get("seconds") or 0) for f in r["failures"])
         c["model_retries_after_skip"] += m.get("model_retries_after_skip", 0)
-        g = r.get("graded") or {} if r["at"] >= GRADING_SINCE else {}
+        g = _current_grade(r) if r["at"] >= GRADING_SINCE else {}
         if any(m in (r.get("answer") or "") for m in _NO_ANSWER):
             g = {}          # the harness spoke, not the agent: nothing graded
         if g.get("valid") is not None:
@@ -1654,7 +1731,10 @@ def write_report(state: dict) -> None:
             rows.append({"metric": "values declined rather than invented", "unit": "",
                          "ask": a.get("refused_values", 0), "blind": b.get("refused_values", 0),
                          "better": "tie"})
-        versus.append({"group": key, "label": label, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": rows})
+        covered = spans.get(f"{key} / ask", []) + spans.get(f"{key} / blind", [])
+        versus.append({"group": key, "label": label, "runs_ask": a["runs"], "runs_blind": b["runs"],
+                       "from": min(covered) if covered else None, "to": max(covered) if covered else None,
+                       "rows": rows})
     # Model providers under their real quotas: the model-driven personas
     # (not builders, not explorers) since blind started retrying once. A
     # provider 429 is the most common real failure the fleet meets, and the
@@ -1803,8 +1883,19 @@ def write_report(state: dict) -> None:
             return None
     canary, onboard = _side("canary.json"), _side("onboard.json")
 
+    ledger = state["runs"]
     report = {
         "generated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+        # What the numbers below are computed over. The fast groups cover the
+        # ledger; the slow arms also cover the archive. Without this the page
+        # said "since 17 Sep" over tables that held two and a half days.
+        "window": {
+            "ledger_runs": len(ledger), "ledger_cap": LEDGER_CAP,
+            "ledger_from": ledger[0]["at"] if ledger else None,
+            "ledger_to": ledger[-1]["at"] if ledger else None,
+            "archived_runs": len(archived), "archive_days": ARCHIVE_DAYS,
+            "archive_from": archived[0]["at"] if archived else None,
+        },
         "canary": canary, "onboard": onboard,
         "totals": {"runs": len(runs), "personas": len(by_persona),
                    "providers_out_of_quota": sorted(state.get("provider_dead", {})),
@@ -1995,12 +2086,13 @@ def main(argv: list[str] | None = None) -> int:
                   else {"checked": 0, "valid": None})
         if graded["checked"] or graded["valid"] is not None:
             record["graded"] = graded
-            if graded.get("correct") is False:
-                # Keep the head of an answer the grader marked wrong, so the
-                # next pass can tell a model that got a version wrong from a
-                # grader that cannot read one. Our own task, our own model,
-                # our own ledger -- and only the ones in dispute.
-                record["answer"] = answer[:200]
+            # The task and the answer are kept with the truth the grade used,
+            # so a fixed grader can grade this run again (see _current_grade).
+            # Our own task, our own model, our own ledger. Prose answers are
+            # asked to stay under sixty words; the cap is far above that, and
+            # a run that hits it is not regraded, because a cut answer would.
+            record["task"] = task[:200]
+            record["answer"] = answer[:ANSWER_KEEP]
     if run.opencode is not None:
         # what it actually produced, checked against truth fetched from the
         # same public APIs the task names (see grading.py)
@@ -2030,7 +2122,9 @@ def main(argv: list[str] | None = None) -> int:
             del state["provider_dead"][provider]
             log(f"  {provider}: quota is back")
         state.setdefault("runs", []).append(record)
-        state["runs"] = state["runs"][-5000:]
+        if len(state["runs"]) > LEDGER_CAP:
+            _archive(state["runs"][:-LEDGER_CAP])
+            state["runs"] = state["runs"][-LEDGER_CAP:]
         _save(state)
         write_report(state)
 

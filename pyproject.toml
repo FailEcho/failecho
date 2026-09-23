@@ -23,6 +23,7 @@ failecho-mcp = "failecho_mcp:main"
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-xdist>=3.5",
     "httpx>=0.27",
 ]
 # The bundled client depends on nothing but the standard library.

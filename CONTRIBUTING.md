@@ -15,6 +15,7 @@ No account, no key. See the README's "Connect an agent" section.
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest          # the whole suite must stay green
+.venv/bin/python -m pytest -n 2     # same suite on two workers: ~1.5 min instead of ~2.5
 .venv/bin/python -m uvicorn app.main:app --reload
 ```
 

@@ -399,8 +399,10 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
-@pytest.fixture(params=["json", "sse"])
+@pytest.fixture(params=["json", "sse"], scope="module")
 def http_server(request):
+    """One fake remote server per transport for the whole module: it is
+    stateless, and starting uvicorn cost 0.9 s for every test that used it."""
     port = _free_port()
     proc = subprocess.Popen([sys.executable, str(ROOT / "tests" / "fake_http_mcp_server.py"), str(port), request.param, "tok"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

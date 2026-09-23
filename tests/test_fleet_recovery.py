@@ -174,7 +174,8 @@ def test_retry_without_tool_choice_drops_the_tools():
     assert state["tools"] is False
 
 
-def test_a_failed_recovery_is_reported_as_such():
+def test_a_failed_recovery_is_reported_as_such(monkeypatch):
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)   # 3 s of real waiting otherwise
     advice = {"fingerprint": "fp", "recommendation": {"action": "retry"}}
     run, reported = run_for("fleet-decor-ask-a", True, advice)
     assert run.recover_provider(F.PROVIDERS["groq"], http_error(503), Chat(fail_times=5), {"model": "m", "tools": True}) is None
@@ -1228,6 +1229,7 @@ def test_the_local_pair_is_wired_and_kept_out_of_the_naive_comparison():
 
 
 def test_the_local_blind_twin_never_asks_the_network(monkeypatch):
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)   # 6 s of real waiting otherwise
     asked = []
     monkeypatch.setattr(F.Run, "_ask", lambda self, *a, **k: asked.append(self.reporter) or {})
     monkeypatch.setattr(F.FailEcho, "_post", lambda self, body: None)
@@ -1504,12 +1506,12 @@ def test_a_wrong_value_is_named_so_a_misgrade_can_be_told_apart(monkeypatch):
                          answered=True)["missed"] == []
 
 
-def test_only_a_disputed_answer_is_kept():
-    """The ledger keeps the head of an answer the grader called wrong, and
-    nothing else: an audit needs the disputed ones, not all of them."""
+def test_a_graded_run_keeps_what_regrading_needs():
+    """Task, answer and the truth the grade used: enough for a fixed grader to
+    grade the run again. Nothing is kept for a run that was not graded."""
     source = open("failecho_fleet/__init__.py").read()
-    assert 'if graded.get("correct") is False:' in source
-    assert 'record["answer"] = answer[:200]' in source
+    assert 'record["task"] = task[:200]' in source
+    assert 'record["answer"] = answer[:ANSWER_KEEP]' in source
 
 
 def test_the_grader_finds_the_line_when_a_model_uses_the_human_name(monkeypatch):
@@ -1564,8 +1566,8 @@ def test_grades_from_the_broken_grader_are_not_counted(tmp_path, monkeypatch):
                             "wait_seconds": 0, "completed": True, "calls_first_try": 2,
                             "calls_recovered": 0, "calls_failed": 0}}
 
-    before = "2026-09-22T21:00:00"      # the broken grader's window
-    after = "2026-09-22T23:00:00"
+    before = "2026-09-22T21:00:00"      # a broken grader's window
+    after = "2026-09-23T23:00:00"
     F.write_report({"runs": [run(before, True, False), run(before, False, False),
                              run(after, True, True), run(after, False, True)]})
 
@@ -1624,7 +1626,7 @@ def test_a_run_the_provider_refused_has_no_answer_to_grade(tmp_path, monkeypatch
     monkeypatch.setattr(F, "LAB_DB", "")
 
     def run(asks, answer, correct):
-        return {"at": "2026-09-23T00:00:00", "reporter": "fleet-gh-ask" if asks else "fleet-gh-blind",
+        return {"at": "2026-09-23T12:00:00", "reporter": "fleet-gh-ask" if asks else "fleet-gh-blind",
                 "path": "decorator", "provider": "groq", "asks": asks, "tool_calls": 2, "model_calls": 1,
                 "seconds": 4.0, "failures": [], "answer": answer,
                 "graded": {"answered": True, "valid": True, "correct": correct, "checked": 3,
@@ -1692,3 +1694,166 @@ def test_a_release_tag_counts_written_either_way(monkeypatch):
         assert grading.grade(prompt, answer, answered=True)["correct"] is True, answer
     assert grading.grade(prompt, "FailEcho/failecho is at v0.1.01, 0 open issues.",
                          answered=True)["correct"] is False
+
+
+# -- the ledger window and the slow arms' archive (2026-09-23) ------------------
+
+
+def _light_run(reporter, asks, at, **extra):
+    base = {"at": at, "reporter": reporter, "path": "decorator", "provider": "groq", "asks": asks,
+            "tool_calls": 2, "model_calls": 1, "seconds": 3.0, "failures": [],
+            "metrics": {"tokens_prompt": 50, "tokens_completion": 5, "asks": 0, "ask_seconds": 0,
+                        "wait_seconds": 0, "completed": True, "calls_first_try": 2,
+                        "calls_recovered": 0, "calls_failed": 0}}
+    base.update(extra)
+    return base
+
+
+def test_the_ledger_cap_archives_the_slow_arms_and_drops_the_rest(tmp_path, monkeypatch):
+    """The light lane fills the 5000-run ledger in about two and a half days,
+    and the OpenCode pairs could never hold more than ~25 runs a side because
+    their old runs fell off the end. Their records are archived; everybody
+    else's are dropped as before."""
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    evicted = [_light_run("fleet-oc-ask-n", True, "2026-09-23T01:00:00"),
+               _light_run("fleet-gh-ask", True, "2026-09-23T01:00:00"),
+               _light_run("fleet-local-blind", False, "2026-09-23T01:01:00")]
+    F._archive(evicted)
+    kept = [r["reporter"] for r in F._archived()]
+    assert kept == ["fleet-oc-ask-n", "fleet-local-blind"]
+
+
+def test_the_archive_forgets_after_its_window(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    F._archive([_light_run("fleet-oc-ask-n", True, "2020-01-01T00:00:00")])
+    F._archive([_light_run("fleet-oc-ask-n", True, "2099-01-01T00:00:00")])
+    assert [r["at"][:4] for r in F._archived()] == ["2099"]
+
+
+def test_a_broken_archive_line_does_not_take_the_scoreboard_down(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    (tmp_path / "archive.jsonl").write_text('{"at": "2099-01-01", "reporter": "fleet-oc-ask-n"}\n{half a line\n')
+    assert len(F._archived()) == 1
+
+
+def test_the_report_counts_archived_runs_and_says_what_it_covers(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    F._archive([_light_run("fleet-local-ask", True, "2099-01-01T00:00:00"),
+                _light_run("fleet-local-blind", False, "2099-01-01T00:01:00")])
+    F.write_report({"runs": [_light_run("fleet-local-ask", True, "2099-01-02T00:00:00"),
+                             _light_run("fleet-local-blind", False, "2099-01-02T00:01:00")]})
+    report = json.loads((tmp_path / "fleet.json").read_text())
+    window = report["window"]
+    assert window["ledger_runs"] == 2 and window["archived_runs"] == 2
+    assert window["ledger_from"] == "2099-01-02T00:00:00"
+    local = next(g for g in report["versus"] if g["group"] == "local")
+    assert (local["runs_ask"], local["runs_blind"]) == (2, 2), "archived runs count in their group"
+    assert local["from"] == "2099-01-01T00:00:00" and local["to"] == "2099-01-02T00:01:00"
+
+
+# -- grades that can be recomputed ----------------------------------------------
+
+
+def test_a_grader_fix_applies_to_runs_graded_before_it(tmp_path, monkeypatch):
+    """A run kept its task, its answer and its truth. Its stored grade came
+    from a grader that could not read zero; the scoreboard grades it again."""
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    task = "Latest release tag of FailEcho/failecho and its open issue count."
+    answer = "FailEcho/failecho latest release: **v0.1.0**. Open issues: **0**."
+    truths = {"github_tag:FailEcho/failecho": "v0.1.0", "github_issues:FailEcho/failecho": 0}
+    frozen_wrong = {"answered": True, "valid": True, "correct": False, "checked": 2, "matched": 1,
+                    "unknown": 0, "refused": 0, "missed": ["issue"], "truth": truths}
+    at = "2099-01-01T00:00:00"
+    F.write_report({"runs": [_light_run("fleet-gh-ask", True, at, task=task, answer=answer, graded=frozen_wrong),
+                             _light_run("fleet-gh-blind", False, at, task=task, answer=answer, graded=frozen_wrong)]})
+    rows = {r["metric"]: r for g in json.loads((tmp_path / "fleet.json").read_text())["versus"]
+            if g["group"] == "real" for r in g["rows"]}
+    assert rows["every checked value correct"]["ask"] == 100.0, "the fixed grader must win over the frozen grade"
+
+
+def test_a_regrade_uses_the_truth_of_the_day_not_todays(monkeypatch):
+    """requests has shipped a new version since; an answer that was right when
+    it was given stays right."""
+    from failecho_fleet import grading
+
+    record = {"task": "Latest versions of the PyPI packages requests, httpx and fastapi, one line each.",
+              "answer": "requests 2.34.2\nhttpx 0.28.1\nfastapi 0.141.1",
+              "graded": {"answered": True, "truth": {"pypi:requests": "2.34.2", "pypi:httpx": "0.28.1",
+                                                     "pypi:fastapi": "0.141.1"}}}
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: "99.0.0")
+    assert F._current_grade(record)["correct"] is True
+
+
+def test_a_cut_answer_is_not_regraded():
+    """A value past the cut would read as missing, and a regrade would turn a
+    right answer wrong. The frozen grade stands."""
+    frozen = {"answered": True, "correct": True, "truth": {"pypi:requests": "2.34.2"}}
+    record = {"task": "Latest versions of the PyPI packages requests, httpx and fastapi, one line each.",
+              "answer": "x" * F.ANSWER_KEEP, "graded": frozen}
+    assert F._current_grade(record) is frozen
+
+
+# -- five more misgrades, found in the stored answers on 23 Sep ------------------
+
+
+def _truths(monkeypatch, table):
+    from failecho_fleet import grading
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: table.get((kind, arg)))
+    return grading
+
+
+def test_digit_groups_written_with_spaces_are_numbers(monkeypatch):
+    g = _truths(monkeypatch, {("github_stars", "modelcontextprotocol/python-sdk"): 24368,
+                              ("github_stars", "modelcontextprotocol/typescript-sdk"): 13442})
+    prompt = "Star counts for modelcontextprotocol/python-sdk and modelcontextprotocol/typescript-sdk."
+    for answer in ("python-sdk: 24 368 stars. typescript-sdk: 13 442 stars.",
+                   "python-sdk: 24 368 stars. typescript-sdk: 13 442 stars.",
+                   "python-sdk: 24,368 stars. typescript-sdk: 13'442 stars.",
+                   "python-sdk: 24.4k stars. typescript-sdk: 13.4k stars."):
+        assert g.grade(prompt, answer, True)["correct"] is True, answer
+    assert g.grade(prompt, "python-sdk: 24 stars. typescript-sdk: 13 stars.", True)["correct"] is False
+
+
+def test_a_one_subject_task_need_not_repeat_the_subject(monkeypatch):
+    g = _truths(monkeypatch, {("github_tag", "FailEcho/failecho"): "v0.1.0",
+                              ("github_issues", "FailEcho/failecho"): 0})
+    prompt = "Latest release tag of FailEcho/failecho and its open issue count."
+    assert g.grade(prompt, "Latest release tag: **v0.1.0** | Open issues: **0**", True)["correct"] is True
+    assert g.grade(prompt, "Latest release tag: **v0.2.0** | Open issues: **0**", True)["correct"] is False
+
+
+def test_two_subjects_still_have_to_be_told_apart(monkeypatch):
+    """The fallback is for one subject only. With two repos' counts in play, a
+    number on a line that names neither could be either's."""
+    g = _truths(monkeypatch, {("github_issues", "langchain-ai/langchain"): 557,
+                              ("github_issues", "run-llama/llama_index"): 836})
+    prompt = "Open issues on langchain-ai/langchain and run-llama/llama_index."
+    result = g.grade(prompt, "LangChain 557 open issues. The other one has 836.", True)
+    assert result["correct"] is False and result["missed"] == ["run-llama/llama_index"]
+
+
+def test_cannot_be_found_is_a_denial(monkeypatch):
+    g = _truths(monkeypatch, {("github_absent", "FailEcho/failecho-does-not-exist"): True})
+    prompt = "Latest release tag of FailEcho/failecho-does-not-exist. If it does not exist, say so."
+    answer = "The repository FailEcho/failecho‑does‑not‑exist cannot be found, so no release tag exists."
+    assert g.grade(prompt, answer, True)["correct"] is True
+
+
+def test_a_line_with_no_value_under_a_refusal_is_a_refusal(monkeypatch):
+    g = _truths(monkeypatch, {("github_issues", "langchain-ai/langchain"): 557,
+                              ("github_issues", "run-llama/llama_index"): 836})
+    prompt = "Open issues on langchain-ai/langchain and run-llama/llama_index."
+    answer = ("Could not fetch real-time data due to rate limits. Here's a general update:\n"
+              "- **LangChain**: Typically has active discussions\n- **LlamaIndex**: very active")
+    result = g.grade(prompt, answer, True)
+    assert result["refused"] == 2 and result["correct"] is None
+    invented = g.grade(prompt, "Could not fetch live data.\n- LangChain: ~100 open issues\n- LlamaIndex: ~50", True)
+    assert invented["correct"] is False, "a refusal that then invents numbers is still an invention"
+
+
+def test_the_harness_saying_its_budget_ran_out_is_not_an_answer():
+    assert any(m in "(model budget exhausted)" for m in F._NO_ANSWER)

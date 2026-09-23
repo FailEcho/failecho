@@ -82,9 +82,29 @@ def db_path() -> Path:
     return TEST_DB
 
 
+def _not_across_an_hour(margin_seconds: float = 8.0) -> None:
+    """Start a test far enough from the top of the hour to finish inside it.
+
+    The per-reporter evidence cap is per UTC hour, by design, and so are the
+    hourly rollups. A test that posts fifty outcomes starting at 04:59:59 puts
+    some in one bucket and some in the next, gets a cap of 5 + 5, and fails --
+    correctly for the product, wrongly for the test. It happened at 05:00:00
+    on 23 Sep. Waiting out the last few seconds of an hour costs at most one
+    short pause per suite, and only when the suite crosses an hour.
+    """
+    import time as _time
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    to_next_hour = 3600 - (now.minute * 60 + now.second + now.microsecond / 1e6)
+    if to_next_hour < margin_seconds:
+        _time.sleep(to_next_hour + 0.5)
+
+
 @pytest.fixture()
 def client():
     """A TestClient with a clean database and a fresh rate-limit budget."""
+    _not_across_an_hour()
     with TestClient(app) as test_client:
         _truncate()
         write_limiter.reset()

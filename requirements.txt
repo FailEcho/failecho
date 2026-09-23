@@ -9,4 +9,5 @@ opentelemetry-proto>=1.20
 
 # Dev / test
 pytest>=8.0
+pytest-xdist>=3.5    # `pytest -n 2`: the suite in about 60% of the time
 httpx>=0.27

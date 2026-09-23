@@ -28,12 +28,28 @@
     cards.appendChild(card("cross-agent help", t.cross_agent_help || 0, "recommendations built on someone else's evidence"));
     cards.appendChild(card("recovery outcomes", t.recovery_outcomes || 0, (t.decaying || 0) + " decaying, " + (t.related_pairs || 0) + " related pairs"));
 
+    // What every table below is computed over. "Since 17 Sep" was printed on
+    // tables that held the last two and a half days: the ledger keeps a fixed
+    // number of runs, and only the slow arms are archived beyond it.
+    function when(iso) { return iso ? iso.slice(0, 16).replace("T", " ") + " UTC" : "?"; }
+    var w = d.window || {}, wEl = el("fleet-window");
+    if (wEl && w.ledger_runs != null) {
+      wEl.innerHTML = "";
+      var strong = document.createElement("strong"); strong.textContent = "What these tables cover. ";
+      wEl.appendChild(strong);
+      wEl.appendChild(document.createTextNode(
+        "The fast groups: the last " + w.ledger_runs + " runs, " + when(w.ledger_from) + " to " + when(w.ledger_to) +
+        " (the ledger keeps " + w.ledger_cap + "). The slow arms (OpenCode, proxy, plugin, local, prod) also keep " +
+        (w.archived_runs || 0) + " older runs from an archive of up to " + w.archive_days + " days. " +
+        "Each group's own dates are in its heading."));
+    }
     var vb = el("fleet-versus").querySelector("tbody"); vb.innerHTML = "";
     (d.versus || []).forEach(function (g) {
       var h = document.createElement("tr"); h.className = "group";
       var th = document.createElement("th"); th.colSpan = 3;
       th.textContent = g.label + " (" + g.runs_ask + " / " + g.runs_blind + " runs" +
-        (g.since ? ", since " + g.since.slice(0, 16).replace("T", " ") + " UTC" : "") + ")"; h.appendChild(th); vb.appendChild(h);
+        (g.from ? ", " + when(g.from) + " to " + when(g.to) : "") +
+        (g.since ? ", counted since " + when(g.since) : "") + ")"; h.appendChild(th); vb.appendChild(h);
       g.rows.forEach(function (r) {
         function cell(v, side) {
           var c = td(v == null ? "-" : (r.unit === "%" ? v + "%" : v), "num" + (r.better === side ? " win" : ""));

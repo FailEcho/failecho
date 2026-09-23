@@ -81,15 +81,18 @@
 
   <h2>With FailEcho vs without</h2>
   <p class="sub">Same tasks, same models, same address. One twin asks the network before it retries and does what
-  it says; the other retries by fixed rules. Every number is a live average over the runs so far, from the same
-  ledger as the tables below; bold is the better side, blank when they are within 2%. Our own agents, in a lab:
+  it says; the other retries by fixed rules. Every number is a live average over the window stated just above the
+  table, from the same ledger as the tables below; bold is the better side, blank when they are within 2%. Our own agents, in a lab:
   a measurement of the mechanism, not adoption.</p>
   <p class="sub"><strong>How a run is graded, exactly.</strong> A model run counts as completed when it returned an
   answer rather than a failure marker; a builder or OpenCode run when the file it was asked for exists and matches
   the task's pattern. That is weaker than "the answer was correct": a wrong but well-formed answer counts, and a
   pattern can match a partly right file. Read the completion rows as <em>runs that produced an answer</em>, and the
   recovery and retry rows, which are counted per call, as the harder evidence. An outside review on 20 Sep made
-  this point; the grader is being strengthened.</p>
+  this point, and since 22 Sep a grader checks the answers themselves: "every checked value correct" compares each
+  value with the truth fetched from the same API, "values declined rather than invented" counts an agent saying it
+  could not get a value, and a run with no truth to check against is left out rather than guessed.</p>
+  <p class="sub" id="fleet-window"><strong>What these tables cover.</strong> Loading&hellip;</p>
   <table id="fleet-versus" class="versus"><thead><tr>
     <th>benchmark</th><th class="num">Ask<span class="versus-sub">with FailEcho</span></th><th class="num">Blind<span class="versus-sub">without</span></th>
   </tr></thead><tbody></tbody></table>

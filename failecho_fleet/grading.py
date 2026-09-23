@@ -54,7 +54,8 @@ REFUSAL_WORDS = ("rate limit", "rate-limit", "rate‑limit", "could not fetch", 
 
 #: How a model denies that something exists. Used for the task whose package
 #: is not real, where any version number at all is a fabrication.
-ABSENT_WORDS = ("not exist", "does not", "doesn't", "no such", "not found",
+ABSENT_WORDS = ("not exist", "does not", "doesn't", "no such", "not found", "cannot be found",
+                "can't be found", "could not be found", "couldn't be found", "not be found",
                 "404", "not available", "nonexistent", "non-existent", "unavailable")
 
 _memory: dict[str, tuple[float, object]] = {}
@@ -256,13 +257,20 @@ def _values(text: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+#: What people put between groups of three digits: a comma, a space, a
+#: no-break space, a thin or narrow no-break space, an apostrophe. A model
+#: writing "24 368" meant 24,368; reading it as 24 marked a right answer wrong.
+_GROUP = r"[,\u0020\u00a0\u2009\u202f']"
+_NUMBER = re.compile(rf"\d{{1,3}}(?:{_GROUP}\d{{3}})+(?!\d)(?:\.\d+)?|\d+(?:\.\d+)?")
+
+
 def _number(value) -> float | None:
-    """The first number in a value, commas and 'k' suffixes allowed."""
-    text = str(value).replace(",", "").strip()
-    match = re.search(r"(\d+(?:\.\d+)?)\s*([kK])?", text)
+    """The first number in a value; digit groups and a 'k' suffix allowed."""
+    text = str(value).strip()
+    match = re.search(rf"({_NUMBER.pattern})\s*([kK](?![a-zA-Z]))?", text)
     if not match:
         return None
-    number = float(match.group(1))
+    number = float(re.sub(_GROUP, "", match.group(1)))
     return number * 1000 if match.group(2) else number
 
 
@@ -357,7 +365,7 @@ def _matches_in_line(line: str, want, kind: str, arg: str) -> bool:
     """
     if kind in ("github_stars", "github_issues"):
         tolerance = STARS_TOLERANCE if kind == "github_stars" else ISSUES_TOLERANCE
-        numbers = re.findall(r"\d[\d,]*(?:\.\d+)?\s*[kK]?", line)
+        numbers = [m.group(0) for m in re.finditer(rf"(?:{_NUMBER.pattern})\s*(?:[kK](?![a-zA-Z]))?", line)]
         return any(_within(n, want, tolerance) for n in numbers)
     if kind in ("pypi_absent", "github_absent", "enum", "never_number", "github_tags", "pypi_license"):
         return _matches(line, want, kind, arg)
@@ -373,6 +381,15 @@ def _matches_in_line(line: str, want, kind: str, arg: str) -> bool:
     return bool(re.search(rf"(?<![\w.])[vV]?{re.escape(wanted)}(?!\.?\d)(?!\w)", line))
 
 
+def _has_value(line: str, kind: str) -> bool:
+    """Whether a line offers any value of the kind asked for at all."""
+    if kind in ("github_stars", "github_issues", "pypi_releases"):
+        return _number(line) is not None
+    if kind in ("pypi", "npm", "crates", "github_tag"):
+        return bool(re.search(r"\d+\.\d+", line or ""))
+    return bool((line or "").strip())
+
+
 def _is_refusal(line: str, text: str, kind: str) -> bool:
     """Whether this value was declined rather than answered.
 
@@ -385,21 +402,32 @@ def _is_refusal(line: str, text: str, kind: str) -> bool:
     return any(word in haystack for word in REFUSAL_WORDS)
 
 
-def _grade_prose(checks, text: str, out: dict) -> dict:
+def _grade_prose(checks, text: str, out: dict, resolve) -> dict:
     """Grade a sentence. The light lane answers in prose and nothing could
     grade it until now -- 963 runs a side counted as 'completed' on a pattern.
     """
     answered_lines = 0
+    kinds = [kind for _, kind, _ in checks]
     for label, kind, arg in checks:
         lines = _lines_for(text, label)
+        if not lines and kinds.count(kind) == 1 and kind not in ("pypi_absent", "github_absent"):
+            # A task about one repository gets an answer that never repeats
+            # its name -- "Latest release tag: v0.1.0" -- and that is still an
+            # answer about it. With one label of this kind there is nobody
+            # else's value to confuse it with, so every line is a candidate.
+            # With two (two repos' issue counts) the line has to say whose.
+            lines = [ln for ln in re.split(r"[\n;]|(?<=[.!])\s", text or "") if ln.strip()]
         line = lines[0] if lines else ""
         if line:
             answered_lines += 1
         # An agent that says "GitHub rate-limited me" did not get the value
         # wrong; it declined to invent one, which is the behaviour this whole
-        # network argues for. Counted apart from both right and wrong.
-        refused = _is_refusal(line, text, kind)
-        want = truth(kind, arg)
+        # network argues for. Counted apart from both right and wrong. That
+        # includes a line that names the repo but gives no value at all while
+        # the answer says elsewhere that it could not fetch one.
+        refused = _is_refusal(line, text, kind) or (
+            not any(_has_value(candidate, kind) for candidate in lines) and _is_refusal("", text, kind))
+        want = resolve(kind, arg)
         if refused:
             out["refused"] += 1
             continue
@@ -448,17 +476,34 @@ def _grade_invariant(checks, values: dict, out: dict) -> bool | None:
     return holds
 
 
-def grade(prompt: str, result_text: str, answered: bool) -> dict:
-    """answered / valid / correct for one run, with the counts behind them."""
+def grade(prompt: str, result_text: str, answered: bool, truths: dict | None = None) -> dict:
+    """answered / valid / correct for one run, with the counts behind them.
+
+    Every truth consulted is kept in ``out["truth"]``. Pass it back as
+    ``truths`` and the same answer can be graded again later, by a fixed
+    grader, against the truth *as it was when the run happened* -- a version
+    that has moved on since must not turn a right answer wrong. Three grader
+    bugs on 22-23 Sep each voided the grades recorded before their fix,
+    because a grade was computed once and frozen; this is what ends that.
+    """
     out = {"answered": bool(answered), "valid": None, "correct": None,
-           "checked": 0, "matched": 0, "unknown": 0, "refused": 0, "missed": []}
+           "checked": 0, "matched": 0, "unknown": 0, "refused": 0, "missed": [], "truth": {}}
+
+    def resolve(kind, arg):
+        key = f"{kind}:{arg}"
+        if truths is not None:
+            return truths.get(key)
+        value = truth(kind, arg)
+        out["truth"][key] = value
+        return value
+
     checks, mode = checks_for(prompt or "")
     if not checks:
         return out
     if mode == "prose":
-        return _grade_prose(checks, result_text or "", out)
+        return _grade_prose(checks, result_text or "", out, resolve)
     if mode == "list":
-        return _grade_list(checks, result_text or "", out)
+        return _grade_list(checks, result_text or "", out, resolve)
 
     values = _values(result_text)
     if not values:
@@ -490,7 +535,7 @@ def grade(prompt: str, result_text: str, answered: bool) -> dict:
             else:
                 out["missed"].append(key)
             continue
-        want = truth(kind, arg)
+        want = resolve(kind, arg)
         if want is None:
             out["unknown"] += 1
             continue
@@ -504,7 +549,7 @@ def grade(prompt: str, result_text: str, answered: bool) -> dict:
     return out
 
 
-def _grade_list(checks, text: str, out: dict) -> dict:
+def _grade_list(checks, text: str, out: dict, resolve) -> dict:
     """A result file holding a JSON list, e.g. the five newest tags."""
     label, kind, arg = checks[0]
     try:
@@ -519,7 +564,7 @@ def _grade_list(checks, text: str, out: dict) -> dict:
         return out
     got = [item.get(label) if isinstance(item, dict) else item for item in data]
     out["valid"] = len(got) == 5 and all(str(g).strip() for g in got)
-    want = truth(kind, arg)
+    want = resolve(kind, arg)
     if want is None:
         out["unknown"] += 1
         return out
