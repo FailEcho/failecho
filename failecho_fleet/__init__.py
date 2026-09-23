@@ -1540,9 +1540,25 @@ def _no_winner_on_too_few_runs(versus: list[dict]) -> None:
                     row["better"] = "tie"
 
 
+def _scored(r: dict) -> dict:
+    """The run as the scoreboard counts it.
+
+    Since 08:06 on 23 Sep a model run with an empty answer is not completed
+    (the rule in main()). The seven recorded before then still say completed, and
+    were counted as finished work that produced nothing. The ledger is left as
+    written; the report applies today's rule to every run that kept its
+    answer. Builders and OpenCode runs finish by their own rules.
+    """
+    answer = r.get("answer")
+    if (isinstance(answer, str) and not answer.strip() and not r.get("build") and not r.get("opencode")
+            and (r.get("metrics") or {}).get("completed")):
+        return {**r, "metrics": {**r["metrics"], "completed": False}}
+    return r
+
+
 def write_report(state: dict) -> None:
     archived = _archived()
-    everything = archived + state["runs"]
+    everything = [_scored(r) for r in archived + state["runs"]]
     lost_memory = {"ask": {}, "blind": {}}
     for r in everything:
         if _lost_to_guest_memory(r):

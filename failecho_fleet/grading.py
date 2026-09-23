@@ -50,6 +50,7 @@ PLACEHOLDERS = {"", "unknown", "error", "n/a", "none", "null", "tbd", "0", "0.0.
 REFUSAL_WORDS = ("rate limit", "rate-limit", "rate‑limit", "could not fetch", "couldn't fetch",
                  "unable to", "data unavailable", "not available", "unavailable",
                  "can't retrieve", "cannot retrieve", "can\u2019t retrieve", "failed to fetch",
+                 "couldn't retrieve", "could not retrieve", "couldn\u2019t retrieve",
                  "no data", "error fetching", "api error", "403", "429")
 
 #: How a model denies that something exists. Used for the task whose package
@@ -526,6 +527,13 @@ def grade(prompt: str, result_text: str, answered: bool, truths: dict | None = N
 
     checks, mode = checks_for(prompt or "")
     if not checks:
+        return out
+    if not (result_text or "").strip():
+        # Nothing said, so nothing right or wrong. The JSON and list paths
+        # always abstained here (no values: valid False, correct None); the
+        # prose path counted every value as missed, so on 23 Sep four empty
+        # replies read as four wrong answers.
+        out["valid"] = False
         return out
     if mode == "prose":
         return _grade_prose(checks, result_text or "", out, resolve)

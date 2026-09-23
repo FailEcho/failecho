@@ -2014,3 +2014,52 @@ def test_the_provider_group_states_its_window(tmp_path, monkeypatch):
     F.write_report({"runs": runs})
     provider = next(g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"] if g["group"] == "provider")
     assert provider["from"] == "2099-01-01T00:00:00" and provider["to"] == "2099-01-02T00:00:00"
+
+
+# -- an empty reply is no answer, and "couldn't retrieve" is a refusal (23 Sep) -------
+
+
+def test_an_empty_prose_reply_is_not_a_wrong_answer():
+    """The JSON path always abstained on an empty reply; the prose path marked
+    every value missed, so four empty replies on 23 Sep read as wrong answers
+    in "every checked value correct"."""
+    from failecho_fleet import grading
+
+    truths = {"npm:express": "5.2.1", "pypi:flask": "3.1.3"}
+    task = "Which is newer, npm express or PyPI flask? Give both versions."
+    for empty in ("", "   \n"):
+        g = grading.grade(task, empty, answered=True, truths=truths)
+        assert g["correct"] is None and g["checked"] == 0 and g["valid"] is False, g
+    # a real wrong answer is still wrong
+    g = grading.grade(task, "Express 5.2.1, Flask 3.0.1", answered=True, truths=truths)
+    assert g["correct"] is False and g["missed"] == ["flask"]
+
+
+def test_couldnt_retrieve_is_a_refusal_not_a_wrong_answer():
+    from failecho_fleet import grading
+
+    truths = {"github_tag:FailEcho/failecho": "v0.1.0", "github_issues:FailEcho/failecho": 0}
+    task = "Latest release tag of FailEcho/failecho and its open issue count."
+    for said in ("I’m sorry, I couldn’t retrieve that information at this time.",
+                 "I could not retrieve the tag or the issue count."):
+        g = grading.grade(task, said, answered=True, truths=truths)
+        assert g["refused"] == 2 and g["correct"] is None, (said, g)
+
+
+def test_an_old_empty_answer_is_not_counted_as_finished(tmp_path, monkeypatch):
+    """Runs before 08:06 on 23 Sep recorded an empty reply as completed. The
+    report applies today's rule to every run that kept its answer; builders
+    finish by their own rule and keep theirs."""
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    empty = _light_run("fleet-local-blind", False, "2099-01-01T00:00:00", answer="")
+    said = _light_run("fleet-local-ask", True, "2099-01-01T00:01:00", answer="Flask 3.1.3")
+    builder = _light_run("fleet-build-ask-n", True, "2099-01-01T00:02:00", answer="", build={"task_done": True})
+    assert F._scored(empty)["metrics"]["completed"] is False
+    assert empty["metrics"]["completed"] is True, "the ledger itself is left as written"
+    assert F._scored(said) is said and F._scored(builder) is builder
+    F.write_report({"runs": [empty, said]})
+    local = next(g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"] if g["group"] == "local")
+    done = next(r for r in local["rows"] if r["metric"] == "runs marked completed (see grading)")
+    assert (done["ask"], done["blind"]) == (100.0, 0.0), done
