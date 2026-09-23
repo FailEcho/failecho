@@ -2063,3 +2063,16 @@ def test_an_old_empty_answer_is_not_counted_as_finished(tmp_path, monkeypatch):
     local = next(g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"] if g["group"] == "local")
     done = next(r for r in local["rows"] if r["metric"] == "runs marked completed (see grading)")
     assert (done["ask"], done["blind"]) == (100.0, 0.0), done
+
+
+def test_a_correctness_row_needs_its_own_sample_for_a_winner():
+    """A group can have 22 runs a side and 2 checkable ones: the row's own
+    count decides whether it names a better side."""
+    versus = [{"group": "ocproxy", "runs_ask": 22, "runs_blind": 22, "rows": [
+        {"metric": "runs marked completed (see grading)", "ask": 86.4, "blind": 90.9, "better": "blind"},
+        {"metric": "every checked value correct", "ask": 100.0, "blind": 50.0, "n_ask": 2, "n_blind": 2, "better": "ask"},
+        {"metric": "result complete and not a placeholder", "ask": 90.0, "blind": 80.0, "n_ask": 12, "n_blind": 11, "better": "ask"}]}]
+    F._no_winner_on_too_few_runs(versus)
+    better = {r["metric"]: r["better"] for r in versus[0]["rows"]}
+    assert better == {"runs marked completed (see grading)": "blind", "every checked value correct": "tie",
+                      "result complete and not a placeholder": "ask"}

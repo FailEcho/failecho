@@ -1531,7 +1531,12 @@ def _no_winner_on_too_few_runs(versus: list[dict]) -> None:
             for row in group["rows"]:
                 row["better"] = "tie"
             continue
-        # rows over a sub-sample carry their own count: the stricter-rules split
+        # rows over a sub-sample carry their own count: graded and checkable
+        # runs (the proxy arm's 100% vs 50% correct was 2 checkable runs a
+        # side), and the stricter-rules split
+        for row in group["rows"]:
+            if "n_ask" in row and min(row["n_ask"] or 0, row["n_blind"] or 0) < MIN_RUNS_FOR_A_WINNER:
+                row["better"] = "tie"
         rows = {r["metric"]: r for r in group["rows"]}
         since = rows.get("runs since the stricter rules")
         if since and min(since.get("ask") or 0, since.get("blind") or 0) < MIN_RUNS_FOR_A_WINNER:
@@ -1800,9 +1805,11 @@ def write_report(state: dict) -> None:
             correct = (_rate(a, "correct_runs", "checkable_runs"), _rate(b, "correct_runs", "checkable_runs"))
             rows.append({"metric": "result complete and not a placeholder", "unit": "%",
                          "ask": valid[0], "blind": valid[1],
+                         "n_ask": a.get("graded_runs", 0), "n_blind": b.get("graded_runs", 0),
                          "better": _better(valid[0], valid[1], lower_is_better=False)})
             rows.append({"metric": "every checked value correct", "unit": "%",
                          "ask": correct[0], "blind": correct[1],
+                         "n_ask": a.get("checkable_runs", 0), "n_blind": b.get("checkable_runs", 0),
                          "better": _better(correct[0], correct[1], lower_is_better=False)})
             rows.append({"metric": "runs where truth was checkable", "unit": "",
                          "ask": a.get("checkable_runs", 0), "blind": b.get("checkable_runs", 0), "better": "tie"})
@@ -1847,9 +1854,11 @@ def write_report(state: dict) -> None:
             correct = (_rate(a, "correct_runs", "checkable_runs"), _rate(b, "correct_runs", "checkable_runs"))
             rows.append({"metric": "answer complete and not a placeholder", "unit": "%",
                          "ask": valid[0], "blind": valid[1],
+                         "n_ask": a.get("graded_runs", 0), "n_blind": b.get("graded_runs", 0),
                          "better": _better(valid[0], valid[1], lower_is_better=False)})
             rows.append({"metric": "every checked value correct", "unit": "%",
                          "ask": correct[0], "blind": correct[1],
+                         "n_ask": a.get("checkable_runs", 0), "n_blind": b.get("checkable_runs", 0),
                          "better": _better(correct[0], correct[1], lower_is_better=False)})
             rows.append({"metric": "runs where truth was checkable", "unit": "",
                          "ask": a.get("checkable_runs", 0), "blind": b.get("checkable_runs", 0), "better": "tie"})
