@@ -16,8 +16,7 @@
  *
  *     .opencode/plugin/failecho.js        (auto-discovered, nothing to configure)
  *
- * (Once `failecho-opencode` is published to npm, `{ "plugin": ["failecho-opencode"] }`
- * in `opencode.json` will do the same. It is not published yet.)
+ * or from npm: `{ "plugin": ["failecho-opencode"] }` in `opencode.json`.
  *
  * What is sent, per call, and nothing else:
  *

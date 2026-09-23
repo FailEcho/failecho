@@ -272,13 +272,16 @@ def test_the_default_setup_tells_the_human_what_would_work_better(client):
     assert "do not install it without asking" in flat
 
 
-def test_nothing_tells_a_user_to_install_an_unpublished_package(client):
-    """failecho-opencode is prepared, not published. Pointing people at an npm
-    name that does not resolve is worse than not mentioning it."""
+def test_the_npm_opencode_plugin_is_offered_now_that_it_is_published(client):
+    """failecho-opencode 0.1.0 reached npm on 23 Sep (verified identical to
+    opencode-plugin/). Before that, every page kept the npm line out: pointing
+    people at a name that does not resolve is worse than not mentioning it."""
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
     for text in (client.get("/setup").text, client.get("/llms.txt").text,
-                 (root / "README.md").read_text()):
-        assert '"plugin": ["failecho-opencode"]' not in text
-    assert "not published yet" in (root / "opencode-plugin" / "README.md").read_text()
+                 (root / "README.md").read_text(), (root / "opencode-plugin" / "README.md").read_text()):
+        assert '"plugin": ["failecho-opencode"]' in " ".join(text.replace("&quot;", '"').split())
+    for text in ((root / "opencode-plugin" / "README.md").read_text(),
+                 (root / "opencode-plugin" / "plugin" / "failecho.js").read_text()):
+        assert "not published yet" not in text

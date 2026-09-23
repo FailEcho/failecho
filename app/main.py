@@ -481,6 +481,8 @@ installs. The difference is one thing: whether the model has to decide to ask.
        curl -fsSL -o .opencode/plugin/failecho.js \\
          https://raw.githubusercontent.com/FailEcho/failecho/main/opencode-plugin/plugin/failecho.js
 
+   Or from npm: `{{ "plugin": ["failecho-opencode"] }}` in `opencode.json`.
+
 3. **Any other MCP client (Cursor, Claude Desktop, ...): the proxy**, in front
    of each MCP server you already use. A failed tool call comes back with one
    line of advice inside its own error.
@@ -831,10 +833,11 @@ sets it on an integration that ignores it reports to the public network:
 
 - REST: send `X-FailEcho-Team` yourself. Works.
 - Claude Code plugin 0.2.0 and newer (`/plugin update failecho`). Works.
-- OpenCode plugin file from the repository. Works.
-- `failecho-autoreport` and `failecho-mcp proxy` (PyPI, npm): in the
-  repository, **not in the published packages yet**. Until their next
-  release, installing them from a registry does not give you private mode.
+- OpenCode plugin, the file or `failecho-opencode` from npm. Works.
+- `failecho-autoreport` 0.1.7 and newer (PyPI). Works.
+- `failecho-mcp proxy` from PyPI, 0.2.3 and newer. Works.
+- `npx failecho-mcp proxy` (npm): in the repository, **not in the published
+  package yet**. Run from npm today, it reports to the public network.
 - The MCP tools: never. A secret does not belong in a tool argument the model
   and every conversation log can see.
 

@@ -193,6 +193,10 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
 curl -fsSL {{GITHUB_URL}}/raw/main/opencode-plugin/plugin/failecho.js \
   -o .opencode/plugin/failecho.js</code></pre>
     </figure><!--/github-->
+    <p class="prose">Or from npm, in <code>opencode.json</code>:</p>
+    <figure class="snip">
+      <pre><code>{ "plugin": ["failecho-opencode"] }</code></pre>
+    </figure>
     <p class="prose">
       Nothing else to configure. When a tool fails &mdash; a <code>curl</code>
       that got a 429, a <code>webfetch</code> that hit a 503, an MCP tool that
@@ -613,7 +617,7 @@ provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
       <li><strong>No account.</strong> The token is self-chosen, like <code>reporter_id</code>, only secret. It is stored as a salted hash and never in the clear, so there is nothing here to leak — and losing it loses access to that evidence. Keep it like a credential.</li>
       <li><strong>Kept for 30 days</strong>, rather than the public 48 hours, because your own history is the point of it.</li>
       <li><strong>Yours to delete or move.</strong> <code>DELETE /v1/team</code> with the token removes everything stored under it, at once. If the token leaks, <code>POST /v1/team/rotate</code> with <code>{"new_token": "…"}</code> moves your history to a new one and the old one reads nothing afterwards. Whoever holds the token can do both, so treat it like a password.</li>
-      <li><strong>Where it works today:</strong> the REST API with the <code>X-FailEcho-Team</code> header, the Claude Code plugin from 0.2.0 (<code>/plugin update failecho</code>), and the OpenCode plugin file. <code>failecho-autoreport</code> and <code>failecho-mcp proxy</code> have it in the repository but <strong>not yet in their published packages</strong> — installed from PyPI or npm today, they report publicly. It is never an MCP tool argument: a token is a secret, and tool arguments are visible to the model and to anything that logs the conversation.</li>
+      <li><strong>Where it works today:</strong> the REST API with the <code>X-FailEcho-Team</code> header, the Claude Code plugin from 0.2.0 (<code>/plugin update failecho</code>), the OpenCode plugin (the file, or <code>failecho-opencode</code> from npm), <code>failecho-autoreport</code> 0.1.7 and newer, and the Python <code>failecho-mcp proxy</code> from 0.2.3 on PyPI. The npm proxy (<code>npx failecho-mcp</code>) has it in the repository but <strong>not yet in its published package</strong> — run from npm today, it reports publicly. It is never an MCP tool argument: a token is a secret, and tool arguments are visible to the model and to anything that logs the conversation.</li>
       <li><strong>Your own fixes come back.</strong> When the public network has no answer and your team does, the advice line says <code>FailEcho (your team's own history): try …</code> — always labelled as yours, never as other agents'.</li>
       <li><strong>Free while the network is bootstrapping.</strong> This is the first thing here that would ever be paid for. It works at zero independent reporters, which is exactly where FailEcho is today, and early teams get it for nothing.</li>
     </ul>

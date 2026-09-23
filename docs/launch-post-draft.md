@@ -5,11 +5,12 @@ post anywhere. Every number is checkable against `docs/claims.md` (lab window
 20 Sep 21:05 – 23 Sep 06:44 UTC, our own agents); the qualifiers in it are
 part of the sentences, not footnotes to drop.
 
-**Publish the packages first.** Version A names `pip install
-failecho-autoreport`, the proxy and the OpenCode plugin. Until 0.1.7, 0.2.3
-and `failecho-opencode` 0.1.0 are live (`docs/publish-2026-09-23.md`), the
-private-mode line is true only for REST, the Claude Code plugin and the
-OpenCode plugin file.
+**Packages, 23 Sep 11:25 UTC:** `failecho-autoreport` 0.1.7 and
+`failecho-mcp` 0.2.3 are live on PyPI and `failecho-opencode` 0.1.0 on npm,
+each verified identical to what was built. **npm `failecho-mcp` is still
+0.2.2**: until `./scripts/publish_npm_relay.sh` runs, `npx failecho-mcp
+proxy` has no private mode, so the private-mode paragraph is true for every
+path except that one.
 
 ---
 

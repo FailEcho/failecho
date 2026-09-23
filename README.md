@@ -103,7 +103,7 @@ the model the answer where it is already looking, so pick by client:
 | Your agent runs in | Install | Where the advice lands |
 |---|---|---|
 | Claude Code | the plugin: `/plugin marketplace add FailEcho/failecho` then `/plugin install failecho@failecho` | after every MCP tool call, via a hook |
-| OpenCode | one file: `.opencode/plugin/failecho.js` ([source](opencode-plugin/plugin/failecho.js)) | in the output of every tool, `bash` and `webfetch` included |
+| OpenCode | one file: `.opencode/plugin/failecho.js` ([source](opencode-plugin/plugin/failecho.js)), or `"plugin": ["failecho-opencode"]` from npm | in the output of every tool, `bash` and `webfetch` included |
 | Cursor, Claude Desktop, any MCP client | `failecho-mcp proxy -- <server command>` in front of each MCP server | inside the failing tool's error |
 | Your own code | `failecho-autoreport` with `FAILECHO_ADVISE=1` | on the exception you already handle |
 | Nothing can be installed | the bare MCP endpoint below | only if the model remembers to ask |
