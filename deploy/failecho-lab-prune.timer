@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly retention run for the FailEcho lab instance
+
+[Timer]
+# :35, away from production's :15 and from the top of the hour
+OnCalendar=*:35
+Persistent=true
+
+[Install]
+WantedBy=timers.target

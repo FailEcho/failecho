@@ -151,3 +151,16 @@ def test_the_otlp_route_has_its_own_body_limit_at_the_edge():
     block = CADDYFILE[CADDYFILE.index("request_body @otlp"):]
     assert "max_size 320KB" in block[: block.index("}")]
     assert "max_size 64KB" in CADDYFILE
+
+
+def test_the_lab_is_pruned_like_production():
+    """The lab was set to keep 96 hours of raw rows and nothing ran the pruner
+    against it, so its queries slowed down every day and every ask-side time
+    in the lab paid for a network slower than the one users get."""
+    service = (DEPLOY / "failecho-lab-prune.service").read_text()
+    timer = (DEPLOY / "failecho-lab-prune.timer").read_text()
+    assert "EnvironmentFile=/etc/failecho-lab.env" in service, "the lab's own database and retention"
+    assert "/srv/failecho-lab/app/scripts/prune.py" in service
+    assert "ReadWritePaths=/srv/failecho-lab/data" in service
+    assert "/srv/failecho/data" not in service, "the lab pruner must never touch production's database"
+    assert "OnCalendar=*:35" in timer

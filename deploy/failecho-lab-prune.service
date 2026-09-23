@@ -1,0 +1,19 @@
+[Unit]
+Description=Prune raw observations of the FailEcho lab instance
+# The lab was configured for 96 hours of raw rows (FIN_RETENTION_HOURS in
+# /etc/failecho-lab.env) and nothing ever ran the pruner against it: by
+# 23 Sep it held seven days, 110k rows, and its queries took 140-640 ms under
+# the fleet's writes where production answers in 60-120 ms. Every ask-side
+# time in the lab was paying for a network slower than the one users get.
+After=failecho-lab.service
+
+[Service]
+Type=oneshot
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho-lab/app
+EnvironmentFile=/etc/failecho-lab.env
+ExecStart=/srv/failecho/.venv/bin/python /srv/failecho-lab/app/scripts/prune.py
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/failecho-lab/data
