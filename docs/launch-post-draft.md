@@ -2,7 +2,7 @@
 
 Rewritten 23 September 2026 for the user to edit and publish. Claude does not
 post anywhere. Every number is checkable against `docs/claims.md` (lab window
-21 Sep 01:56 – 23 Sep 12:21 UTC, our own agents); the qualifiers in it are
+21 Sep 06:21 – 23 Sep 17:42 UTC, our own agents); the qualifiers in it are
 part of the sentences, not footnotes to drop.
 
 **Packages, 23 Sep:** all live and verified identical to what was built --
@@ -38,24 +38,25 @@ twins: same task, same model, one asks the network before retrying, the other
 does not. Over the last two and a half days:
 
 - When a fix exists (model-provider rate limits and outages): **74% of failures
-  recovered with FailEcho, 27% without**, and **92% vs 83%** of runs finished
-  (about 460 runs a side).
+  recovered with FailEcho, 30% without**, and **92% vs 84%** of runs finished
+  (436 runs a side).
 - Where nothing works, it says so: on an exhausted Stack Exchange quota the
   network told agents to skip, and the agents that retried anyway recovered
-  **0 times out of 225**.
-- Wasted time: **1.2 s vs 2.2 s** lost inside failures per run, using the live
+  **0 times out of 275**.
+- Wasted time: **1.1 s vs 2.1 s** lost inside failures per run, using the live
   network's own advice.
 
 **What I am not claiming.** No outside agent has used it yet: independent
 reporters is 0, and the front page says so. The big numbers are against an
 agent that retries once after three seconds; against one that recovers
-carefully, both finish all but one run in 216 and FailEcho saves about 18% of the time lost
+carefully, both finish all but one run in 256 and FailEcho saves about 12% of the time lost
 to failures — that is the honest size of it for a well-built agent. On real
 public APIs, where the commonest failure (GitHub's 403) has no fix, asking
-costs time: 6.9 s vs 5.9 s lost inside failures per run. A grader
-checks answers against the real APIs, and there is no measured difference in
-correctness yet (on real APIs the agents without FailEcho are slightly ahead,
-100% vs 97% on 31 and 34 checked runs -- one answer -- which is noise): it saves retries and time, and I cannot yet say it makes
+costs a round trip for nothing: 6.8 s vs 5.8 s lost inside failures per run
+(not significant per run; per failure it was 0.6 s while my lab's database was
+slow and is 0.16 s since I fixed that). A grader checks answers against the
+real APIs, and there is no measured difference in correctness (98% vs 100% on
+57 and 50 checked runs): it saves retries and time, and I cannot say it makes
 answers more right. And pasting the MCP
 URL alone does little; use one of the paths above.
 
@@ -113,25 +114,25 @@ is already reading. Its shape (the counts here are illustrative, not measured):
 ### The numbers, and their limits
 
 55 test agents, all mine, in twins that run the same task with the same model.
-Window: 21 Sep 01:56 – 23 Sep 12:21 UTC.
+Window: 21 Sep 06:21 – 23 Sep 17:42 UTC.
 
 | Group | With | Without |
 |---|---|---|
-| Model-provider failures recovered | 73.9% | 26.7% |
-| Runs finished (provider group, ~460 a side) | 91.5% | 83.2% |
-| Tokens per finished run (provider group) | 1,609 | 1,675 |
-| Seconds lost in failures, advice from production | 1.18 | 2.24 |
-| Retry attempts per failure, advice from production | 1.38 | 1.99 |
-| Careful recovery on both sides: runs finished | 100% | 99.1% |
-| Careful recovery on both sides: seconds lost in failures | 8.4 | 10.3 |
-| Real APIs, seconds lost in failures (asking is a round trip) | 6.90 | 5.88 |
-| Real APIs, checked answers correct (34 vs 31 runs, p = 1.0) | 97.1% | 100% |
-| Coding agents in a VM, runs finished | 79.8% | 78.3% |
+| Model-provider failures recovered | 74.1% | 30.1% |
+| Runs finished (provider group, 436 a side) | 91.7% | 83.5% |
+| Tokens per finished run (provider group) | 1,502 | 1,571 |
+| Seconds lost in failures, advice from production | 1.09 | 2.06 |
+| Retry attempts per failure, advice from production | 1.41 | 1.99 |
+| Careful recovery on both sides: runs finished | 100% | 99.2% |
+| Careful recovery on both sides: seconds lost in failures | 8.1 | 9.2 |
+| Real APIs, seconds lost in failures (asking is a round trip) | 6.76 | 5.77 |
+| Real APIs, checked answers correct (57 vs 50 runs, p = 1.0) | 98.2% | 100% |
+| Coding agents in a VM, runs finished | 75.9% | 74.3% |
 
 Read the bottom half as carefully as the top. Against a careful agent the gain
 is time, not outcomes. On real public APIs FailEcho loses time: most of those
 failures have no fix, and asking still costs a round trip. Checked answers
-show no difference yet at this size; if anything they lean the other way. Coding agents fail on their own
+show no difference. Coding agents fail on their own
 bugs, and a network of other agents' failures cannot help with that.
 
 ### What the audit found
