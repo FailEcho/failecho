@@ -1640,3 +1640,55 @@ def test_a_run_the_provider_refused_has_no_answer_to_grade(tmp_path, monkeypatch
             if g["group"] == "real" for r in g["rows"]}
     assert rows["runs where truth was checkable"]["ask"] == 1, "the refused run is not a graded run"
     assert rows["every checked value correct"]["ask"] == 100.0
+
+
+def test_a_value_may_arrive_below_the_summary_line(monkeypatch):
+    """"**npm express** is newer." is a summary; the numbers are in the list
+    under it. Taking only the first line that names a package marked right
+    answers wrong -- 8 of the 42 disputed runs on 23 Sep."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {"express": "5.2.1", "flask": "3.1.3"}.get(arg))
+    prompt = "Which is newer, npm express or PyPI flask? Give both versions."
+
+    listed = grading.grade(prompt, "**npm express** is newer.\n\n- **express**: 5.2.1\n- **flask**: 3.1.3",
+                           answered=True)
+    assert listed["correct"] is True, listed
+
+    wrong = grading.grade(prompt, "**npm express** is newer.\n\n- **express**: 4.0.0\n- **flask**: 3.1.3",
+                          answered=True)
+    assert wrong["correct"] is False and wrong["missed"] == ["express"]
+
+
+def test_zero_is_an_answer(monkeypatch):
+    """A relative tolerance around zero is undefined, so "0 open issues" was
+    graded wrong every time it was right -- 21 of those 42 runs."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        ("github_issues", "FailEcho/failecho"): 0,
+        ("github_tag", "FailEcho/failecho"): "v0.1.0"}.get((kind, arg)))
+    prompt = "Latest release tag of FailEcho/failecho and its open issue count."
+
+    assert grading.grade(prompt, "FailEcho/failecho latest release: **v0.1.0**. Open issues: **0**.",
+                         answered=True)["correct"] is True
+    invented = grading.grade(prompt, "FailEcho/failecho latest release: **v0.1.0**. Open issues: **7**.",
+                             answered=True)
+    assert invented["correct"] is False and invented["missed"] == ["issue"]
+
+
+def test_a_release_tag_counts_written_either_way(monkeypatch):
+    """The API says `v0.1.0` and a model writes `0.1.0`. Both are right; a
+    longer tag that merely starts the same is not."""
+    from failecho_fleet import grading
+
+    monkeypatch.setattr(grading, "truth", lambda kind, arg: {
+        ("github_tag", "FailEcho/failecho"): "v0.1.0",
+        ("github_issues", "FailEcho/failecho"): 0}.get((kind, arg)))
+    prompt = "Latest release tag of FailEcho/failecho and its open issue count."
+
+    for answer in ("FailEcho/failecho is at v0.1.0, 0 open issues.",
+                   "FailEcho/failecho is at 0.1.0, 0 open issues."):
+        assert grading.grade(prompt, answer, answered=True)["correct"] is True, answer
+    assert grading.grade(prompt, "FailEcho/failecho is at v0.1.01, 0 open issues.",
+                         answered=True)["correct"] is False

@@ -268,8 +268,13 @@ def _number(value) -> float | None:
 
 def _within(got, want, tolerance: float) -> bool:
     got_n, want_n = _number(got), _number(want)
-    if got_n is None or want_n in (None, 0):
+    if got_n is None or want_n is None:
         return False
+    if want_n == 0:
+        # Zero is a real answer, and a relative tolerance around it is
+        # undefined -- which made "0 open issues" wrong every single time it
+        # was right. 21 of the 42 disputed runs on 23 Sep were this.
+        return got_n == 0
     return abs(got_n - want_n) / want_n <= tolerance
 
 
@@ -308,12 +313,16 @@ def _matches(got, want, kind: str, arg: str = "") -> bool:
     return str(got).strip().lstrip("v=^~") == str(want).strip().lstrip("v")
 
 
-def _line_for(text: str, label: str) -> str:
-    """The line of a prose answer that talks about this package or repo.
+def _lines_for(text: str, label: str) -> list[str]:
+    """Every line of a prose answer that talks about this package or repo.
 
-    A model asked for three versions writes three lines. Searching the whole
-    answer for a version string would pass an answer that got requests right
-    and httpx wrong, because httpx's number appears somewhere.
+    A model asked for three versions writes three lines, so the whole answer
+    cannot be searched for one value: that would pass an answer that got
+    requests right and httpx wrong, because httpx's number appears somewhere.
+    But the *first* line mentioning a name is often a summary --
+    "**npm express** is newer." above the list that holds the numbers -- and
+    taking only that one marked right answers wrong. So: every line that names
+    it, and a match on any of them.
     """
     needles = [label.lower()]
     if "/" in label:
@@ -324,14 +333,19 @@ def _line_for(text: str, label: str) -> str:
     # answer, graded as no answer at all -- so punctuation is ignored on both
     # sides before the comparison.
     flat = [re.sub(r"[^a-z0-9]", "", n) for n in needles]
+    found = []
     for line in re.split(r"[\n;]|(?<=[.!])\s", text or ""):
         low = line.lower()
-        if any(n in low for n in needles):
-            return line
         squashed = re.sub(r"[^a-z0-9]", "", low)
-        if any(n and n in squashed for n in flat):
-            return line
-    return ""
+        if any(n in low for n in needles) or any(n and n in squashed for n in flat):
+            found.append(line)
+    return found
+
+
+def _line_for(text: str, label: str) -> str:
+    """The first line naming this label, for the callers that want one."""
+    lines = _lines_for(text, label)
+    return lines[0] if lines else ""
 
 
 def _matches_in_line(line: str, want, kind: str, arg: str) -> bool:
@@ -352,8 +366,11 @@ def _matches_in_line(line: str, want, kind: str, arg: str) -> bool:
     # A version: present in the line, and not as the prefix of a longer one.
     # The trailing lookahead allows the full stop that ends a sentence
     # ("uv is at 0.12.17.") while still rejecting 0.12.17.1 and 0.12.171.
+    # A release tag is written both ways -- the API says `v0.1.0`, a model
+    # writes `0.1.0`, and either is the right answer -- so the optional v
+    # belongs inside the pattern rather than only on the expected value.
     wanted = str(want).strip().lstrip("v")
-    return bool(re.search(rf"(?<![\w.]){re.escape(wanted)}(?!\.?\d)(?!\w)", line))
+    return bool(re.search(rf"(?<![\w.])[vV]?{re.escape(wanted)}(?!\.?\d)(?!\w)", line))
 
 
 def _is_refusal(line: str, text: str, kind: str) -> bool:
@@ -374,7 +391,8 @@ def _grade_prose(checks, text: str, out: dict) -> dict:
     """
     answered_lines = 0
     for label, kind, arg in checks:
-        line = _line_for(text, label)
+        lines = _lines_for(text, label)
+        line = lines[0] if lines else ""
         if line:
             answered_lines += 1
         # An agent that says "GitHub rate-limited me" did not get the value
@@ -389,7 +407,7 @@ def _grade_prose(checks, text: str, out: dict) -> dict:
             out["unknown"] += 1
             continue
         out["checked"] += 1
-        if line and _matches_in_line(line, want, kind, arg):
+        if any(_matches_in_line(candidate, want, kind, arg) for candidate in lines):
             out["matched"] += 1
         else:
             # which value was wrong, not what it said: enough to tell a model
