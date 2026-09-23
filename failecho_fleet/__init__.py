@@ -1829,19 +1829,29 @@ def write_report(state: dict) -> None:
             # The question a paying team asks: if we switch this on, when does
             # it start helping? A recommendation needs five recovered attempts
             # on one failure shape, and a small team produces those slowly.
+            # A skip is advice but not a fix. Until 23 Sep these rows counted
+            # any verdict, so the team's first *skip* (Stack Exchange's
+            # exhausted quota, 13:46) read as "first fix after 7.4 h" and 65%
+            # of failures "had a fix" when none did.
             asked = sorted((r for r in runs if r["reporter"] in TEAM_ASKERS), key=lambda r: r["at"])
-            with_fix = [r for r in asked if any(f.get("recommended") for f in r.get("failures") or [])]
-            hours = None
-            if asked and with_fix:
-                start = dt.datetime.fromisoformat(asked[0]["at"])
-                hours = round((dt.datetime.fromisoformat(with_fix[0]["at"]) - start).total_seconds() / 3600, 1)
+            verdict = lambda f: str(f.get("recommended") or "").split(" ")[0]   # noqa: E731
+            is_fix = lambda f: verdict(f) not in ("", "skip")                   # noqa: E731
+            is_skip = lambda f: verdict(f) == "skip"                            # noqa: E731
+            start = dt.datetime.fromisoformat(asked[0]["at"]) if asked else None
+
+            def first(test):
+                hit = next((r for r in asked if any(test(f) for f in r.get("failures") or [])), None)
+                return round((dt.datetime.fromisoformat(hit["at"]) - start).total_seconds() / 3600, 1) if hit else None
+
             failures_met = sum(len(r.get("failures") or []) for r in asked)
-            advised = sum(1 for r in asked for f in r.get("failures") or [] if f.get("recommended"))
-            rows.append({"metric": "hours until the team's own history had its first fix", "unit": "h",
-                         "ask": hours, "blind": None, "better": "tie"})
-            rows.append({"metric": "failures where the team's own history had a fix", "unit": "%",
-                         "ask": _pct(advised / failures_met) if failures_met else None, "blind": None,
-                         "better": "tie"})
+            share = lambda test: (_pct(sum(1 for r in asked for f in r.get("failures") or [] if test(f)) / failures_met)  # noqa: E731
+                                  if failures_met else None)
+            for metric, value, unit in (
+                    ("hours until the team's own history had its first fix", first(is_fix), "h"),
+                    ("hours until the team's own history first said skip", first(is_skip), "h"),
+                    ("failures where the team's own history had a fix", share(is_fix), "%"),
+                    ("failures where the team's own history said skip", share(is_skip), "%")):
+                rows.append({"metric": metric, "unit": unit, "ask": value, "blind": None, "better": "tie"})
         if key not in ("opencode", "ocproxy", "ochook") and (a.get("graded_runs") or b.get("graded_runs")):
             # The light lane answers in prose and was graded on a pattern
             # until 22 Sep: "completed" meant the model said something. These

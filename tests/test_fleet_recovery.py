@@ -2145,3 +2145,25 @@ def test_a_declined_value_in_a_result_file_is_not_a_wrong_one():
     assert grade({"pallets/flask": 14290, "psf/requests": 54337, "encode/httpx": 15504})["correct"] is False
     assert not grading._declined(14290) and not grading._declined("4.29.0") and not grading._declined(0)
     assert grading._declined("rate limited (429)") and grading._declined(None)
+
+
+def test_the_team_rows_do_not_call_a_skip_a_fix(tmp_path, monkeypatch):
+    """23 Sep: the team's first verdict of its own was a skip, and the page
+    said "first fix after 7.4 h" and "65% of failures had a fix"."""
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    fail = lambda rec: {"service": "api.stackexchange.com", "operation": "q", "error_type": "rate_limit",  # noqa: E731
+                        "error_code": "429", "asked": True, "recommended": rec, "skipped": rec == "skip",
+                        "attempts": 1, "recovered": False, "seconds": 0.1}
+    runs = [_light_run("fleet-team-ask-a", True, "2099-01-01T00:00:00", failures=[fail(None)]),
+            _light_run("fleet-team-ask-a", True, "2099-01-01T02:00:00", failures=[fail("skip"), fail("skip")]),
+            _light_run("fleet-team-ask-b", True, "2099-01-01T05:00:00", failures=[fail("wait_until_reset")]),
+            _light_run("fleet-team-blind-a", False, "2099-01-01T00:01:00", failures=[fail(None)])]
+    F.write_report({"runs": runs})
+    team = next(g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"] if g["group"] == "team")
+    rows = {r["metric"]: r["ask"] for r in team["rows"]}
+    assert rows["hours until the team's own history first said skip"] == 2.0
+    assert rows["hours until the team's own history had its first fix"] == 5.0
+    assert rows["failures where the team's own history said skip"] == 50.0
+    assert rows["failures where the team's own history had a fix"] == 25.0
