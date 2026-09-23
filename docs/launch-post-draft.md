@@ -55,7 +55,7 @@ public APIs, where the commonest failure (GitHub's 403) has no fix, asking
 costs time: 6.9 s vs 5.9 s lost inside failures per run. A grader
 checks answers against the real APIs, and there is no measured difference in
 correctness yet (on real APIs the agents without FailEcho are slightly ahead,
-100% vs 93% on 25 and 29 checked runs, which is noise at that size): it saves retries and time, and I cannot yet say it makes
+100% vs 97% on 31 and 34 checked runs -- one answer -- which is noise): it saves retries and time, and I cannot yet say it makes
 answers more right. And pasting the MCP
 URL alone does little; use one of the paths above.
 
@@ -125,7 +125,7 @@ Window: 21 Sep 01:56 – 23 Sep 12:21 UTC.
 | Careful recovery on both sides: runs finished | 100% | 99.1% |
 | Careful recovery on both sides: seconds lost in failures | 8.4 | 10.3 |
 | Real APIs, seconds lost in failures (asking is a round trip) | 6.90 | 5.88 |
-| Real APIs, checked answers correct (29 vs 25 runs, p = 0.49) | 93.1% | 100% |
+| Real APIs, checked answers correct (34 vs 31 runs, p = 1.0) | 97.1% | 100% |
 | Coding agents in a VM, runs finished | 79.8% | 78.3% |
 
 Read the bottom half as carefully as the top. Against a careful agent the gain

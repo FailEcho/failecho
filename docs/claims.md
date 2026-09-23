@@ -35,7 +35,7 @@ moves gets re-checked here before it is repeated.
 | Claim | Required qualifier |
 |---|---|
 | The provider-group numbers | The control retries **once after 3 seconds**, not like a careful engineer. Against careful recovery (local group) the gain is time, not finished runs |
-| "Runs finished" | A model run counts when it **returned a non-empty answer**. A grader checks the answers against the APIs: on real APIs **93.1% vs 100%** of checked values correct -- the side *without* FailEcho ahead -- on 29 vs 25 checkable runs since the regradable grader went live (05:17 UTC, 23 Sep), p = 0.49; careful recovery 100% vs 100% on 22 vs 20. No measured difference in correctness either way |
+| "Runs finished" | A model run counts when it **returned a non-empty answer**. A grader checks the answers against the APIs: on real APIs **97.1% vs 100%** of checked values correct -- the side *without* FailEcho ahead by one answer -- on 34 vs 31 checkable runs since the regradable grader went live (05:17 UTC, 23 Sep), p = 1.0; careful recovery 100% vs 100% on 24 vs 22 (13:03, after the semicolon fix 7d46658). No measured difference in correctness either way |
 | Real-API finish rate (67.5% vs 65.0%) | Not significant (p = 0.26). And on real APIs asking **costs time**: 6.90 s vs 5.88 s lost inside failures per run (905 runs a side), because each ask is a round trip and GitHub's 403, the commonest failure there, has no fix to find; attempts per failure are 1.8 vs 1.9. Say both |
 | Coding agents in a VM (79.8% vs 78.3%) | A tie: they fail on their own bugs, which no network of other agents' failures can help with |
 | The MCP endpoint on its own | Models call a tool they have to choose **0.19-0.25 times per run**; the OpenCode pair with it is a tie (79.2% vs 75.0%, 24 runs a side). Lead with the in-path integrations |
@@ -51,7 +51,7 @@ moves gets re-checked here before it is repeated.
 | "Private mode works with every FailEcho integration" | Not the MCP tools, by design (a secret does not belong in a tool argument), and not older package versions: `failecho-autoreport` before 0.1.7, `failecho-mcp` before 0.2.3 and the Claude Code plugin before 0.2.0 ignore `FAILECHO_TEAM` and report **publicly**. Say "from these versions" |
 | "Signed reporters are real people" | A key is free to make. Signing rules out impersonation, nothing more |
 | "Private mode makes a team's agents do better" | Works and is private -- that is tested. Whether it *helps* a small team is being measured by the team arm (started 23 Sep, a week to read) |
-| "FailEcho makes agents more correct" | No measured difference yet, and on real APIs the side without it is ahead: 93.1% vs 100% of checked answers on 29 vs 25 runs (p = 0.49). It saves wasted retries and time, and recovers far more often where a fix exists |
+| "FailEcho makes agents more correct" | No measured difference yet, and on real APIs the side without it is ahead by one answer: 97.1% vs 100% of checked answers on 34 vs 31 runs (p = 1.0). It saves wasted retries and time, and recovers far more often where a fix exists |
 | "Proven to raise task completion" | Only in the provider group, and only against a naive retry; see the qualifiers |
 | "Independent agents confirm this" | Independent reporters: 0 |
 | "Your secrets can never leak" | Defaults are narrow, but a URL path or an error string can carry an identifier. Say what is sent, not what cannot happen |
