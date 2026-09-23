@@ -1517,6 +1517,29 @@ def _lost_to_guest_memory(r: dict) -> bool:
     return bool(o.get("guest_oom_kills")) and not o.get("completed")
 
 
+#: Below this many runs a side a table marks no winner. The page bolds "the
+#: better side", and on 23 Sep it bolded the plugin arm's 100% vs 0% on two
+#: runs a side and the MCP twin's 100% vs 50% on four: true arithmetic, false
+#: impression. Both sides lose their bold equally.
+MIN_RUNS_FOR_A_WINNER = 10
+
+
+def _no_winner_on_too_few_runs(versus: list[dict]) -> None:
+    for group in versus:
+        if min(group.get("runs_ask") or 0, group.get("runs_blind") or 0) < MIN_RUNS_FOR_A_WINNER:
+            group["too_few_runs"] = True
+            for row in group["rows"]:
+                row["better"] = "tie"
+            continue
+        # rows over a sub-sample carry their own count: the stricter-rules split
+        rows = {r["metric"]: r for r in group["rows"]}
+        since = rows.get("runs since the stricter rules")
+        if since and min(since.get("ask") or 0, since.get("blind") or 0) < MIN_RUNS_FOR_A_WINNER:
+            for row in group["rows"]:
+                if "since the rules" in row["metric"]:
+                    row["better"] = "tie"
+
+
 def write_report(state: dict) -> None:
     archived = _archived()
     everything = archived + state["runs"]
@@ -1838,7 +1861,8 @@ def write_report(state: dict) -> None:
             continue
         side = "ask" if r["asks"] else "blind"
         c = prov.setdefault(side, {"runs": 0, "completed": 0, "failures": 0, "recovered": 0, "tokens": 0, "seconds": 0.0,
-                                   "skipped_for_quota": 0})
+                                   "skipped_for_quota": 0, "first": r["at"], "last": r["at"]})
+        c["first"], c["last"] = min(c["first"], r["at"]), max(c["last"], r["at"])
         c["runs"] += 1; c["completed"] += int(bool(r["metrics"].get("completed")))
         c["tokens"] += r["metrics"].get("tokens_prompt", 0) + r["metrics"].get("tokens_completion", 0)
         c["seconds"] += float(r.get("seconds") or 0)
@@ -1852,7 +1876,8 @@ def write_report(state: dict) -> None:
         tpc = lambda c: round(c["tokens"] / c["completed"]) if c["completed"] else None   # noqa: E731
         spr = lambda c: round(c["seconds"] / c["runs"], 1) if c["runs"] else None   # noqa: E731
         versus.append({"group": "provider", "label": "Model providers under real quotas (groq, Gemini, OpenRouter, Ollama)",
-                       "since": PROVIDER_CONTROL_SINCE, "runs_ask": a["runs"], "runs_blind": b["runs"], "rows": [
+                       "since": PROVIDER_CONTROL_SINCE, "runs_ask": a["runs"], "runs_blind": b["runs"],
+                       "from": min(a["first"], b["first"]), "to": max(a["last"], b["last"]), "rows": [
             {"metric": "runs marked completed (see grading)", "unit": "%", "ask": _pct(cr(a)), "blind": _pct(cr(b)),
              "better": _better(cr(a), cr(b), lower_is_better=False)},
             {"metric": "provider failures met", "unit": "", "ask": a["failures"], "blind": b["failures"], "better": "tie"},
@@ -1976,6 +2001,7 @@ def write_report(state: dict) -> None:
     canary, onboard = _side("canary.json"), _side("onboard.json")
 
     ledger = state["runs"]
+    _no_winner_on_too_few_runs(versus)
     report = {
         "generated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         # What the numbers below are computed over. The fast groups cover the

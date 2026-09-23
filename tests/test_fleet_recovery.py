@@ -557,6 +557,7 @@ def test_a_model_recalling_the_same_tool_after_a_skip_is_counted():
 def test_the_versus_table_is_built_from_the_same_ledger(tmp_path, monkeypatch):
     """Metrics as rows, with and without as columns, the better side marked,
     a tie inside 2%. Nothing in it that the cost and cohort tables do not say."""
+    monkeypatch.setattr(F, "MIN_RUNS_FOR_A_WINNER", 0)  # direction on one run a side, not sample size
     import json
 
     monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
@@ -587,6 +588,7 @@ def test_the_versus_table_has_a_provider_group_since_the_control_changed(tmp_pat
     from the moment blind started retrying once; builders and explorers stay
     out. A 429 the asker got past (switch_model) is a finished task the
     blind run did not get."""
+    monkeypatch.setattr(F, "MIN_RUNS_FOR_A_WINNER", 0)  # direction on one run a side, not sample size
     import json
 
     monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
@@ -1982,3 +1984,33 @@ def test_an_empty_answer_is_not_a_finished_run():
     import inspect
     source = inspect.getsource(F.run_once) if hasattr(F, "run_once") else open(F.__file__).read()
     assert 'run.completed = bool((answer or "").strip()) and not answer.startswith("(")' in source
+
+
+# -- the scoreboard does not crown a side on a handful of runs (23 Sep) --------------
+
+
+def test_no_side_is_marked_better_on_too_few_runs(tmp_path, monkeypatch):
+    """The page bolds the better side. On two runs a side it bolded the plugin
+    arm's 100% vs 0%: true arithmetic, false impression."""
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    runs = [_light_run("fleet-local-ask", True, "2099-01-01T00:00:00"),
+            _light_run("fleet-local-blind", False, "2099-01-01T00:01:00", metrics={
+                "tokens_prompt": 50, "tokens_completion": 5, "asks": 0, "ask_seconds": 0, "wait_seconds": 0,
+                "completed": False, "calls_first_try": 2, "calls_recovered": 0, "calls_failed": 0})]
+    F.write_report({"runs": runs})
+    local = next(g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"] if g["group"] == "local")
+    assert local["too_few_runs"] is True
+    assert all(r["better"] == "tie" for r in local["rows"]), "no winner on one run a side"
+
+
+def test_the_provider_group_states_its_window(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
+    monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(F, "LAB_DB", "")
+    runs = [_light_run(p, asks, f"2099-01-0{i+1}T00:00:00")
+            for i, (p, asks) in enumerate((("fleet-decor-ask-a", True), ("fleet-decor-blind-a", False)))]
+    F.write_report({"runs": runs})
+    provider = next(g for g in json.loads((tmp_path / "fleet.json").read_text())["versus"] if g["group"] == "provider")
+    assert provider["from"] == "2099-01-01T00:00:00" and provider["to"] == "2099-01-02T00:00:00"

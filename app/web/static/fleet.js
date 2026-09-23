@@ -49,7 +49,8 @@
       var th = document.createElement("th"); th.colSpan = 3;
       th.textContent = g.label + " (" + g.runs_ask + " / " + g.runs_blind + " runs" +
         (g.from ? ", " + when(g.from) + " to " + when(g.to) : "") +
-        (g.since ? ", counted since " + when(g.since) : "") + ")"; h.appendChild(th); vb.appendChild(h);
+        (g.since ? ", counted since " + when(g.since) : "") +
+        (g.too_few_runs ? "; too few runs to call a side" : "") + ")"; h.appendChild(th); vb.appendChild(h);
       g.rows.forEach(function (r) {
         function cell(v, side) {
           var c = td(v == null ? "-" : (r.unit === "%" ? v + "%" : v), "num" + (r.better === side ? " win" : ""));

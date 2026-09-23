@@ -96,6 +96,7 @@ def test_the_opencode_twins_share_provider_and_task_and_the_run_is_recorded(tmp_
 
 
 def test_the_versus_table_has_an_opencode_group(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "MIN_RUNS_FOR_A_WINNER", 0)  # direction on one run a side, not sample size
     monkeypatch.setattr(F, "REPORT_PATH", str(tmp_path / "fleet.json"))
     monkeypatch.setattr(F, "STATE_DIR", str(tmp_path))
     monkeypatch.setattr(F, "LAB_DB", "")
