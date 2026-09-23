@@ -244,6 +244,29 @@ def checks_for(prompt: str) -> tuple[list[tuple[str, str, str]], str]:
     return [], "json"
 
 
+#: Kinds whose right answer can look like a decline ("none", "does not exist").
+_UNDECLINABLE = ("pypi_absent", "github_absent", "enum", "never_number")
+
+
+def _declined(value) -> bool:
+    """Whether a result-file value says the agent could not get it.
+
+    The OpenCode tasks say "if a tool refuses, put the reason under "error"
+    instead of inventing numbers". An agent doing exactly that per key --
+    {"pallets/flask": {"error": "URLError ..."}} -- or writing "unknown" was
+    graded wrong; the prose grader has always counted the same thing as a
+    declined value. "0" and "0.0.0" stay placeholders, not declines: zero is
+    a real star or issue count.
+    """
+    if isinstance(value, dict):
+        return any(str(k).lower() == "error" for k in value)
+    text = str(value).strip().lower()
+    if text in PLACEHOLDERS - {"0", "0.0.0"}:
+        return True
+    return bool(re.search(r"[a-z]", text)) and any(
+        re.search(rf"(?<!\w){re.escape(w)}(?!\w)", text) for w in REFUSAL_WORDS)
+
+
 def _values(text: str) -> dict:
     """The result file as a mapping, whatever shape the agent wrote it in."""
     text = (text or "").strip()
@@ -429,18 +452,41 @@ _REGISTRY_WORDS = {"pypi": ("pypi",), "npm": ("npm",), "crates": ("crates", "cra
                    "github_issues": ("issue",)}
 
 
-def _grade_prose(checks, text: str, out: dict, resolve) -> dict:
+def _bare_rows(checks, text: str, prompt: str) -> list[str] | None:
+    """One value per line, no names, in the order the task asked for them.
+
+    "Latest versions of requests, httpx and fastapi, one line each" answered
+    "2.34.2 / 0.28.1 / 0.141.1" is right, and was graded three times wrong
+    because no line named its package (23 Sep, fleet-prod-blind). Read that
+    way only when nothing in the answer names any label, the line count is
+    the label count, every line holds a value of its kind, and the task named
+    the labels in that order.
+    """
+    low = (prompt or "").lower()
+    where = [low.find(label.lower()) for label, _, _ in checks]
+    if len(checks) < 2 or -1 in where or where != sorted(where):
+        return None
+    if any(_lines_for(text, label) for label, _, _ in checks):
+        return None
+    rows = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    if len(rows) != len(checks) or not all(_has_value(row, kind) for row, (_, kind, _) in zip(rows, checks)):
+        return None
+    return rows
+
+
+def _grade_prose(checks, text: str, out: dict, resolve, prompt: str = "") -> dict:
     text = _plain(text)
     """Grade a sentence. The light lane answers in prose and nothing could
     grade it until now -- 963 runs a side counted as 'completed' on a pattern.
     """
     answered_lines = 0
     kinds = [kind for _, kind, _ in checks]
-    for label, kind, arg in checks:
+    bare = _bare_rows(checks, text, prompt)
+    for i, (label, kind, arg) in enumerate(checks):
         # a denial is read in the sentence that names the package, past any
         # semicolon (23 Sep: "...`FailEcho/failecho-does-not-exist`; it does
         # not exist." graded wrong)
-        lines = _lines_for(text, label, clauses=kind not in ("pypi_absent", "github_absent"))
+        lines = [bare[i]] if bare else _lines_for(text, label, clauses=kind not in ("pypi_absent", "github_absent"))
         if not lines and kinds.count(kind) == 1 and kind not in ("pypi_absent", "github_absent"):
             # A task about one repository gets an answer that never repeats
             # its name -- "Latest release tag: v0.1.0" -- and that is still an
@@ -544,7 +590,7 @@ def grade(prompt: str, result_text: str, answered: bool, truths: dict | None = N
         out["valid"] = False
         return out
     if mode == "prose":
-        return _grade_prose(checks, result_text or "", out, resolve)
+        return _grade_prose(checks, result_text or "", out, resolve, prompt=prompt or "")
     if mode == "list":
         return _grade_list(checks, result_text or "", out, resolve)
 
@@ -570,6 +616,9 @@ def grade(prompt: str, result_text: str, answered: bool, truths: dict | None = N
     for key, kind, arg in checks:
         if key not in values:
             continue
+        if kind not in _UNDECLINABLE and _declined(values[key]):
+            out["refused"] += 1
+            continue
         if kind in ("enum", "never_number"):
             # No fetch: the truth is what the tool can possibly have returned.
             out["checked"] += 1
@@ -588,7 +637,15 @@ def grade(prompt: str, result_text: str, answered: bool, truths: dict | None = N
         else:
             out["missed"].append(key)
     if out["checked"]:
-        out["correct"] = out["checked"] == out["matched"] and out["valid"] is not False
+        # A gap makes the answer incomplete, not wrong, when it is declined:
+        # per key, or by the file's own "error" as the task asks. A key left
+        # out with no word, or a bare "0.0.0", still counts against it.
+        explained = any(str(k).lower() == "error" for k in values)
+        gaps = [k for k, kind, _ in checks
+                if (k not in values and not explained)
+                or (k in values and str(values[k]).strip().lower() in PLACEHOLDERS
+                    and not (kind not in _UNDECLINABLE and _declined(values[k])))]
+        out["correct"] = out["checked"] == out["matched"] and not gaps
     return out
 
 
