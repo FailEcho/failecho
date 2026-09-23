@@ -348,3 +348,100 @@ def test_llms_txt_itself_documents_private_mode_and_signing(client):
     assert "## Private mode: your team's evidence, shared with nobody" in body
     assert "## Proving who is reporting" in body
     assert "X-FailEcho-Team" in body and "X-Reporter-Signature" in body
+
+
+# -- skip: the verdict a small team needs most (2026-09-23) -----------------------
+
+
+def _fail_and_try(client, token, times, action="backoff", successful=False, reporter="agent-1"):
+    fingerprint = report(client, token=token, **{"X-Reporter-ID": reporter}).json()["fingerprint"]
+    for _ in range(times):
+        client.post("/v1/outcome", json={"fingerprint": fingerprint, "action": action, "successful": successful},
+                    headers={"X-FailEcho-Team": token, "X-Reporter-ID": reporter})
+    return fingerprint
+
+
+def test_a_team_is_told_to_stop_when_nothing_it_tried_has_worked(client):
+    """The public network's most useful verdict had no private equivalent: a
+    team that kept hitting an exhausted quota was never told to stop."""
+    _fail_and_try(client, TEAM, 5)
+    rec = ask(client).json()["team_evidence"]["recommendation"]
+    assert rec["action"] == "skip" and rec["scope"] == "team" and rec["from_other_agents"] is False
+    assert rec["based_on_attempts"] == 5
+
+
+def test_four_failures_are_not_yet_a_verdict(client):
+    _fail_and_try(client, TEAM, 4)
+    assert ask(client).json()["team_evidence"]["recommendation"] is None
+
+
+def test_one_success_in_the_window_means_it_is_not_hopeless(client):
+    fingerprint = _fail_and_try(client, TEAM, 6)
+    client.post("/v1/outcome", json={"fingerprint": fingerprint, "action": "wait_until_reset", "successful": True},
+                headers={"X-FailEcho-Team": TEAM, "X-Reporter-ID": "agent-2"})
+    assert ask(client).json()["team_evidence"]["recommendation"] is None
+
+
+def test_one_agents_retry_storm_counts_what_the_public_network_counts(client):
+    """At most five attempts per agent per hour, like the public cap: twenty
+    failed retries in one burst are a verdict worth five, not twenty."""
+    _fail_and_try(client, TEAM, 20)
+    rec = ask(client).json()["team_evidence"]["recommendation"]
+    assert rec["action"] == "skip" and rec["based_on_attempts"] == 5
+    listed = ask(client).json()["team_evidence"]["recovery_actions"][0]
+    assert listed["attempts"] == 20, "raw counts are still reported as they are"
+
+
+def test_old_failures_do_not_make_a_skip(client, db_path):
+    import sqlite3
+    from datetime import timedelta
+
+    from app.core.clock import utcnow
+
+    _fail_and_try(client, TEAM, 6)
+    old = (utcnow() - timedelta(days=3)).isoformat(sep=" ")
+    connection = sqlite3.connect(db_path)
+    try:
+        connection.execute("update private_recovery_outcomes set created_at = ?", (old,))
+        connection.commit()
+    finally:
+        connection.close()
+    assert ask(client).json()["team_evidence"]["recommendation"] is None, "a fix may have landed since"
+
+
+def test_a_fix_that_works_beats_a_skip(client):
+    fingerprint = _fail_and_try(client, TEAM, 5, action="backoff")
+    for _ in range(5):
+        client.post("/v1/outcome", json={"fingerprint": fingerprint, "action": "wait_until_reset", "successful": True},
+                    headers={"X-FailEcho-Team": TEAM, "X-Reporter-ID": "agent-2"})
+    assert ask(client).json()["team_evidence"]["recommendation"]["action"] == "wait_until_reset"
+
+
+def test_every_integration_says_a_team_skip_as_an_instruction():
+    """"try skip, worked 0/5" reads as nonsense; the public skip is said as an
+    instruction, and so is the team's."""
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    from failecho_autoreport import FailEcho
+
+    answer = {"recommendation": None, "recovery_actions": [],
+              "team_evidence": {"private": True, "recommendation": {"action": "skip", "scope": "team",
+                                                                    "based_on_attempts": 5},
+                                "recovery_actions": [{"action": "backoff", "attempts": 5, "successes": 0}]}}
+    python_line = FailEcho.advice_text(answer)
+    assert python_line == "FailEcho (your team's own history): skip -- nothing your agents tried recently has fixed this failure."
+    root = Path(__file__).resolve().parents[1]
+    if shutil.which("node"):
+        node = subprocess.run(["node", "-e", "const p=require(process.argv[1]);"
+                               "process.stdout.write(p.adviceText(JSON.parse(process.argv[2]))||'')",
+                               str(root / "npm-relay" / "bin" / "proxy.js"), __import__("json").dumps(answer)],
+                              capture_output=True, text=True, timeout=30)
+        assert node.stdout == python_line
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hook", root / "plugin" / "hooks" / "failecho_hook.py")
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    note = hook.context_note("svc", "op", {"known": False, **answer})
+    assert "Do not retry this call" in note and "5 attempts" in note

@@ -174,6 +174,9 @@ function teamLine(answer, triedOnly) {
     if (a && typeof a === "object") actions.set(a.action, a);
   }
   const rec = team.recommendation || {};
+  if (rec.action === "skip" && !triedOnly) {
+    return "FailEcho (your team's own history): skip -- nothing your agents tried recently has fixed this failure.";
+  }
   if (rec.action && !triedOnly) {
     const a = actions.get(rec.action) || {};
     const evidence = "successes" in a && "attempts" in a ? `, worked ${a.successes}/${a.attempts}` : "";

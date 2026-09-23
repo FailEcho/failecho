@@ -217,6 +217,9 @@ export default async function failecho() {
     if (team && typeof team === "object") {
       const teamActions = (team.recovery_actions || []).filter((a) => a && a.action);
       const teamRec = team.recommendation;
+      if (teamRec && teamRec.action === "skip") {
+        return "FailEcho (your team's own history): skip -- nothing your agents tried recently has fixed this failure.";
+      }
       if (teamRec && teamRec.action) {
         const stats = teamActions.find((a) => a.action === teamRec.action);
         const counts = stats ? `, worked ${stats.successes}/${stats.attempts}` : "";

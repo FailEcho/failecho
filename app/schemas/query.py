@@ -272,6 +272,14 @@ class TeamRecommendation(StrictModel):
         default=False,
         description="Always false here. Your own evidence is never somebody else's.",
     )
+    based_on_attempts: int | None = Field(
+        default=None,
+        description=(
+            "For `skip`: how many recent attempts, after the per-agent hourly cap, "
+            "all failed. The same rule as the public verdict: five or more, none "
+            "successful, inside 24 hours."
+        ),
+    )
 
 
 class TeamAction(StrictModel):

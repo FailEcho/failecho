@@ -352,3 +352,16 @@ def test_without_a_team_token_nothing_says_team():
         assert all("x-failecho-team" not in {k.lower() for k in h} for _, _, h in net.posts)
     finally:
         net.stop()
+
+
+def test_a_team_skip_is_said_as_an_instruction():
+    team = {"private": True, "recommendation": {"action": "skip", "scope": "team", "based_on_attempts": 6},
+            "recovery_actions": [{"action": "backoff", "attempts": 6, "successes": 0}]}
+    net = Network(answer={"known": False, "status": "INSUFFICIENT_DATA", "recommendation": None,
+                          "recovery_actions": [], "fingerprint": "abc123", "team_evidence": team})
+    try:
+        results = drive([CURL_429], net.endpoint, env={"FAILECHO_TEAM": "team-token-gggggggggggggggg"})
+        assert ("FailEcho (your team's own history): skip -- nothing your agents tried recently "
+                "has fixed this failure.") in results[0]["output"]
+    finally:
+        net.stop()

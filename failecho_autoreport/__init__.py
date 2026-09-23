@@ -216,6 +216,8 @@ def _team_line(answer: dict, tried_only: bool = False) -> str | None:
         return None
     actions = {a.get("action"): a for a in team.get("recovery_actions") or [] if isinstance(a, dict)}
     rec = team.get("recommendation") or {}
+    if rec.get("action") == "skip" and not tried_only:
+        return "FailEcho (your team's own history): skip -- nothing your agents tried recently has fixed this failure."
     if rec.get("action") and not tried_only:
         a = actions.get(rec["action"]) or {}
         evidence = (f", worked {a['successes']}/{a['attempts']}"

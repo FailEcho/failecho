@@ -393,6 +393,9 @@ def _team_note(answer: dict) -> str | None:
         return None
     actions = {a.get("action"): a for a in team.get("recovery_actions") or [] if isinstance(a, dict)}
     rec = team.get("recommendation") or {}
+    if rec.get("action") == "skip":
+        return (f"Your team's own history: nothing your agents tried in the last 24h has worked "
+                f"({rec.get('based_on_attempts') or 'several'} attempts). Do not retry this call; fail fast.")
     if rec.get("action"):
         a = actions.get(rec["action"]) or {}
         counts = (f" ({a.get('successes')}/{a.get('attempts')} attempts)"

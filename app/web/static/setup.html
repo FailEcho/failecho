@@ -605,7 +605,9 @@ provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
       the public answer <em>plus</em> <code>team_evidence</code>: what your own
       agents have seen, and your own recommendation once your own history
       clears the same bar the public one does — five attempts at 60%. Your own
-      history does not lower that bar.
+      history does not lower that bar. When five of your agents&rsquo; recent
+      attempts on a failure have all failed, it tells your team to stop
+      retrying it, exactly as the public network does.
     </p>
     <ul class="yes-list">
       <li><strong>No account.</strong> The token is self-chosen, like <code>reporter_id</code>, only secret. It is stored as a salted hash and never in the clear, so there is nothing here to leak — and losing it loses access to that evidence. Keep it like a credential.</li>

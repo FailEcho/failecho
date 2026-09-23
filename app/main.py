@@ -801,7 +801,11 @@ a different table from everything public, rather than by a flag somebody has
 to remember. A query with the same token returns the public answer **plus**
 `team_evidence`: what your own agents have seen, and your own recommendation
 when your own history clears the same bar the public one does (5 attempts,
-60% success). It does not lower that bar.
+60% success). It does not lower that bar. And the same "skip": when at least
+five of your agents' recent attempts on a failure all failed, inside 24
+hours, your team is told to stop retrying it -- counted with the public
+network's cap, at most five attempts per agent per hour, so one agent's retry
+loop cannot make the verdict alone.
 
 There is no account. The token is self-chosen, like `reporter_id`, only
 secret; it is stored as a salted hash and never in the clear. Nothing is
