@@ -11,11 +11,8 @@ curl -o .opencode/plugin/failecho.js \
 ```
 
 That is the whole installation: OpenCode auto-discovers any `*.js` in
-`.opencode/plugin/`. Or, from npm:
-
-```json
-{ "plugin": ["failecho-opencode"] }
-```
+`.opencode/plugin/`. (An npm package, `failecho-opencode`, is prepared in this
+directory but not published yet; until it is, the file above is the way in.)
 
 ## What it looks like
 

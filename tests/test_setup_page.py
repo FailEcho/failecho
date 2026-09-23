@@ -209,3 +209,76 @@ def test_both_navigations_are_present_and_answer_different_questions():
         chips = html[html.index('class="shell setup-jump"'):]
         chips = chips[:chips.index("</nav>")]
         assert chips.count('href="#') == 4, f"{page} chip nav is not four chips"
+
+
+# -- FailEcho in the tool path, not the tool list (2026-09-23) ------------------
+
+
+def _order(body: str, *markers: str) -> list[int]:
+    return [body.index(m) for m in markers]
+
+
+def test_the_setup_page_leads_with_what_works(client):
+    """A tool the model must choose to call is one it mostly does not call:
+    0.19-0.24 times per run in the lab. The integrations that put the answer
+    where the model is already looking come first; the bare endpoint comes
+    after all of them, and says what it is."""
+    body = client.get("/setup").text
+    positions = _order(body, 'id="choose"', 'id="claude-code"', 'id="opencode"',
+                       'id="proxy"', 'id="rest-api"', 'id="mcp-clients"')
+    assert positions == sorted(positions), "in-path integrations must come before the bare endpoint"
+    assert "least effective" in body
+    assert "once every five runs" in body
+
+
+def test_opencode_has_a_setup_path(client):
+    """The install line sits inside the GitHub markers, like the hook's, so a
+    self-hosted instance without FIN_GITHUB_URL does not advertise a URL it
+    does not serve. The section itself is always there."""
+    from pathlib import Path
+
+    body = client.get("/setup").text
+    assert 'id="opencode"' in body and ".opencode/plugin/" in body
+    template = (Path(__file__).resolve().parents[1] / "app" / "web" / "static" / "setup.html").read_text()
+    assert "{{GITHUB_URL}}/raw/main/opencode-plugin/plugin/failecho.js" in template
+
+
+def test_no_page_claims_the_unmeasured_integrations_help(client):
+    """The OpenCode plugin and the proxy are built and verified; neither has a
+    measured result. The pages may say what they do, never that they help."""
+    for path in ("/setup", "/llms.txt"):
+        flat = " ".join(client.get(path).text.split()).lower()
+        for claim in ("the opencode plugin improves", "the proxy improves",
+                      "proxy raises", "plugin raises completion"):
+            assert claim not in flat, f"{path} claims {claim!r}"
+    llms = client.get("/llms.txt").text
+    assert "has no result to quote yet" in llms
+    assert "no measured improvement to quote" in llms
+
+
+def test_llms_txt_ranks_setups_by_what_moved_results(client):
+    body = client.get("/llms.txt").text
+    section = body[body.index("## Which setup actually works"):]
+    positions = _order(section, "Claude Code: the plugin", "OpenCode: one plugin file",
+                       "the proxy", "failecho-autoreport", "The bare MCP endpoint")
+    assert positions == sorted(positions)
+
+
+def test_the_default_setup_tells_the_human_what_would_work_better(client):
+    """The minimal-trust default stays the default -- it installs nothing --
+    but it may not pretend to be the good option."""
+    flat = " ".join(client.get("/llms.txt").text.split())
+    assert "Then say what would work better, once." in flat
+    assert "do not install it without asking" in flat
+
+
+def test_nothing_tells_a_user_to_install_an_unpublished_package(client):
+    """failecho-opencode is prepared, not published. Pointing people at an npm
+    name that does not resolve is worse than not mentioning it."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    for text in (client.get("/setup").text, client.get("/llms.txt").text,
+                 (root / "README.md").read_text()):
+        assert '"plugin": ["failecho-opencode"]' not in text
+    assert "not published yet" in (root / "opencode-plugin" / "README.md").read_text()

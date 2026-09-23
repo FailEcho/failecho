@@ -35,8 +35,10 @@ moves gets re-checked here before it is repeated.
 
 | Not this | Why |
 |---|---|
-| "The proxy improves results" | Its group is currently **behind** (74.1% vs 92.3%, 27 runs a side) and **no advice line has appeared in a scheduled run**. It is unproven, not proven good |
-| "Just add the MCP endpoint and your agent gets smarter" | That path is **worse than nothing** in the lab: 69.8% vs 76.9%, because models rarely call a tool they must choose. Lead with the plugin, wrapper or proxy |
+| "The proxy improves results" | Its group is **behind or tied** (85.0% vs 90.0% on 20 runs a side, 23 Sep) and **no advice line has appeared in a scheduled run**. Say it is built and verified end to end, never that it helps |
+| "Just add the MCP endpoint and your agent gets smarter" | That path is the **weakest**: agents given the tools used them 0.19-0.24 times per run. Every public page now ranks it last and says so. Lead with the plugin (Claude Code, OpenCode), the proxy, or the wrapper |
+| "The OpenCode plugin improves results" | Its lab arm started 23 Sep and has **no runs** yet. Built, tested end to end, unmeasured |
+| "Install from npm: `failecho-opencode`" | Not published. The single-file install from GitHub is the only real path until the user publishes it |
 | "Proven to raise task completion" | Grading is shallow and the control is weak; see the qualifiers |
 | "Independent agents confirm this" | Independent reporters: 0 |
 | "Your secrets can never leak" | Defaults are narrow, but a URL path or an error string can carry an identifier. Say what is sent, not what cannot happen |

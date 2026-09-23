@@ -65,18 +65,21 @@
       About two minutes. No account, no API key, nothing to pay for.
     </p>
     <p class="hero-support">
-      Pick the one line that matches how you run agents. Everything below talks to the same network, so an agent set up one way benefits from failures reported another way.
+      Pick the one line that matches how you run agents. The ones at the top put FailEcho in the path of your tools, which is where it works; everything talks to the same network, so an agent set up one way benefits from failures reported another way.
     </p>
   </section>
 <div class="pagelayout">
   <nav class="pagenav" aria-label="On this page">
     <p class="pagenav-title">On this page</p>
     <div class="pagenav-links">
+      <a href="#choose">Pick by where your agent runs</a>
       <a href="#let-the-agent">Let your agent set it up</a>
       <a href="#claude-code">Claude Code — the fast path</a>
       <a href="#hook">Claude Code — without the plugin</a>
-      <a href="#mcp-clients">Any other MCP client</a>
+      <a href="#opencode">OpenCode — one plugin file</a>
+      <a href="#proxy">Other MCP clients — the proxy</a>
       <a href="#rest-api">Your own code, no MCP</a>
+      <a href="#mcp-clients">The bare MCP endpoint</a>
       <a href="#check">How to tell it is working</a>
       <a href="#private">Private mode — free for early teams</a>
       <a href="#cost">What it costs, measured</a>
@@ -90,7 +93,28 @@
   <div class="pagemain">
 
 
-  <nav class="shell setup-jump" aria-label="Choose your integration"><a href="#let-the-agent"><span>00</span> Let the agent</a><a href="#claude-code"><span>01</span> Claude Code</a><a href="#mcp-clients"><span>02</span> MCP clients</a><a href="#rest-api"><span>03</span> REST API</a></nav>
+  <nav class="shell setup-jump" aria-label="Choose your integration"><a href="#claude-code"><span>01</span> Claude Code</a><a href="#opencode"><span>02</span> OpenCode</a><a href="#proxy"><span>03</span> Other MCP clients</a><a href="#rest-api"><span>04</span> Your own code</a></nav>
+
+  <section class="shell band" id="choose" aria-labelledby="choose-title">
+    <div class="band-head">
+      <h2 id="choose-title" class="label">Pick by where your agent runs</h2>
+      <p class="band-sub">Put FailEcho in the path of the tools your agent already uses, not in its list of tools to remember.</p>
+    </div>
+    <ul class="yes-list">
+      <li><strong>Claude Code</strong> &rarr; <a href="#claude-code">the plugin</a>. A hook runs after every MCP tool call; nothing for the model to decide.</li>
+      <li><strong>OpenCode</strong> &rarr; <a href="#opencode">one plugin file</a>. It runs around every tool OpenCode uses, including <code>bash</code> and <code>webfetch</code>.</li>
+      <li><strong>Cursor, Claude Desktop, any other MCP client</strong> &rarr; <a href="#proxy">the proxy</a>, in front of each MCP server you already use. Advice arrives inside the failing tool&rsquo;s error.</li>
+      <li><strong>Your own agent code</strong> &rarr; <a href="#rest-api"><code>failecho-autoreport</code></a> with advice on. The answer lands on the exception you already handle.</li>
+      <li><strong>Nothing can be installed</strong> &rarr; <a href="#mcp-clients">the bare MCP endpoint</a>. The smallest option, and the least effective one.</li>
+    </ul>
+    <p class="prose">
+      Why the order: a tool the model has to choose to call is one it mostly
+      does not call. In our lab, agents given FailEcho&rsquo;s MCP tools used
+      them about <strong>once every five runs</strong>. The integrations that
+      put the answer where the model is already looking are the ones that
+      moved results &mdash; see <a href="#cost">what it costs, measured</a>.
+    </p>
+  </section>
 
   <section class="shell band" id="let-the-agent" aria-labelledby="agent-title">
     <div class="band-head">
@@ -159,10 +183,150 @@ curl -fsSL {{GITHUB_URL}}/raw/main/plugin/hooks/failecho_hook.py \
     </figure>
   </section>
 
+  <section class="shell band" id="opencode" aria-labelledby="opencode-title">
+    <div class="band-head">
+      <h2 id="opencode-title" class="label">OpenCode — one plugin file</h2>
+      <p class="band-sub">OpenCode runs every <code>.js</code> file in <code>.opencode/plugin/</code> around every tool it uses. Drop this one in.</p>
+    </div>
+    <!--github--><figure class="snip">
+      <pre><code>mkdir -p .opencode/plugin
+curl -fsSL {{GITHUB_URL}}/raw/main/opencode-plugin/plugin/failecho.js \
+  -o .opencode/plugin/failecho.js</code></pre>
+    </figure><!--/github-->
+    <p class="prose">
+      Nothing else to configure. When a tool fails &mdash; a <code>curl</code>
+      that got a 429, a <code>webfetch</code> that hit a 503, an MCP tool that
+      errored &mdash; the plugin asks the network and appends one line to the
+      output the model is already reading:
+    </p>
+    <figure class="snip">
+      <pre><code>HTTP/2 429
+rate limit exceeded
+
+FailEcho: try wait_until_reset (worked 33/40).</code></pre>
+    </figure>
+    <p class="band-sub">
+      It reports the shape only: the API host or MCP server, the endpoint or
+      tool, an error class and code, the latency. Never the command, the
+      arguments, the output, a file path or a token. Local tools &mdash;
+      <code>read</code>, <code>write</code>, <code>grep</code> &mdash; and shell
+      commands with no URL in them are never reported. Advice waits at most
+      three seconds; with the network unreachable the tool&rsquo;s output comes
+      back exactly as it was. <code>FAILECHO_DISABLED=1</code> turns it off,
+      <code>FAILECHO_ADVISE=0</code> reports without annotating.
+    </p>
+    <p class="fineprint">
+      Built on the same design as the Claude Code hook. Its own comparison in
+      the lab &mdash; OpenCode with the plugin against OpenCode without &mdash;
+      started on 23 September 2026; until it has runs, there is no measured
+      result for it to quote.
+    </p>
+  </section>
+
+  <section class="shell band" id="proxy" aria-labelledby="proxy-title">
+    <div class="band-head">
+      <h2 id="proxy-title" class="label">Cursor, Claude Desktop, any MCP client — the proxy</h2>
+      <p class="band-sub">
+        A model given FailEcho's tools has to think of asking, and while it is
+        handling a failure it mostly does not. The proxy puts the answer where
+        the model is already looking: put it in front of the MCP servers you
+        already use, and a failed tool call comes back with one line of advice.
+      </p>
+    </div>
+    <figure class="snip">
+      <pre><code>{
+  "mcpServers": {
+    "github": {
+      "command": "uvx",
+      "args": ["failecho-mcp", "proxy", "--",
+               "npx", "-y", "@modelcontextprotocol/server-github"]
+    }
+  }
+}</code></pre>
+    </figure>
+    <p class="band-sub">
+      <code>npx -y failecho-mcp proxy -- …</code> works the same way, with no
+      Python needed. For a remote server, give its URL instead of a command:
+      <code>failecho-mcp proxy --header "Authorization: Bearer $TOKEN" -- https://…/mcp</code>
+      (a header token works; OAuth does not, so connect those directly).
+    </p>
+    <figure class="snip">
+      <pre><code>429 rate limit exceeded
+FailEcho: try backoff, worked n/m (confidence 0.61).</code></pre>
+    </figure>
+    <p class="band-sub">
+      A server that wraps an API reports under its own name, so tell the proxy
+      which host each tool calls: <code>--upstream 'github_*=api.github.com'</code>
+      (or <code>--upstream api.github.com</code> for every tool). When the
+      server's own name has no advice yet, the proxy asks under that host and
+      says so &mdash; <code>FailEcho (evidence from api.github.com): …</code>.
+      Reports keep the server's name. The GitHub MCP server's own names map to
+      <code>api.github.com</code> without being told.
+    </p>
+    <p class="band-sub">
+      Every other message passes through unchanged &mdash; byte for byte for a
+      server started locally; a remote server's messages are parsed and
+      re-serialised. Each call's outcome is reported as its shape only
+      &mdash; the server's name, the tool, an error class and code, the latency
+      &mdash; never arguments, never results, and never the error
+      text: the proxy reads it to pick an error class and drops it, ignoring
+      <code>FAILECHO_SEND_ERRORS</code> even when you have set it for the
+      wrapper (0.2.2 and newer). A failed call repeated with the same arguments counts as
+      a retry, compared as a hash that never leaves your machine. Advice waits
+      at most 3 seconds, on failures only; if FailEcho is unreachable the error
+      passes through as it was. <code>FAILECHO_DISABLED=1</code> makes it a
+      plain pipe, <code>FAILECHO_ADVISE=0</code> reports without adding advice.
+    </p>
+  </section>
+
+  <section class="shell band" id="rest-api" aria-labelledby="rest-title">
+    <div class="band-head">
+      <h2 id="rest-title" class="label">Your own code, no MCP</h2>
+      <p class="band-sub">One HTTP call. It writes no observation and keeps no record of the question, and is never rate limited; it adds 1 to a daily counter of answered/unanswered queries.</p>
+    </div>
+    <figure class="snip">
+      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"service": "api.github.com", "operation": "create_issue",
+       "error_type": "rate_limit", "error_code": "429"}'</code></pre>
+    </figure>
+    <p class="band-sub">
+      Reporting takes two more calls. <code>/v1/observe</code> after every call,
+      success or failure — failure rates need a denominator:
+    </p>
+    <figure class="snip">
+      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/observe \
+  -H "Content-Type: application/json" \
+  -H "X-Reporter-ID: my-agent-1" \
+  -d '{"service": "github-mcp", "operation": "create_issue",
+       "outcome": "failure", "error_type": "validation_error",
+       "error_code": "422"}'</code></pre>
+    </figure>
+    <p class="band-sub">
+      That returns the <code>fingerprint</code>. If you then try something and it
+      works, send the outcome — this is the scarcest and most useful thing in
+      the network, because it is the only call that records what actually
+      <em>fixed</em> a failure:
+    </p>
+    <figure class="snip">
+      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/outcome \
+  -H "Content-Type: application/json" \
+  -H "X-Reporter-ID: my-agent-1" \
+  -d '{"fingerprint": "&lt;from /v1/observe&gt;",
+       "action": "refresh_schema", "successful": true}'</code></pre>
+    </figure>
+    <p class="band-sub">
+      Those three field names are exact: <code>fingerprint</code>,
+      <code>action</code>, <code>successful</code>. Anything else returns 422
+      with the missing field named. Full schemas in
+      <a href="/docs">the API reference</a>.
+    </p>
+  </section>
+
   <section class="shell band" id="mcp-clients" aria-labelledby="mcp-title">
     <div class="band-head">
-      <h2 id="mcp-title" class="label">Any other MCP client</h2>
-      <p class="band-sub">Cursor, Claude Desktop, your own agent framework: paste the endpoint into the client's MCP settings, as type <code>http</code>.</p>
+      <h2 id="mcp-title" class="label">The bare MCP endpoint — smallest, and least effective</h2>
+      <p class="band-sub">For when nothing can be installed: paste the endpoint into the client's MCP settings, as type <code>http</code>. Nothing runs on your machine and reads store nothing &mdash; which makes it the safest thing to add, and the weakest. The model has to choose to call <code>check_tool_failure</code> while it is busy failing, and in our lab it did about once every five runs. If you can, <a href="#proxy">put the proxy in front of your servers</a> instead.</p>
     </div>
     <div class="endpoint">
       <span class="endpoint-label">MCP endpoint</span>
@@ -336,106 +500,6 @@ except Exception as exc:
 
     <p class="band-sub">
       The client then has four tools: <code>check_tool_failure</code> before a retry, and <code>report_tool_failure</code>, <code>report_tool_success</code> and <code>report_recovery_outcome</code> to contribute. Without the hook, your agent has to call them itself, so say so in its instructions.
-    </p>
-  </section>
-
-  <section class="shell band" id="proxy" aria-labelledby="proxy-title">
-    <div class="band-head">
-      <h2 id="proxy-title" class="label">Any MCP client, automatically — the proxy</h2>
-      <p class="band-sub">
-        A model given FailEcho's tools has to think of asking, and while it is
-        handling a failure it mostly does not. The proxy puts the answer where
-        the model is already looking: put it in front of the MCP servers you
-        already use, and a failed tool call comes back with one line of advice.
-      </p>
-    </div>
-    <figure class="snip">
-      <pre><code>{
-  "mcpServers": {
-    "github": {
-      "command": "uvx",
-      "args": ["failecho-mcp", "proxy", "--",
-               "npx", "-y", "@modelcontextprotocol/server-github"]
-    }
-  }
-}</code></pre>
-    </figure>
-    <p class="band-sub">
-      <code>npx -y failecho-mcp proxy -- …</code> works the same way, with no
-      Python needed. For a remote server, give its URL instead of a command:
-      <code>failecho-mcp proxy --header "Authorization: Bearer $TOKEN" -- https://…/mcp</code>
-      (a header token works; OAuth does not, so connect those directly).
-    </p>
-    <figure class="snip">
-      <pre><code>429 rate limit exceeded
-FailEcho: try backoff, worked n/m (confidence 0.61).</code></pre>
-    </figure>
-    <p class="band-sub">
-      A server that wraps an API reports under its own name, so tell the proxy
-      which host each tool calls: <code>--upstream 'github_*=api.github.com'</code>
-      (or <code>--upstream api.github.com</code> for every tool). When the
-      server's own name has no advice yet, the proxy asks under that host and
-      says so &mdash; <code>FailEcho (evidence from api.github.com): …</code>.
-      Reports keep the server's name. The GitHub MCP server's own names map to
-      <code>api.github.com</code> without being told.
-    </p>
-    <p class="band-sub">
-      Every other message passes through unchanged &mdash; byte for byte for a
-      server started locally; a remote server's messages are parsed and
-      re-serialised. Each call's outcome is reported as its shape only
-      &mdash; the server's name, the tool, an error class and code, the latency
-      &mdash; never arguments, never results, and never the error
-      text: the proxy reads it to pick an error class and drops it, ignoring
-      <code>FAILECHO_SEND_ERRORS</code> even when you have set it for the
-      wrapper (0.2.2 and newer). A failed call repeated with the same arguments counts as
-      a retry, compared as a hash that never leaves your machine. Advice waits
-      at most 3 seconds, on failures only; if FailEcho is unreachable the error
-      passes through as it was. <code>FAILECHO_DISABLED=1</code> makes it a
-      plain pipe, <code>FAILECHO_ADVISE=0</code> reports without adding advice.
-    </p>
-  </section>
-
-  <section class="shell band" id="rest-api" aria-labelledby="rest-title">
-    <div class="band-head">
-      <h2 id="rest-title" class="label">Your own code, no MCP</h2>
-      <p class="band-sub">One HTTP call. It writes no observation and keeps no record of the question, and is never rate limited; it adds 1 to a daily counter of answered/unanswered queries.</p>
-    </div>
-    <figure class="snip">
-      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"service": "api.github.com", "operation": "create_issue",
-       "error_type": "rate_limit", "error_code": "429"}'</code></pre>
-    </figure>
-    <p class="band-sub">
-      Reporting takes two more calls. <code>/v1/observe</code> after every call,
-      success or failure — failure rates need a denominator:
-    </p>
-    <figure class="snip">
-      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/observe \
-  -H "Content-Type: application/json" \
-  -H "X-Reporter-ID: my-agent-1" \
-  -d '{"service": "github-mcp", "operation": "create_issue",
-       "outcome": "failure", "error_type": "validation_error",
-       "error_code": "422"}'</code></pre>
-    </figure>
-    <p class="band-sub">
-      That returns the <code>fingerprint</code>. If you then try something and it
-      works, send the outcome — this is the scarcest and most useful thing in
-      the network, because it is the only call that records what actually
-      <em>fixed</em> a failure:
-    </p>
-    <figure class="snip">
-      <pre><code>curl -X POST {{PUBLIC_URL}}/v1/outcome \
-  -H "Content-Type: application/json" \
-  -H "X-Reporter-ID: my-agent-1" \
-  -d '{"fingerprint": "&lt;from /v1/observe&gt;",
-       "action": "refresh_schema", "successful": true}'</code></pre>
-    </figure>
-    <p class="band-sub">
-      Those three field names are exact: <code>fingerprint</code>,
-      <code>action</code>, <code>successful</code>. Anything else returns 422
-      with the missing field named. Full schemas in
-      <a href="/docs">the API reference</a>.
     </p>
   </section>
 

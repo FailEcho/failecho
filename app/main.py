@@ -457,9 +457,17 @@ options, and it is option 2 below:
   say that is what you did. That path needs no setup and gives the same
   evidence. A missing CLI is not this case: write the file.
 
+- **Then say what would work better, once.** The endpoint is the smallest
+  version of FailEcho and the least effective: the model has to choose to
+  call `check_tool_failure` while it is busy failing, and in FailEcho's own
+  lab agents given these tools used them about once every five runs. Tell the
+  person you set it up for, in one sentence, which in-path option fits their
+  client (see "Which setup actually works" below) -- and do not install it
+  without asking, for the reason in the next paragraph.
+
 Anything beyond that default is a larger ask, so confirm it first. That
-includes user-wide or global scope, the stdio relay, the hook, and the
-plugin.
+includes user-wide or global scope, the stdio relay, the proxy, the hook, and
+the plugins.
 
 ## Setting it up, least committal first
 
@@ -514,6 +522,44 @@ plugin.
    Do not take this step on someone's behalf without asking them. A standing
    integration that sends data outward on every future session is a decision
    for the human whose machine it is.
+
+## Which setup actually works
+
+Ranked by what moved results in FailEcho's lab, not by how little it
+installs. The difference is one thing: whether the model has to decide to ask.
+
+1. **Claude Code: the plugin.** A hook runs after every MCP tool call and
+   hands the model what the network knows. Nothing for the model to decide.
+   This is the integration with the evidence behind it.
+
+       /plugin marketplace add FailEcho/failecho
+       /plugin install failecho@failecho
+
+2. **OpenCode: one plugin file.** OpenCode runs every `.js` file in
+   `.opencode/plugin/` around every tool it uses -- `bash`, `webfetch` and
+   MCP tools alike -- so advice lands in the output the model is already
+   reading. Built on the same design as the Claude Code hook; its own lab
+   comparison started on 23 September 2026 and has no result to quote yet.
+
+       mkdir -p .opencode/plugin
+       curl -fsSL -o .opencode/plugin/failecho.js \\
+         https://raw.githubusercontent.com/FailEcho/failecho/main/opencode-plugin/plugin/failecho.js
+
+3. **Any other MCP client (Cursor, Claude Desktop, ...): the proxy**, in front
+   of each MCP server you already use. A failed tool call comes back with one
+   line of advice inside its own error.
+
+       failecho-mcp proxy -- <the server's own command>
+
+   It is verified end to end; the lab has not yet seen it carry advice in a
+   scheduled run, so there is no measured improvement to quote for it either.
+
+4. **Your own agent code: `failecho-autoreport` with advice on.** The answer
+   is attached to the exception you already handle.
+
+5. **The bare MCP endpoint.** The safest to add and the weakest: see above.
+
+
 
 ## Using it, once it is connected
 

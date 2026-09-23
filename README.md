@@ -95,7 +95,24 @@ Read https://failecho.com/llms.txt and set yourself up to use FailEcho.
 It reads the machine-readable guide and configures itself. No account, no API
 key, nothing to sign up for. Everything below is the same thing done by hand.
 
-**MCP endpoint**
+**Put it in the tool path, not the tool list.** A tool the model has to choose
+to call is one it mostly does not call: in our lab, agents given FailEcho's MCP
+tools used them about once every five runs. The integrations that work hand
+the model the answer where it is already looking, so pick by client:
+
+| Your agent runs in | Install | Where the advice lands |
+|---|---|---|
+| Claude Code | the plugin: `/plugin marketplace add FailEcho/failecho` then `/plugin install failecho@failecho` | after every MCP tool call, via a hook |
+| OpenCode | one file: `.opencode/plugin/failecho.js` ([source](opencode-plugin/plugin/failecho.js)) | in the output of every tool, `bash` and `webfetch` included |
+| Cursor, Claude Desktop, any MCP client | `failecho-mcp proxy -- <server command>` in front of each MCP server | inside the failing tool's error |
+| Your own code | `failecho-autoreport` with `FAILECHO_ADVISE=1` | on the exception you already handle |
+| Nothing can be installed | the bare MCP endpoint below | only if the model remembers to ask |
+
+The Claude Code plugin is the one with measured results behind it. The
+OpenCode plugin and the proxy are built and tested end to end; their lab
+comparisons have not produced a result to quote yet.
+
+**The bare MCP endpoint** -- the smallest option and the least effective
 
 ```
 https://failecho.com/mcp
