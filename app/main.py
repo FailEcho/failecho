@@ -835,9 +835,9 @@ sets it on an integration that ignores it reports to the public network:
 - Claude Code plugin 0.2.0 and newer (`/plugin update failecho`). Works.
 - OpenCode plugin, the file or `failecho-opencode` from npm. Works.
 - `failecho-autoreport` 0.1.7 and newer (PyPI). Works.
-- `failecho-mcp proxy` from PyPI, 0.2.3 and newer. Works.
-- `npx failecho-mcp proxy` (npm): in the repository, **not in the published
-  package yet**. Run from npm today, it reports to the public network.
+- `failecho-mcp proxy` 0.2.3 and newer, PyPI or npm. Works.
+- Older `failecho-autoreport` and `failecho-mcp` ignore the variable and
+  report to the public network: upgrade first.
 - The MCP tools: never. A secret does not belong in a tool argument the model
   and every conversation log can see.
 

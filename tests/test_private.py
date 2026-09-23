@@ -325,9 +325,10 @@ def test_the_pages_do_not_promise_private_mode_where_it_does_not_work(client):
     mode says which integrations it works with, and which not yet."""
     for path in ("/llms.txt", "/setup"):
         flat = " ".join(client.get(path).text.split())
-        # 23 Sep: PyPI has 0.1.7 and 0.2.3; npm failecho-mcp is still 0.2.2
-        assert "not in the published package yet" in flat or "not yet in its published package" in flat, path
-        assert "npx failecho-mcp" in flat, path
+        # 23 Sep: 0.1.7 and 0.2.3 are published; older versions still ignore the token
+        assert "0.1.7 and newer" in flat and "0.2.3 and newer" in flat, path
+        assert "report publicly" in flat or "report to the public network" in flat, path
+        assert "not in the published package" not in flat and "not yet in its published package" not in flat, path
         assert "failecho-autoreport, the plugin, the proxy" not in flat, path
 
 
