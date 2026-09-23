@@ -15,5 +15,9 @@ WorkingDirectory=/srv/failecho-lab/app
 EnvironmentFile=/etc/failecho-lab.env
 ExecStart=/srv/failecho/.venv/bin/python /srv/failecho-lab/app/scripts/prune.py
 ProtectSystem=strict
+# strict also makes /tmp read-only, and SQLite needs a temp file for a
+# large GROUP BY: the lab's first prune died on it with "disk I/O error"
+# (23 Sep). Production only worked because its database is still small.
+PrivateTmp=true
 ProtectHome=true
 ReadWritePaths=/srv/failecho-lab/data

@@ -164,3 +164,12 @@ def test_the_lab_is_pruned_like_production():
     assert "ReadWritePaths=/srv/failecho-lab/data" in service
     assert "/srv/failecho/data" not in service, "the lab pruner must never touch production's database"
     assert "OnCalendar=*:35" in timer
+
+
+def test_both_pruners_have_a_writable_tmp():
+    """ProtectSystem=strict makes /tmp read-only; a large GROUP BY needs a temp
+    file. The lab's first prune failed with "disk I/O error", and production's
+    identical unit would have failed the same way as soon as it grew."""
+    for name in ("failecho-prune.service", "failecho-lab-prune.service"):
+        unit = (DEPLOY / name).read_text()
+        assert "ProtectSystem=strict" in unit and "PrivateTmp=true" in unit, name
