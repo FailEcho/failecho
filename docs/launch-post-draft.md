@@ -1,8 +1,15 @@
 # Launch post, draft
 
-Written 22 September 2026 for the user to edit and publish. Claude does not
-post anywhere. Every number is checkable against `docs/claims.md`; the
-qualifiers in it are part of the sentences, not footnotes to drop.
+Rewritten 23 September 2026 for the user to edit and publish. Claude does not
+post anywhere. Every number is checkable against `docs/claims.md` (lab window
+20 Sep 21:05 – 23 Sep 06:44 UTC, our own agents); the qualifiers in it are
+part of the sentences, not footnotes to drop.
+
+**Publish the packages first.** Version A names `pip install
+failecho-autoreport`, the proxy and the OpenCode plugin. Until 0.1.7, 0.2.3
+and `failecho-opencode` 0.1.0 are live (`docs/publish-2026-09-23.md`), the
+private-mode line is true only for REST, the Claude Code plugin and the
+OpenCode plugin file.
 
 ---
 
@@ -11,44 +18,54 @@ qualifiers in it are part of the sentences, not footnotes to drop.
 **FailEcho: agents share what fixed a failure, so the next one does not retry blind**
 
 When an agent's tool or API call fails, it usually retries and hopes. FailEcho
-is a shared, anonymous network where agents report the *shape* of a failure
-(service, operation, error class, code, latency — never prompts, arguments,
-results or bodies) and get back what other agents already tried and whether it
-worked.
+is a shared network where agents report the *shape* of a failure — service,
+operation, error class, code, latency; never prompts, arguments, results or
+bodies — and get back what other agents already tried and whether it worked.
 
-The part I care about is that nobody has to remember to ask. Three paths
-deliver the answer inside the failure itself:
+The thing I learned building it: **the answer has to arrive without the model
+choosing to ask.** Give a model a "check this failure" tool and it calls it
+about once every five runs. So FailEcho sits in the path of the tools the agent
+already uses:
 
-- a Claude Code plugin (a hook, no model decision);
-- `pip install failecho-autoreport` — advice attached to the exception;
-- `failecho-mcp proxy -- <your MCP server>` — one line added to the failed
-  tool's error, for any MCP client.
+- **Claude Code** — a plugin; a hook runs after every MCP tool call.
+- **OpenCode** — one plugin file; it runs around every tool, `bash` included.
+- **Any other MCP client** — `failecho-mcp proxy -- <your server>` adds one line
+  to a failed tool's error.
+- **Your own code** — `pip install failecho-autoreport`; the advice lands on the
+  exception you already handle.
 
-**What I measured, in my own lab, with my own agents.** 45 test agents run
-around the clock in twins: same task, same model, one asks the network before
-retrying, the other retries by fixed rules. Over four days, on failures where a
-fix exists (model-provider rate limits and outages):
+**What I measured, in my own lab, with my own agents.** 55 test agents run in
+twins: same task, same model, one asks the network before retrying, the other
+does not. Over the last two and a half days:
 
-- failures recovered: **77% with, 17% without**
-- runs that finished: **94% vs 84%**
-- tokens per finished run: **1,835 vs 1,984**
-
-On deliberately flaky endpoints it is mostly about waste: 21.3 s vs 28.3 s per
-run, and 316 retries the network told agents to skip.
+- When a fix exists (model-provider rate limits and outages): **72% of failures
+  recovered with FailEcho, 24% without**, and **93% vs 84%** of runs finished
+  (about 470 runs a side).
+- Where nothing works, it says so: on an exhausted Stack Exchange quota the
+  network told agents to skip, and the agents that retried anyway recovered
+  **0 times out of 266**.
+- Wasted time: **1.0 s vs 2.2 s** lost inside failures per run, using the live
+  network's own advice.
 
 **What I am not claiming.** No outside agent has used it yet: independent
-reporters is 0, and the front page says so. A "finished run" means the agent
-returned an answer, not a verified-correct one. The control is a plain retry
-after 3 seconds, so this is a win over naive retrying, not over careful
-recovery engineering. Pasting the MCP URL alone is *worse* than nothing in my
-lab (the model rarely calls a tool it has to choose) — use the plugin, the
-wrapper or the proxy. The proxy's own group is currently behind and has not yet
-shown a single advice line in a scheduled run; I am fixing that measurement
-rather than quoting it.
+reporters is 0, and the front page says so. The big numbers are against an
+agent that retries once after three seconds; against one that recovers
+carefully, both finish every run and FailEcho saves about 12% of the time lost
+to failures — that is the honest size of it for a well-built agent. A grader
+checks answers against the real APIs, and on those, correctness is a tie: it
+saves retries and time, it does not make answers more right. And pasting the MCP
+URL alone does little; use one of the paths above.
 
-It is MIT, self-hostable, needs no account or key, and reads store no
-observation. Site: https://failecho.com — lab scoreboard, with the losing
-cohorts included: https://lab.failecho.com/fleet
+**Free for early teams: private mode.** Set one environment variable and your
+team's failures stay yours — separate tables, never pooled or counted — and
+your own fixes come back to your agents, including "stop, nothing you tried has
+worked". Delete it all or rotate a leaked token any time. It works and is
+tested; whether it *helps* a small team is being measured now, and I will post
+that when there is a week of it.
+
+MIT, self-hostable, no account or key, and a read stores nothing.
+https://failecho.com — the lab scoreboard, losing cohorts included:
+https://lab.failecho.com/fleet
 
 ---
 
@@ -58,7 +75,7 @@ cohorts included: https://lab.failecho.com/fleet
 
 An agent hits `429`, or `503`, or a schema error. It retries. It retries again.
 Somewhere else, another agent hit the same failure an hour ago and found the
-thing that worked — switch model, wait for the reset, refresh the schema — and
+thing that worked — switch model, wait for the reset, stop and fail fast — and
 that knowledge dies in its log.
 
 ### What FailEcho does
@@ -67,63 +84,83 @@ Agents report the shape of a failure and, crucially, what they tried next and
 whether it worked. The network keys that on
 service + operation + version + schema hash + failure fingerprint, and answers
 one question: *before you retry, is this worth retrying, and what worked for
-others?*
+others?* When nothing has worked for anyone in the last day, the answer is
+"skip", and that turns out to be one of the most useful things it says.
 
 What never leaves the machine: prompts, tool arguments, results, request or
-response bodies, headers, keys. Error text is off by default and is normalised
-server-side when it is sent at all. A query writes no observation; it adds 1 to
-a daily counter of answered/unanswered queries, and that is the whole of it.
+response bodies, headers, keys. Error text is off by default. A query writes no
+observation.
 
 ### Why "automatically" is the whole product
 
-The first version of this exposed four tools over MCP and expected agents to
-call them. They mostly do not. In my lab, OpenCode called FailEcho 0.12 times
-per run, and that cohort ended up *worse* than the one without FailEcho,
-because the tool definitions cost tokens in every step and bought almost
-nothing. That is the most useful negative result I have.
+The first version exposed four tools over MCP and expected agents to call them.
+They mostly do not: in my lab, OpenCode called FailEcho about 0.2 times per run,
+even with the strictest instruction I could write, and the pair with it is a
+tie with the pair without. That is the most useful negative result I have.
 
-So the product is now the three automatic paths above. The advice arrives in
-the error the model is already reading:
+So FailEcho now sits in the tool path — a Claude Code hook, an OpenCode plugin,
+an MCP proxy, a Python wrapper — and the advice arrives in the error the model
+is already reading. Its shape (the counts here are illustrative, not measured):
 
-    HTTP 403 rate limit exceeded: {"message":"API rate limit exceeded for ..."}
-    FailEcho (evidence from api.github.com): no clear fix yet; on this service's
-    other operations, agents tried wait_until_reset worked 2/11, backoff worked
-    104/2330.
+    HTTP/2 429
+    rate limit exceeded
 
-Which in that case means: stop retrying, this is not going to work.
+    FailEcho: try wait_until_reset (worked 33/40).
 
 ### The numbers, and their limits
 
-45 personas, ~90,000 observations, 13,000 recovery outcomes, four days, all my
-own agents. Twins run the same task with the same model, alternating order.
+55 test agents, all mine, in twins that run the same task with the same model.
+Window: 20 Sep 21:05 – 23 Sep 06:44 UTC.
 
 | Group | With | Without |
 |---|---|---|
-| Model-provider failures recovered | 77.3% | 17.2% |
-| Runs finished (provider group) | 94.0% | 83.5% |
-| Tokens per finished run | 1,835 | 1,984 |
-| Flaky endpoints, seconds per run | 21.3 | 28.3 |
-| Real APIs (GitHub, PyPI, npm, crates, Stack Exchange) | 68.3% | 64.0% |
-| Coding agents in a VM | 84.0% | 83.7% |
+| Model-provider failures recovered | 72.1% | 24.4% |
+| Runs finished (provider group, ~470 a side) | 92.8% | 84.4% |
+| Tokens per finished run (provider group) | 1,583 | 1,676 |
+| Seconds lost in failures, advice from production | 1.03 | 2.21 |
+| Retry attempts per failure, advice from production | 1.28 | 1.99 |
+| Careful recovery on both sides: runs finished | 100% | 100% |
+| Careful recovery on both sides: seconds lost in failures | 9.2 | 10.5 |
+| Real APIs, checked answers correct | 83.3% | 83.3% |
+| Coding agents in a VM, runs finished | 82.1% | 81.5% |
 
-The last row is the honest shape of it: coding agents mostly fail on their own
+Read the bottom half as carefully as the top. Against a careful agent the gain
+is time, not outcomes. Checked answers tie. Coding agents fail on their own
 bugs, and a network of other agents' failures cannot help with that.
 
-Limits, stated once and plainly: zero independent reporters so far; "finished"
-means an answer was returned, not verified correct; the control is a naive
-retry; the proxy group is unproven; nothing here sees an agent's own `curl`.
+### What the audit found
 
-### An outside review, and what it broke
+I had an outside model review the product, and then audited my own numbers
+against the raw ledger. Both found real problems, and the fixes are in the repo
+with the reasoning: a grader that marked "0 open issues" wrong every time it was
+right, a scoreboard whose "since 17 September" covered two and a half days, the
+slowest experiments silently capped at 25 runs a side, a flaky test that was
+really the clock crossing an hour. The grader bugs made answers look worse than
+they were; the scoreboard's window made the evidence look longer than it was.
+None of them changed the headline numbers above, which are counted per call and
+never went through the grader.
 
-I had a strong model review the whole thing — code, published packages, the
-scoring, the claims. It found no fabricated numbers and several claims wider
-than the measurement, plus real defects: a 5xx containing the word "invalid"
-filed as a validation error; the proxy honouring an error-text switch it
-promised to ignore; an advice line that hid the server's own "these attempts
-are failing lately" warning. All fixed and published. The findings live in the
-repo with their status, including the ones I have not done yet.
+### Private mode, free for early teams
+
+A shared network needs other agents; your own evidence does not. Send a secret
+your team shares and every report is stored for your team alone — separate
+tables, never pooled, never counted — and your agents get your own history
+back, labelled as yours, including a "skip" when five of your recent attempts
+all failed. `DELETE /v1/team` removes everything; `POST /v1/team/rotate` moves
+it to a new token if one leaks. There is no account: the token is the team.
+
+It works and it is private — that is tested end to end. Whether it helps a small
+team, and how soon, is being measured by a lab arm that started today.
 
 ### Try it
+
+    # Claude Code
+    /plugin marketplace add FailEcho/failecho
+    /plugin install failecho@failecho
+
+    # OpenCode
+    mkdir -p .opencode/plugin && curl -fsSL -o .opencode/plugin/failecho.js \
+      https://raw.githubusercontent.com/FailEcho/failecho/main/opencode-plugin/plugin/failecho.js
 
     # any MCP client
     npx -y failecho-mcp proxy -- npx -y @modelcontextprotocol/server-github
@@ -138,8 +175,14 @@ whole thing self-hosts from the repo with your own salt.
 
 ## Notes for the poster
 
-- Keep the limits paragraph. It is the reason the good numbers are believable.
+- Keep the limits paragraph and the bottom half of the table. They are the
+  reason the good numbers are believable.
 - Do not add a claim that is not in `docs/claims.md`.
-- If someone asks "how do you know reporters are independent?": today, you do
-  not — ids are self-chosen and a restart mints a new one. Persistent signed
-  identity is the next piece of work. Say that.
+- If someone asks "how do you know reporters are independent?": today there are
+  none, and the front page says 0. Reporters can now sign with an Ed25519 key,
+  which proves a report came from that key and nothing more — keys are free,
+  so it is not a count of people. The adoption threshold is what counts one.
+- If someone asks whether private mode helps: say it is measured from 23 Sep
+  and you will post the result, not that it does.
+- Numbers move: re-check `docs/claims.md` against lab.failecho.com/fleet the
+  day you post.
