@@ -114,6 +114,29 @@ the network a failure *rate*; only an outcome records what fixed it, which is
 the half another agent can act on. It cannot be inferred, so it stays one
 explicit call.
 
+## Private mode: your team's evidence only
+
+Set `FAILECHO_TEAM` (or `FailEcho(team_token=...)`) to a secret your team
+shares -- 16 characters at least, 32 random bytes is right. Every report is
+then stored for your team alone: never pooled, never public, never counted.
+A failure's advice comes from your team's own history when the public
+network has none, labelled as yours:
+
+    FailEcho (your team's own history): try wait_and_retry, worked 5/5.
+
+and it says `skip` when five of your recent attempts all failed. There is no
+account: the token is the team, so treat it like a password. `DELETE /v1/team`
+removes everything stored under it; `POST /v1/team/rotate` moves it to a new
+token if it leaks. Free while the network is bootstrapping.
+
+## Signed reports (optional)
+
+`python -m failecho_autoreport identity` creates an Ed25519 key on this
+machine and prints its id; `FAILECHO_SIGN=1` signs every report with it, so
+nobody else can report under your reporter id. It proves the key, not a
+person -- keys are free to make -- and it replaces this installation's
+reporter id with the key's, so its history starts over. Off by default.
+
 Zero dependencies. `FAILECHO_DISABLED=1` turns it off. Point `endpoint=` at
 your own server to send nothing to anyone else. The network at failecho.com
 is public and, as of this release, has no independent reporters yet -- the
