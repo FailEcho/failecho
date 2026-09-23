@@ -445,3 +445,60 @@ def test_every_integration_says_a_team_skip_as_an_instruction():
     spec.loader.exec_module(hook)
     note = hook.context_note("svc", "op", {"known": False, **answer})
     assert "Do not retry this call" in note and "5 attempts" in note
+
+
+# -- a team's control over its own data (2026-09-23) ------------------------------
+
+NEW_TEAM = "team-token-zzzzzzzzzzzzzzzzzzzzzzzz"
+
+
+def test_a_team_can_delete_everything_it_stored(client):
+    fingerprint = report(client).json()["fingerprint"]
+    report(client)
+    client.post("/v1/outcome", json={"fingerprint": fingerprint, "action": "retry", "successful": True},
+                headers={"X-FailEcho-Team": TEAM})
+    report(client, token=OTHER_TEAM)                       # somebody else's, must survive
+
+    gone = client.delete("/v1/team", headers={"X-FailEcho-Team": TEAM})
+    assert gone.status_code == 200
+    assert gone.json()["deleted_observations"] == 2 and gone.json()["deleted_outcomes"] == 1
+    assert ask(client).json()["team_evidence"] is None
+    assert ask(client, token=OTHER_TEAM).json()["team_evidence"]["observations"] == 1, "only this team's rows"
+    again = client.delete("/v1/team", headers={"X-FailEcho-Team": TEAM}).json()
+    assert again["deleted_observations"] == 0, "idempotent"
+
+
+def test_delete_needs_a_token_and_never_touches_public_data(client):
+    client.post("/v1/observe", json=FAILURE)                # public
+    assert client.delete("/v1/team").status_code == 400
+    client.delete("/v1/team", headers={"X-FailEcho-Team": TEAM})
+    assert client.get("/v1/stats").json()["observations_total"] == 1
+
+
+def test_a_leaked_token_can_be_replaced_without_losing_history(client):
+    fingerprint = report(client).json()["fingerprint"]
+    for _ in range(5):
+        client.post("/v1/outcome", json={"fingerprint": fingerprint, "action": "wait_and_retry", "successful": True},
+                    headers={"X-FailEcho-Team": TEAM})
+    moved = client.post("/v1/team/rotate", json={"new_token": NEW_TEAM}, headers={"X-FailEcho-Team": TEAM})
+    assert moved.status_code == 200 and moved.json() == {
+        "deleted_observations": 0, "deleted_outcomes": 0, "moved_observations": 1, "moved_outcomes": 5}
+    assert ask(client).json()["team_evidence"] is None, "the old token reads nothing now"
+    assert ask(client, token=NEW_TEAM).json()["team_evidence"]["recommendation"]["action"] == "wait_and_retry"
+
+
+def test_rotation_never_merges_two_teams(client):
+    report(client)
+    report(client, token=OTHER_TEAM)
+    refused = client.post("/v1/team/rotate", json={"new_token": OTHER_TEAM}, headers={"X-FailEcho-Team": TEAM})
+    assert refused.status_code == 409
+    assert ask(client, token=OTHER_TEAM).json()["team_evidence"]["observations"] == 1
+
+
+def test_rotation_refuses_a_weak_or_unchanged_token(client):
+    report(client)
+    assert client.post("/v1/team/rotate", json={"new_token": "short"},
+                       headers={"X-FailEcho-Team": TEAM}).status_code == 422
+    assert client.post("/v1/team/rotate", json={"new_token": TEAM},
+                       headers={"X-FailEcho-Team": TEAM}).status_code == 400
+    assert client.post("/v1/team/rotate", json={"new_token": NEW_TEAM}).status_code == 400

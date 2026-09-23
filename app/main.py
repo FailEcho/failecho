@@ -40,7 +40,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import observe, otlp, outcome, query, services
+from app.api import observe, otlp, outcome, query, services, team
 from app.api.otlp import OTLP_MAX_BODY_BYTES
 from app.core.config import settings
 from app.db.database import SessionLocal, init_db
@@ -186,6 +186,7 @@ app.include_router(otlp.router, prefix="/v1")
 app.include_router(query.router, prefix="/v1")
 app.include_router(outcome.router, prefix="/v1")
 app.include_router(services.router, prefix="/v1")
+app.include_router(team.router, prefix="/v1")
 
 
 @app.get(
@@ -811,6 +812,17 @@ There is no account. The token is self-chosen, like `reporter_id`, only
 secret; it is stored as a salted hash and never in the clear. Nothing is
 issued and nothing is billed, so there is nothing to leak -- and losing the
 token loses access to that evidence.
+
+The team controls its data with the same token and nothing else:
+
+    DELETE {base_url}/v1/team          delete everything stored under it, now
+    POST   {base_url}/v1/team/rotate   {{"new_token": "..."}} -- for a leaked
+                                       token: history moves, the old one
+                                       reads nothing afterwards
+
+Rotation is refused if the new token already holds evidence, so two teams are
+never merged by accident. The token is the team: whoever holds it can read,
+delete and rotate, and there is no account to appeal to.
 
     FAILECHO_TEAM=<token>
 
