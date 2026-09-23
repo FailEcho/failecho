@@ -52,8 +52,9 @@ reporters is 0, and the front page says so. The big numbers are against an
 agent that retries once after three seconds; against one that recovers
 carefully, both finish every run and FailEcho saves about 12% of the time lost
 to failures — that is the honest size of it for a well-built agent. A grader
-checks answers against the real APIs, and on those, correctness is a tie: it
-saves retries and time, it does not make answers more right. And pasting the MCP
+checks answers against the real APIs, and there is no measured difference in
+correctness yet: it saves retries and time, and I cannot yet say it makes
+answers more right. And pasting the MCP
 URL alone does little; use one of the paths above.
 
 **Free for early teams: private mode.** Set one environment variable and your
@@ -121,11 +122,11 @@ Window: 20 Sep 21:05 – 23 Sep 06:44 UTC.
 | Retry attempts per failure, advice from production | 1.28 | 1.99 |
 | Careful recovery on both sides: runs finished | 100% | 100% |
 | Careful recovery on both sides: seconds lost in failures | 9.2 | 10.5 |
-| Real APIs, checked answers correct | 83.3% | 83.3% |
+| Real APIs, checked answers correct (16 vs 14 runs: too few to call) | 100% | 85.7% |
 | Coding agents in a VM, runs finished | 82.1% | 81.5% |
 
 Read the bottom half as carefully as the top. Against a careful agent the gain
-is time, not outcomes. Checked answers tie. Coding agents fail on their own
+is time, not outcomes. Checked answers show no difference yet at this size. Coding agents fail on their own
 bugs, and a network of other agents' failures cannot help with that.
 
 ### What the audit found

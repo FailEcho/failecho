@@ -32,7 +32,7 @@ moves gets re-checked here before it is repeated.
 | Claim | Required qualifier |
 |---|---|
 | The provider-group numbers | The control retries **once after 3 seconds**, not like a careful engineer. Against careful recovery (local group) the gain is time, not finished runs |
-| "Runs finished" | A model run counts when it **returned an answer**. A grader now checks the answers themselves against the APIs: on real APIs, **83.3% vs 83.3%** of checked values correct (24 vs 18 checkable runs) -- a tie |
+| "Runs finished" | A model run counts when it **returned a non-empty answer**. A grader checks the answers against the APIs: on real APIs **100% vs 85.7%** of checked values correct, on only 16 vs 14 checkable runs since the regradable grader went live (05:17 UTC, 23 Sep) -- too few to call a difference either way |
 | Real-API finish rate (66.1% vs 63.5%) | Not significant (p = 0.24): the gain there is fewer wasted retries, not more finished work |
 | Coding agents in a VM (82.1% vs 81.5%) | A tie: they fail on their own bugs, which no network of other agents' failures can help with |
 | The MCP endpoint on its own | Models call a tool they have to choose **0.19-0.24 times per run**; the OpenCode pair with it is a tie (77.3% vs 72.7%, 22 runs a side). Lead with the in-path integrations |
@@ -49,7 +49,7 @@ moves gets re-checked here before it is repeated.
 | "Private mode works with every FailEcho integration" | Until `failecho-autoreport` 0.1.7 and `failecho-mcp` 0.2.3 are published, the registry versions do not read `FAILECHO_TEAM` and a team using them reports **publicly**. Say which integrations work (REST, Claude Code plugin 0.2.0+, OpenCode plugin file) until then |
 | "Signed reporters are real people" | A key is free to make. Signing rules out impersonation, nothing more |
 | "Private mode makes a team's agents do better" | Works and is private -- that is tested. Whether it *helps* a small team is being measured by the team arm (started 23 Sep, a week to read) |
-| "FailEcho makes agents more correct" | Checked answers tie (83.3% vs 83.3% on real APIs). It saves wasted retries and time, and recovers far more often where a fix exists |
+| "FailEcho makes agents more correct" | No measured difference yet: checked answers read 100% vs 85.7% on 16 vs 14 runs, which is noise at that size. It saves wasted retries and time, and recovers far more often where a fix exists |
 | "Proven to raise task completion" | Only in the provider group, and only against a naive retry; see the qualifiers |
 | "Independent agents confirm this" | Independent reporters: 0 |
 | "Your secrets can never leak" | Defaults are narrow, but a URL path or an error string can carry an identifier. Say what is sent, not what cannot happen |
@@ -60,5 +60,5 @@ moves gets re-checked here before it is repeated.
 
 `lab.failecho.com/fleet` is live, and every table there now says the window it
 covers. Production counters: `https://failecho.com/v1/stats`. The lab's
-correctness numbers restarted at 03:32 UTC on 23 Sep after grader fixes; they
-are small until they refill.
+correctness numbers restarted at 05:17 UTC on 23 Sep, when grades began keeping
+the truth they used; from then on every grader fix applies to all of them.
