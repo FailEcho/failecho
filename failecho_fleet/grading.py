@@ -402,7 +402,29 @@ def _is_refusal(line: str, text: str, kind: str) -> bool:
     return any(word in haystack for word in REFUSAL_WORDS)
 
 
+#: Typography a model uses that means nothing to a grader: curly quotes and
+#: apostrophes, a non-breaking hyphen, and markdown emphasis. "does **not**
+#: exist" failed "does not", and "couldn’t fetch" failed "couldn't fetch",
+#: on right answers, three and one times on 23 Sep.
+_TYPOGRAPHY = str.maketrans({"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"',
+                             "\u2011": "-", "\u2010": "-", "\u2013": "-", "*": None, "`": None})
+
+
+def _plain(text: str) -> str:
+    return (text or "").translate(_TYPOGRAPHY)
+
+
+#: The word an answer uses to say which registry a value came from. With one
+#: value of that kind in the task, a line naming the registry is about it:
+#: "On PyPI the most recent version is 0.12.18" answers the uv-on-PyPI
+#: question without saying "uv" again.
+_REGISTRY_WORDS = {"pypi": ("pypi",), "npm": ("npm",), "crates": ("crates", "crate"),
+                   "github_tag": ("github", "release", "tag"), "github_stars": ("star",),
+                   "github_issues": ("issue",)}
+
+
 def _grade_prose(checks, text: str, out: dict, resolve) -> dict:
+    text = _plain(text)
     """Grade a sentence. The light lane answers in prose and nothing could
     grade it until now -- 963 runs a side counted as 'completed' on a pattern.
     """
@@ -435,7 +457,12 @@ def _grade_prose(checks, text: str, out: dict, resolve) -> dict:
             out["unknown"] += 1
             continue
         out["checked"] += 1
-        if any(_matches_in_line(candidate, want, kind, arg) for candidate in lines):
+        candidates = list(lines)
+        if kinds.count(kind) == 1 and not any(_matches_in_line(c, want, kind, arg) for c in lines):
+            words = _REGISTRY_WORDS.get(kind, ())
+            candidates += [ln for ln in re.split(r"[\n;]|(?<=[.!])\s", text)
+                           if any(w in ln.lower() for w in words) and ln not in candidates]
+        if any(_matches_in_line(candidate, want, kind, arg) for candidate in candidates):
             out["matched"] += 1
         else:
             # which value was wrong, not what it said: enough to tell a model

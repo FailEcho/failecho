@@ -1945,3 +1945,40 @@ def test_the_team_group_reports_how_soon_its_own_history_helped(tmp_path, monkey
     rows = {r["metric"]: r for r in groups["team"]["rows"]}
     assert rows["hours until the team's own history had its first fix"]["ask"] == 6.0
     assert rows["failures where the team's own history had a fix"]["ask"] == 50.0
+
+
+# -- typography, and the registry a line names (23 Sep, 08:xx) --------------------
+
+
+def test_markdown_emphasis_does_not_hide_a_denial(monkeypatch):
+    g = _truths(monkeypatch, {("pypi_absent", "definitely-not-a-real-package-xyz-123"): True,
+                              ("pypi", "uv"): "0.12.18"})
+    prompt = "Does the PyPI package 'definitely-not-a-real-package-xyz-123' exist? And what is the latest 'uv'?"
+    answer = ("The package **definitely-not-a-real-package-xyz-123** does **not** exist. "
+              "The latest version of **uv** is **0.12.18**.")
+    assert g.grade(prompt, answer, True)["correct"] is True
+
+
+def test_a_curly_apostrophe_still_says_could_not(monkeypatch):
+    g = _truths(monkeypatch, {("github_stars", "modelcontextprotocol/python-sdk"): 24369,
+                              ("github_stars", "modelcontextprotocol/typescript-sdk"): 13443})
+    prompt = "Star counts for modelcontextprotocol/python-sdk and modelcontextprotocol/typescript-sdk."
+    result = g.grade(prompt, "I’m sorry, I couldn’t fetch the star counts due to API limits.", True)
+    assert result["refused"] == 2 and result["correct"] is None
+
+
+def test_a_line_that_names_the_registry_answers_for_its_one_package(monkeypatch):
+    g = _truths(monkeypatch, {("pypi", "uv"): "0.12.18", ("github_tag", "astral-sh/uv"): None})
+    prompt = "Latest release of astral-sh/uv on GitHub, and does 'uv' on PyPI match it?"
+    right = "The latest release on astral-sh/uv's GitHub is **v0.12.19**.\nOn PyPI the most recent version is **0.12.18**."
+    assert g.grade(prompt, right, True)["correct"] is True
+    wrong = "The latest release on astral-sh/uv's GitHub is v0.12.19.\nOn PyPI the most recent version is 0.12.11."
+    assert g.grade(prompt, wrong, True)["correct"] is False, "naming the registry is not a free pass"
+
+
+def test_an_empty_answer_is_not_a_finished_run():
+    """Found through the grader: three runs whose model returned nothing were
+    counted as completed, because the test was only 'not a (failure)'."""
+    import inspect
+    source = inspect.getsource(F.run_once) if hasattr(F, "run_once") else open(F.__file__).read()
+    assert 'run.completed = bool((answer or "").strip()) and not answer.startswith("(")' in source

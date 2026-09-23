@@ -423,7 +423,15 @@ OPENCODE_PERSONAS = {"fleet-oc-ask-n", "fleet-oc-blind-n"}
 #: model writes "LlamaIndex" where the task names run-llama/llama_index. The
 #: answers behind those grades were not kept, so they cannot be re-graded --
 #: and a rate that silently mixes two graders is worse than a shorter one.
-GRADING_SINCE = "2026-09-23T03:32:00"   # moved from 21:55 when the zero and summary-line fixes went live
+GRADING_SINCE = "2026-09-23T05:17:00"
+# Moved twice, each time with its reason. From 21:55 to 03:32 when the zero
+# and summary-line fixes went live; from 03:32 to 05:17 when grades began to
+# keep the truth they used. The grades between were made by a grader with
+# five bugs since fixed ("24 368", a one-subject answer without its name, the
+# harness's "(model budget exhausted)", "cannot be found", a value-less line
+# under a refusal) and carry no snapshot, so they cannot be redone -- and
+# every grade after 05:17 is recomputed by the current grader at report time,
+# so this should be the last move.
 
 #: How much of a prose answer the ledger keeps for regrading.
 ANSWER_KEEP = 600
@@ -2138,7 +2146,10 @@ def main(argv: list[str] | None = None) -> int:
     elif provider is None:
         run.completed = all(f["recovered"] for f in run.failures)
     else:
-        run.completed = not answer.startswith("(")
+        # An answer, not a parenthesised failure -- and not nothing. An empty
+        # reply was counted as a finished run until 23 Sep; the grader then
+        # marked it wrong, which is how it was found.
+        run.completed = bool((answer or "").strip()) and not answer.startswith("(")
 
     record = {"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "reporter": reporter, "path": path,
               "provider": provider, "model": getattr(run, "model", None), "asks": asks, "tool_calls": run.tool_calls, "model_calls": run.model_calls,
