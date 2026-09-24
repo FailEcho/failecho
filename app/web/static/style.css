@@ -658,7 +658,7 @@ footer.shell {
 /* ---- responsive -------------------------------------------------------- */
 @media (max-width: 900px) {
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .principles { grid-template-columns: minmax(0, 1fr); }
+
   .two-col { grid-template-columns: minmax(0, 1fr); gap: 22px; }
 }
 
@@ -675,10 +675,10 @@ footer.shell {
   .band { padding-block: 40px; }
   .metrics, .metrics--quiet { grid-template-columns: minmax(0, 1fr); }
   .metric { padding: 18px; }
-  .two-up { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+
   .hero-actions { flex-direction: column; align-items: stretch; }
   .hero-actions .btn { text-align: center; }
-  .btn-quiet { text-align: center; padding-top: 6px; }
+
   .echo { padding: 18px; }
   .endpoint { padding: 18px; }
 }
@@ -772,7 +772,7 @@ footer.shell {
   margin: 0 0 8px;
   font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
 }
-.flow-body { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+
 
 
 @media (max-width: 900px) {
@@ -941,14 +941,11 @@ footer.shell {
    it. All four are visible at once, which is the point: the question a first
    visitor has is "is there a path for me", and a tab strip answers it one
    quarter at a time. */
-.hero--lead { padding-block: 64px 52px; max-width: 1040px; }
-.hero--lead h1 { margin: 0 0 24px; max-width: none; }
+.hero--lead { padding-block: 48px 34px; max-width: 1040px; }
+.hero--lead h1 { margin: 0 0 20px; max-width: none; font-size: clamp(40px, 4.7vw, 80px); }
 .hero--lead .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
-.hero-def {
-  margin: 30px 0 0; max-width: 68ch;
-  font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
-}
-.hero--lead .hero-actions { margin-top: 64px; }
+
+.hero--lead .hero-actions { margin-top: 40px; }
 
 /* ---- the four ways ------------------------------------------------------ */
 .install { padding-bottom: 72px; }
@@ -1411,7 +1408,7 @@ section[id], h2[id] { scroll-margin-top: 100px; }
 .setup-jump a:hover { background: var(--surface); color: var(--ink); }
 .setup-jump span { color: var(--ink-3); font: 11px var(--mono); margin-right: 12px; }
 .band > .band-sub + .snip,.endpoint + .band-sub,.snip + .band-sub { margin-top: 20px; }
-.snip,.terminal,.faq,.story,.principles,.endpoint,.table-wrap { border-radius: var(--r); }
+.snip, .terminal, .faq, .story, .endpoint, .table-wrap { border-radius: var(--r); }
 @media(max-width:760px) {
   .setup-jump { grid-template-columns: minmax(0,1fr); gap: 8px; padding-bottom: 32px; }
   .setup-jump a { padding: 15px 18px; }
@@ -1491,8 +1488,8 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   background: rgba(8, 10, 16, 0.92); border: 1px solid rgba(255,255,255,0.08);
   border-radius: var(--r); padding: 22px 26px 18px; margin: 30px auto 6px; max-width: 860px; text-align: left;
 }
-.versus-kicker { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #fff; letter-spacing: 0.01em; }
-.versus-kicker span { font-weight: 400; color: var(--ink-2); margin-left: 10px; font-size: 13px; }
+
+
 .versus { width: 100%; border-collapse: collapse; font-size: 15px; }
 .versus th, .versus td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; vertical-align: baseline; }
 .versus thead th { font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); font-weight: 500; padding-bottom: 8px; }
@@ -1512,8 +1509,41 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   .versus th, .versus td { padding: 8px 6px; }
 }
 
-/* measured | not shown yet: equal weight; stacked on a phone */
-.evidence-grid { text-align: left; display: grid; grid-template-columns: 1fr 1fr; gap: 28px 48px; max-width: 980px; margin: 8px auto 20px; }
-.evidence-head { margin: 0 0 14px; font-family: var(--serif); font-weight: 400; font-size: 21px; color: var(--ink); }
-.evidence-grid li { line-height: 1.55; }
-@media (max-width: 760px) { .evidence-grid { grid-template-columns: 1fr; } }
+/* ---- measured / not shown yet: under the hero; right column sits lower */
+.band--evidence { padding-block: 36px 72px; }
+.band--evidence .band-head { margin-bottom: 22px; }
+.evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; max-width: 1080px; margin: 0 auto; text-align: left; align-items: start; }
+.evidence-panel {
+  background: rgba(5, 7, 11, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 28px 32px 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.evidence-panel--no { margin-top: 80px; }
+.evidence-head { margin: 0 0 10px; font-family: var(--serif); font-weight: 400; font-size: 28px; color: #fff; }
+.evidence-list { list-style: none; margin: 0; padding: 0; }
+.evidence-list li {
+  position: relative; padding: 14px 0 14px 32px; border-top: 1px solid rgba(255, 255, 255, 0.09);
+  font-family: var(--sans); font-size: 17.5px; line-height: 1.55; color: rgba(255, 255, 255, 0.92);
+}
+.evidence-list li:first-child { border-top: 0; }
+.evidence-list strong { color: #fff; font-weight: 700; }
+.evidence-list a { color: #fff; }
+.evidence-list--yes li::before {
+  content: ""; position: absolute; left: 4px; top: 21px; width: 6px; height: 11px;
+  border: 2px solid #fff; border-top: 0; border-left: 0; transform: rotate(42deg);
+}
+.evidence-list--no li { color: rgba(255, 255, 255, 0.8); }
+.evidence-list--no li::before { content: ""; position: absolute; left: 0; top: 27px; width: 14px; height: 2px; background: var(--red); }
+.evidence-context { max-width: 780px; margin: 48px auto 0; font-size: 16.5px; line-height: 1.7; color: rgba(255, 255, 255, 0.85); }
+.evidence-source { margin: 12px auto 0; font-size: 14px; color: rgba(255, 255, 255, 0.62); }
+.evidence-source a { color: #fff; }
+.evidence-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin: 28px 0 0; }
+.evidence-actions .btn { padding: 17px 32px; font-size: 16px; }
+.evidence-actions .btn:not(.btn--red) { background: rgba(5, 7, 11, 0.8); border-color: rgba(255, 255, 255, 0.3); }
+@media (max-width: 760px) {
+  .band--evidence { padding-block: 44px 56px; }
+  .evidence-grid { grid-template-columns: 1fr; gap: 16px; }
+  .evidence-panel { padding: 22px 20px 12px; }
+  .evidence-panel--no { margin-top: 0; }
+  .evidence-list li { font-size: 16.5px; }
+  .evidence-actions .btn { width: 100%; text-align: center; }
+}

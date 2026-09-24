@@ -111,32 +111,23 @@
     </p>
   </section>
 
-<!--lab-->  <section class="shell band band--center band--bleed band--lab" id="lab" aria-labelledby="lab-title">
+<!--lab-->  <section class="shell band band--center band--bleed band--lab band--evidence" id="lab" aria-labelledby="lab-title">
     <div class="band-head">
       <h2 id="lab-title" class="label">What we have measured, and what not</h2>
-      <p class="band-sub">
-        FailEcho&rsquo;s own agents run round the clock against a separate
-        instance of this software on real services &mdash; PyPI, npm,
-        crates.io, the GitHub and Stack Exchange APIs, and seven model
-        providers on their free tiers &mdash; in twins: same task, same model,
-        one asks FailEcho before it retries and acts on the answer, one does
-        not. Measured 22&ndash;24 Sep 2026. Every number is ours,
-        none of it is adoption; independent users so far: 0.
-      </p>
     </div>
     <div class="evidence-grid">
-      <div>
+      <div class="evidence-panel">
         <h3 class="evidence-head">Measured</h3>
-        <ul class="yes-list">
+        <ul class="evidence-list evidence-list--yes">
           <li><strong>74% vs 31%</strong> of model-provider rate-limit failures recovered, by switching model when the network said so. Runs finished: <strong>91% vs 80%</strong>.</li>
           <li><strong>12 s vs 19 s</strong> lost to flaky APIs per run &mdash; retries that were never going to work, skipped.</li>
           <li>When it says <strong>stop</strong>, it is right: agents that retried anyway recovered <strong>0 times in 404</strong>.</li>
           <li>No extra tokens; one round trip per failure, none on success.</li>
         </ul>
       </div>
-      <div>
+      <div class="evidence-panel evidence-panel--no">
         <h3 class="evidence-head">Not shown yet</h3>
-        <ul class="no-list">
+        <ul class="evidence-list evidence-list--no">
           <li>Any gain for an agent that already retries carefully.</li>
           <li>Any difference in answer correctness, or on coding tasks.</li>
           <li>Any effect when the model alone decides what to do with the advice: the gains need code that acts on it (<a href="/setup#act">a few lines</a>).</li>
@@ -144,12 +135,19 @@
         </ul>
       </div>
     </div>
-    <p class="fineprint">
-      Every number, its sample and its test:
-      <!--github--><a href="{{GITHUB_URL}}/blob/main/docs/claims.md" target="_blank" rel="external noopener">docs/claims.md</a>.<!--/github-->
-      The scoreboard shows where FailEcho loses too.
+    <p class="evidence-context">
+      FailEcho&rsquo;s own agents run round the clock against a separate
+      instance of this software on real services &mdash; PyPI, npm, crates.io,
+      the GitHub and Stack Exchange APIs, and seven model providers on their
+      free tiers &mdash; in twins: same task, same model, one asks FailEcho
+      before it retries and acts on the answer, one does not. Measured
+      22&ndash;24 Sep 2026. Every number is ours,
+      none of it is adoption; independent users so far: 0.
     </p>
-    <p class="hero-actions">
+    <p class="evidence-source">Every number, its sample and its test:
+      <!--github--><a href="{{GITHUB_URL}}/blob/main/docs/claims.md" target="_blank" rel="external noopener">docs/claims.md</a>.<!--/github-->
+      The scoreboard shows where FailEcho loses too.</p>
+    <p class="evidence-actions">
       <a class="btn btn--red" href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">Watch the scoreboard</a>
       <a class="btn" href="{{LAB_URL}}/network" target="_blank" rel="external noopener">The network, as the fleet sees it</a>
     </p>
