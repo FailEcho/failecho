@@ -161,10 +161,16 @@ def run(*, endpoint: str, token: str, db_path: str, state_path: str, max_rows: i
     cursor = state.get("cursor") or start_cursor(db, backfill_hours)
     gap = 60.0 / max(1, per_minute)
     result = {"sent_observations": 0, "sent_outcomes": 0, "skipped": 0, "stopped": None}
-    budget = max_rows
+    # Observations go first (an outcome's fingerprint should be known before
+    # it), but a quarter of the pass is kept for outcomes: they are what turns
+    # into advice, and on the first run a 6-hour observation backlog took the
+    # whole budget and sent none (24 Sep).
+    reserve = max(1, max_rows // 4)
+    budget = max_rows - reserve
     for kind, key, fetch, path in (("observe", "observations", pending_observations, "/v1/observe"),
                                    ("outcome", "outcomes", pending_outcomes, "/v1/outcome")):
-        # observations first: an outcome's fingerprint should exist before it
+        if kind == "outcome":
+            budget += reserve
         while budget > 0 and result["stopped"] is None:
             batch = fetch(db, cursor[key], min(budget, 200))
             if not batch:

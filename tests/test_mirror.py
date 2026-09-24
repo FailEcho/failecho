@@ -109,7 +109,8 @@ def test_a_refusal_stops_the_pass_and_keeps_the_row(lab, tmp_path):
 
 def test_the_row_budget_is_respected(lab, tmp_path):
     post = Recorder()
-    assert _run(lab, tmp_path, post, max_rows=1)["sent_observations"] == 1 and len(post.calls) == 1
+    result = _run(lab, tmp_path, post, max_rows=1)
+    assert len(post.calls) == 1 and result["sent_observations"] + result["sent_outcomes"] == 1
 
 
 def test_the_lab_database_is_opened_read_only(lab):
@@ -140,3 +141,11 @@ def test_inert_unless_enabled_and_never_unlabelled(monkeypatch, capsys):
 def test_httpbingo_and_other_test_endpoints_are_not_on_the_list():
     assert not {"httpbingo.org", "httpbin.org", "packages", "localhost"} & M.ALLOWED_SERVICES
     assert not any(s.endswith("failecho.com") for s in M.ALLOWED_SERVICES)
+
+
+def test_an_observation_backlog_does_not_starve_the_outcomes(lab, tmp_path):
+    """24 Sep, first live pass: 500 observations and 0 outcomes, because the
+    backlog took the whole budget. Outcomes are what becomes advice."""
+    post = Recorder()
+    result = _run(lab, tmp_path, post, max_rows=2)
+    assert result["sent_outcomes"] == 1 and result["sent_observations"] == 1, result
