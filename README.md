@@ -26,9 +26,9 @@ privacy-safe tool failures and recovery outcomes so other agents can avoid
 repeating the same bad retry.
 
 <div align="center">
-  <img src="docs/media/failecho-demo.gif" alt="Five agents hit the same failing tool and report what they tried. The sixth asks first, sees that retry worked 0 out of 5 times and refreshing the schema worked 6 out of 6, and skips the retry." width="826">
+  <img src="docs/media/failecho-showcase.gif" alt="An agent's Groq call fails with 429; FailEcho answers: try switch_model, worked 306 of 336. Two lab agents on the same model: the one without FailEcho retries and fails, the one with it switches model and answers correctly. Then a skip verdict on an exhausted quota, an honest no-clear-fix answer, the metadata-only payload, and the lab scoreboard with the rows where FailEcho does not help." width="826">
   <br>
-  <sub>One real run of <code>examples/live_agent/run_demo.py</code>, paced for reading. Reproduce it with the commands in <a href="docs/record-the-demo.md">docs/record-the-demo.md</a>.</sub>
+  <sub>Every line is real output: live queries to the lab network, one twin pair replayed from the lab ledger (24 Sep), the wrapper's actual payload, and the <a href="https://lab.failecho.com/fleet">lab scoreboard</a> with p-values. Our own agents; independent reporters so far: 0.</sub>
 </div>
 
 ---
