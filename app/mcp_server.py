@@ -19,6 +19,7 @@ from typing import Annotated, Any
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
 from pydantic import Field
 from starlette.requests import ClientDisconnect
 from starlette.routing import Route
@@ -137,9 +138,19 @@ def _rate_limited(ctx: Context | None) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
+#: What each tool does, for hosts that warn before a call (and directories
+#: that reject tools without all four hints). The read stores nothing; the
+#: three reports only ever add a row to FailEcho's own store -- nothing is
+#: deleted or overwritten, and a repeated report counts twice, so none is
+#: idempotent. None of the four reaches outside FailEcho.
+READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
+REPORT = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
+
+
 @mcp_server.tool(
     name="check_tool_failure",
     title="Check what the network knows about a tool failure",
+    annotations=READ,
     description=(
         "Use FailEcho when another tool fails, before retrying blindly. Call this "
         "BEFORE retrying a failed tool, API or MCP call. Returns what other agents "
@@ -235,6 +246,7 @@ async def check_tool_failure(
 @mcp_server.tool(
     name="report_tool_failure",
     title="Report a failed tool call to the network",
+    annotations=REPORT,
     description=(
         "Report a failed tool/API/MCP call so others can recognise it; call after "
         "a failure, alongside check_tool_failure.\n\n"
@@ -324,6 +336,7 @@ async def report_tool_failure(
 @mcp_server.tool(
     name="report_tool_success",
     title="Report a successful tool call to the network",
+    annotations=REPORT,
     description=(
         "Report that a call SUCCEEDED. Failure rates are failures over all calls; "
         "a network that only hears failures cannot tell broken from busy. No "
@@ -381,6 +394,7 @@ async def report_tool_success(
 @mcp_server.tool(
     name="report_recovery_outcome",
     title="Report whether a recovery action worked",
+    annotations=REPORT,
     description=(
         "After acting on a failure -- retry, wait, refresh_schema, reconnect, "
         "use_fallback, reauthenticate -- report whether it worked. Every "

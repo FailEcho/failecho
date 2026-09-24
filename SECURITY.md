@@ -4,6 +4,13 @@ FailEcho is a public, unauthenticated service that collects failure metadata
 from autonomous systems. Two kinds of issue matter here, and they are worth
 separating.
 
+## What connecting asks of you
+
+Nothing: no key, no token, no account. The credentials a code scan finds in
+this repository (model-provider keys, FailEcho's operator token) belong to
+the tooling for FailEcho's own lab and are read only on our servers; see
+"What connecting asks of you" in the README.
+
 ## Reporting a vulnerability
 
 **Please do not open a public issue for a security problem.**

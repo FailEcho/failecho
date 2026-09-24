@@ -395,3 +395,24 @@ def test_a_disconnect_does_not_become_no_response_returned(client):
         assert statuses == [499], statuses
     finally:
         mcp_endpoint.app = real
+
+
+def test_every_tool_declares_all_four_hints_truthfully(client):
+    """24 Sep: an MCP trust index graded FailEcho down for tools with no
+    readOnly/destructive/idempotent/openWorld hints, and OpenAI's directory
+    rejects a tool missing any of the four. They are declared on the wire,
+    as booleans, and they say what the handlers do: the check stores nothing;
+    each report appends one row and repeating it counts twice; none of them
+    reaches outside FailEcho."""
+    tools = {t["name"]: t for t in rpc(client, "tools/list")["result"]["tools"]}
+    want = {
+        "check_tool_failure": (True, False, True, False),
+        "report_tool_failure": (False, False, False, False),
+        "report_tool_success": (False, False, False, False),
+        "report_recovery_outcome": (False, False, False, False),
+    }
+    for name, expected in want.items():
+        a = tools[name].get("annotations") or {}
+        got = tuple(a.get(k) for k in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"))
+        assert all(isinstance(v, bool) for v in got), (name, a)
+        assert got == expected, (name, got)

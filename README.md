@@ -83,6 +83,7 @@ its significance test: [`docs/claims.md`](docs/claims.md); live:
 
 | | |
 |---|---|
+| [What connecting asks of you](#what-connecting-asks-of-you) | Nothing: no key, no token, no account |
 | [Privacy](#privacy) | What is never sent, and what is never stored |
 | [How the numbers are produced](#how-the-numbers-are-produced) | Wilson scores, and why not a model |
 | [Abuse floor (V1)](#abuse-floor-v1) | Rate limits, reporter weighting, what is not solved |
@@ -970,6 +971,25 @@ Every call is **fail-soft**: a timeout or an unreachable server returns `None`
 Telemetry must never break the agent it observes.
 
 ---
+
+## What connecting asks of you
+
+**Nothing.** The hosted MCP endpoint (`https://failecho.com/mcp`), the REST API,
+the plugins, the proxy and `failecho-autoreport` need no key, token or account,
+and read no credential. Every optional setting is listed under
+[Configuration](#configuration); the only secret any of them takes is your own
+team token, if you choose private mode.
+
+This repository also holds the tooling for **FailEcho's own lab** -- the fleet
+of test agents behind the scoreboard (`failecho_fleet`, `failecho_agent`,
+`failecho_sandbox`, `deploy/`). That tooling reads model-provider keys
+(`GROQ_API_KEY`, `GEMINI_API_KEY`, ...) and FailEcho's operator token from
+*our* servers' environment. You never need them, and nothing you install reads
+them. It is public so the lab's numbers can be checked, not because you run it.
+
+`app/web/static/vendor/` is Swagger UI, unmodified upstream build output with
+its checksums in [its README](app/web/static/vendor/README.md); a test fails if
+it is ever edited.
 
 ## Privacy
 
