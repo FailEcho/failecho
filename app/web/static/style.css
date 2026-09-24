@@ -941,11 +941,11 @@ footer.shell {
    it. All four are visible at once, which is the point: the question a first
    visitor has is "is there a path for me", and a tab strip answers it one
    quarter at a time. */
-.hero--lead { padding-block: 48px 34px; max-width: 1040px; }
-.hero--lead h1 { margin: 0 0 20px; max-width: none; font-size: clamp(40px, 4.7vw, 80px); }
+.hero--lead { padding-block: 64px 52px; max-width: 1040px; }
+.hero--lead h1 { margin: 0 0 24px; max-width: none; }
 .hero--lead .hero-lede { max-width: 46ch; color: var(--ink); font-size: 20px; }
 
-.hero--lead .hero-actions { margin-top: 40px; }
+.hero--lead .hero-actions { margin-top: 64px; }
 
 /* ---- the four ways ------------------------------------------------------ */
 .install { padding-bottom: 72px; }
@@ -1509,41 +1509,35 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   .versus th, .versus td { padding: 8px 6px; }
 }
 
-/* ---- evidence ---- */
-.band--evidence { padding-block: 64px 72px; }
-.band--evidence .band-head { margin-bottom: 44px; }
-.evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; max-width: 1080px; margin: 0 auto; text-align: left; align-items: start; }
-.evidence-panel {
-  background: rgba(5,7,11,.8); border: 1px solid rgba(255,255,255,.1);
-  padding: 28px 32px 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-}
-.evidence-and { margin: 34px 0 18px; font-family: var(--serif); font-size: clamp(30px, 3.4vw, 46px); line-height: 1.05; color: #fff; }
-.evidence-head { margin: 0 0 10px; font-family: var(--serif); font-weight: 400; font-size: 28px; color: #fff; }
-.evidence-list { list-style: none; margin: 0; padding: 0; }
-.evidence-list li {
-  position: relative; padding: 14px 0 14px 32px; border-top: 1px solid rgba(255,255,255,.09);
-  font-family: var(--sans); font-size: 17.5px; line-height: 1.55; color: rgba(255,255,255,.92);
-}
-.evidence-list li:first-child { border-top: 0; }
-.evidence-list strong { color: #fff; font-weight: 700; }
-.evidence-list a { color: #fff; }
-.evidence-list--yes li::before {
-  content: ""; position: absolute; left: 4px; top: 21px; width: 6px; height: 11px;
-  border: 2px solid #fff; border-top: 0; border-left: 0; transform: rotate(42deg);
-}
-.evidence-list--no li { color: rgba(255,255,255,.8); }
-.evidence-list--no li::before { content: ""; position: absolute; left: 0; top: 27px; width: 14px; height: 2px; background: var(--red) }
-.evidence-context { max-width: 780px; margin: 48px auto 0; font-size: 16.5px; line-height: 1.7; color: rgba(255,255,255,.85); }
-.evidence-source { margin: 12px auto 0; font-size: 14px; color: rgba(255,255,255,.62); }
-.evidence-source a { color: #fff; }
-.evidence-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin: 28px 0 0; }
-.evidence-actions .btn { padding: 17px 32px; font-size: 16px; }
-.evidence-actions .btn:not(.btn--red) { background: rgba(5,7,11,.8); border-color: rgba(255,255,255,.3); }
-@media (max-width: 760px) {
-  .band--evidence { padding-block: 44px 56px; }
-  .evidence-grid { grid-template-columns: 1fr; gap: 16px; }
-  .evidence-panel { padding: 22px 20px 12px; }
-  .evidence-and { margin: 18px 0 12px; }
-  .evidence-list li { font-size: 16.5px; }
-  .evidence-actions .btn { width: 100%; text-align: center; }
+/* evidence: Measured leads */
+.band--evidence{padding-block:104px 84px}
+.band--evidence .band-head{margin-bottom:52px}
+.evidence-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:36px;max-width:1100px;margin:0 auto;text-align:left;align-items:start}
+.evidence-panel{background:#05070bb8;border:1px solid #ffffff14;padding:24px 28px 16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.evidence-grid>.evidence-panel{background:#060609e6;border-top:3px solid var(--red);padding:34px 38px 24px}
+.evidence-head{margin:0 0 8px;font-family:var(--serif);font-weight:400;font-size:23px;color:#ffffffbf}
+.evidence-grid>.evidence-panel .evidence-head{font-size:38px;color:#fff}
+.evidence-list{list-style:none;margin:0;padding:0}
+.evidence-list li{position:relative;padding:12px 0 12px 28px;border-top:1px solid #ffffff14;font-family:var(--sans);font-size:15.5px;line-height:1.55;color:#ffffffa8}
+.evidence-list li:first-child{border-top:0}
+.evidence-list--yes li{padding:16px 0 16px 36px;font-size:19px;color:#fffffff2}
+.evidence-list strong{color:#fff;font-weight:700}
+.evidence-list a{color:#fff}
+.evidence-list--yes li::before{content:"";position:absolute;left:5px;top:22px;width:7px;height:13px;border:3px solid var(--red);border-top:0;border-left:0;transform:rotate(42deg)}
+.evidence-list--no li::before{content:"";position:absolute;left:0;top:24px;width:12px;height:2px;background:#ffffff59}
+.evidence-and{margin:58px 0 10px;font-family:var(--serif);font-size:19px;color:#ffffff8c}
+.evidence-context{max-width:780px;margin:52px auto 0;font-size:16.5px;line-height:1.7;color:#ffffffd9}
+.evidence-source{margin:12px auto 0;font-size:14px;color:#ffffff9e}
+.evidence-source a{color:#fff}
+.evidence-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin:28px 0 0}
+.evidence-actions .btn{padding:17px 32px;font-size:16px}
+.evidence-actions .btn:not(.btn--red){background:#05070bcc;border-color:#ffffff4c}
+@media (max-width:760px){
+.band--evidence{padding-block:64px 56px}
+.evidence-grid{grid-template-columns:1fr;gap:12px}
+.evidence-panel,.evidence-grid>.evidence-panel{padding:22px 20px 12px}
+.evidence-grid>.evidence-panel .evidence-head{font-size:32px}
+.evidence-list--yes li{font-size:17.5px}
+.evidence-and{margin:18px 0 6px}
+.evidence-actions .btn{width:100%;text-align:center}
 }
