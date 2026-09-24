@@ -128,8 +128,8 @@ against real Playwright by swapping `FakePage` out.
 
 1. **This document.** Naming, classes, privacy contract.
 2. **Adapter in private mode only**: a team's own evidence, nothing shared.
-   Useful at zero independent reporters, and it is the first paid product in
-   `docs/business-model.md`.
+   Useful at zero independent reporters, and it is the first thing that would
+   ever be paid for.
 3. **Share site-side classes publicly**, once the taxonomy has survived contact
    with real sites and the structure hash proves stable.
 4. **Merchant report last**: "agents fail at your checkout 34% of the time,

@@ -76,7 +76,7 @@ is slow".
 
 ## Hide the prompt before you record anything
 
-The default prompt renders `root@arbitrage:/root/agentwebsite#`. That is the
+The default prompt renders `root@<hostname>:/root/agentwebsite#`. That is the
 server's hostname, the fact that you are root on it, and the absolute path,
 published to everyone who watches. None of it is a secret exactly, and none of
 it belongs in a video either -- a hostname plus "root" is a free hint for
@@ -118,7 +118,7 @@ fullscreen, and anything in a notification. A cast file is plain text, so you
 can grep it:
 
 ```bash
-grep -iE "root@|arbitrage|/root/|token|salt|password" demo.cast
+grep -iE "root@|$(hostname)|/root/|token|salt|password" demo.cast
 ```
 
 ## Making the GIF
@@ -142,7 +142,7 @@ asciinema rec demo.cast --overwrite -q --cols 100 --rows 32 -i 1 \
 **2. Check it before converting.** The cast is plain text:
 
 ```bash
-grep -iE "root@|arbitrage|/root/|token|salt|password" demo.cast
+grep -iE "root@|$(hostname)|/root/|token|salt|password" demo.cast
 ```
 
 **3. Convert.**

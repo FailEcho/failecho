@@ -1561,14 +1561,12 @@ useful:
   `refreshSchema` would be counted separately if agents disagree on spelling
   (input is lowercased and space-normalized, which handles the common cases).
 
-## Launch documentation
+## Evidence
 
-- [`docs/marketing.md`](docs/marketing.md) — approved messaging, launch posts,
-  and the claims that must never be made
-- [`docs/launch-plan.md`](docs/launch-plan.md) — distribution sequence,
-  experiment metrics and the milestones that decide whether this works
-- [`docs/search-console.md`](docs/search-console.md) — indexing checklist for
-  Google Search Console and Bing, and what actually moves brand search
+- [`docs/claims.md`](docs/claims.md) — every claim FailEcho makes, the exact
+  evidence behind it, and the ones it must not make
+- [lab.failecho.com/fleet](https://lab.failecho.com/fleet) — the live
+  scoreboard, losing groups included
 
 ## Contact
 

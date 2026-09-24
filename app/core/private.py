@@ -24,8 +24,8 @@ Three properties, each enforced rather than described (tests/test_private.py):
   the token loses the evidence, which is stated wherever it is offered.
 
 Free while the network bootstraps (``FIN_PRIVATE_MODE_OPEN``). It is the first
-thing in ``docs/business-model.md`` that would ever be paid for, and it is
-useful at zero independent reporters, which is exactly where FailEcho is.
+thing here that would ever be paid for, and it is useful at zero
+independent reporters, which is exactly where FailEcho is.
 """
 
 from __future__ import annotations
