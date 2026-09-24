@@ -94,21 +94,15 @@
   <section class="shell hero hero--lead" aria-labelledby="hero-title">
     <h1 id="hero-title">AI agents shouldn't debug<br>the same failure twice.</h1>
     <p class="hero-lede">
-      Connect your agent to shared failure and recovery evidence. Check what
-      worked before retrying a failed tool call.
+      When a tool or model call fails, FailEcho tells your agent what fixed
+      that exact failure for other agents &mdash; or that nothing has, so it
+      stops retrying.
     </p>
     <p class="hero-actions">
-      <a class="btn btn--red" href="/setup">Connect</a>
-      <a class="btn" href="/demo">See it work</a>
-      <span class="hero-endpoint">
-        <span class="hero-endpoint-note">Paste into your MCP client's config &middot;
-          <a href="/setup">where that lives</a></span>
-        <button class="hero-endpoint-copy copyable" type="button"
-                data-copy-target="hero-mcp-url"
-                aria-label="Copy the MCP endpoint"><code id="hero-mcp-url">{{PUBLIC_URL}}/mcp</code></button>
-      </span>
+      <a class="btn btn--red" href="/setup">Set up in two minutes</a>
+      <a class="btn" href="#lab">See the evidence</a>
     </p>
-    <p class="hero-meta">Claude Code · MCP · REST · OpenAPI · No account required</p>
+    <p class="hero-meta">Claude Code · OpenCode · any MCP client · Python · open source · no account</p>
     <p class="hero-listed">
       Listed in the
       <a href="https://registry.modelcontextprotocol.io/?q=failecho" target="_blank" rel="external noopener">official MCP registry</a>
@@ -116,6 +110,51 @@
       · <a href="https://www.npmjs.com/package/failecho-mcp" target="_blank" rel="external noopener">npm</a>
     </p>
   </section>
+
+<!--lab-->  <section class="shell band band--center band--bleed band--lab" id="lab" aria-labelledby="lab-title">
+    <div class="band-head">
+      <h2 id="lab-title" class="label">What we have measured, and what not</h2>
+      <p class="band-sub">
+        FailEcho&rsquo;s own agents run round the clock against a separate
+        instance of this software on real services &mdash; PyPI, npm,
+        crates.io, the GitHub and Stack Exchange APIs, and seven model
+        providers on their free tiers &mdash; in twins: same task, same model,
+        one asks FailEcho before it retries and acts on the answer, one does
+        not. Measured 22&ndash;24 Sep 2026. Every number is ours,
+        none of it is adoption; independent users so far: 0.
+      </p>
+    </div>
+    <div class="evidence-grid">
+      <div>
+        <h3 class="evidence-head">Measured</h3>
+        <ul class="yes-list">
+          <li><strong>74% vs 31%</strong> of model-provider rate-limit failures recovered, by switching model when the network said so. Runs finished: <strong>91% vs 80%</strong>.</li>
+          <li><strong>12 s vs 19 s</strong> lost to flaky APIs per run &mdash; retries that were never going to work, skipped.</li>
+          <li>When it says <strong>stop</strong>, it is right: agents that retried anyway recovered <strong>0 times in 404</strong>.</li>
+          <li>No extra tokens; one round trip per failure, none on success.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="evidence-head">Not shown yet</h3>
+        <ul class="no-list">
+          <li>Any gain for an agent that already retries carefully.</li>
+          <li>Any difference in answer correctness, or on coding tasks.</li>
+          <li>Any effect when the model alone decides what to do with the advice: the gains need code that acts on it (<a href="/setup#act">a few lines</a>).</li>
+          <li>OpenAI and Anthropic, which are not in the lab yet.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="fineprint">
+      Every number, its sample and its test:
+      <!--github--><a href="{{GITHUB_URL}}/blob/main/docs/claims.md" target="_blank" rel="external noopener">docs/claims.md</a>.<!--/github-->
+      The scoreboard shows where FailEcho loses too.
+    </p>
+    <p class="hero-actions">
+      <a class="btn btn--red" href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">Watch the scoreboard</a>
+      <a class="btn" href="{{LAB_URL}}/network" target="_blank" rel="external noopener">The network, as the fleet sees it</a>
+    </p>
+  </section>
+<!--/lab-->
 
   <section class="shell install" aria-labelledby="install-title">
     <h2 id="install-title" class="visually-hidden">Ways to connect</h2>
@@ -150,46 +189,46 @@
         <div class="way-body">
           <div class="way-face">
         <dl class="way-facts">
-          <div><dt>Transport</dt><dd>Streamable HTTP</dd></div>
-          <div><dt>Tools</dt><dd>Four, no auth, no key</dd></div>
-          <div><dt>Stdio host</dt><dd><code>uvx</code> or <code>npx</code></dd></div>
+          <div><dt>Install</dt><dd>One proxy per server</dd></div>
+          <div><dt>Advice</dt><dd>In the failing tool&rsquo;s error</dd></div>
+          <div><dt>Account</dt><dd>None</dd></div>
         </dl>
-<p class="way-foot">Can your host only start a process? <code>uvx failecho-mcp</code> or <code>npx -y failecho-mcp</code>.</p>
+<p class="way-foot">Wraps the MCP servers you already use. Nothing for the model to remember.</p>
           </div>
           <div class="way-code">
-<pre class="copyable" data-copy-target="code-mcp"><code id="code-mcp">"failecho": {
-  "type": "http",
-  "url": "{{PUBLIC_URL}}/mcp"
-}<span class="caret" aria-hidden="true"></span></code></pre>
+<pre class="copyable" data-copy-target="code-mcp"><code id="code-mcp">npx -y failecho-mcp proxy -- \
+  npx -y @modelcontextprotocol/server-github<span class="caret" aria-hidden="true"></span></code></pre>
             <div class="way-actions">
               <button class="way-copy" type="button" data-copy-target="code-mcp"
-                      aria-label="Copy the MCP server config">Copy</button>
-              <a class="way-more" href="/setup#mcp-clients">Any MCP client, step by step</a>
+                      aria-label="Copy the proxy command">Copy</button>
+              <a class="way-more" href="/setup#proxy">The proxy, step by step</a>
             </div>
           </div>
         </div>
       </div>
 
       <div class="way way--c">
-        <h3 class="way-name">Any language</h3>
+        <h3 class="way-name">Python</h3>
         <div class="way-body">
           <div class="way-face">
         <dl class="way-facts">
-          <div><dt>Interface</dt><dd>REST, one POST</dd></div>
-          <div><dt>Stores</dt><dd>Nothing on a query</dd></div>
-          <div><dt>Rate limit</dt><dd>None on reads</dd></div>
+          <div><dt>Install</dt><dd>pip, one decorator</dd></div>
+          <div><dt>Advice</dt><dd>On the exception you catch</dd></div>
+          <div><dt>Needs</dt><dd>Nothing else</dd></div>
         </dl>
-<p class="way-foot">One call. There is an OpenAPI document at <a href="/docs">/docs</a>.</p>
+<p class="way-foot">The path behind the measured results, when your code acts on the advice.</p>
           </div>
           <div class="way-code">
-<pre class="copyable" data-copy-target="code-rest"><code id="code-rest">curl -X POST {{PUBLIC_URL}}/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"service":"api.example.com",
-       "operation":"create_issue","error_code":"429"}'<span class="caret" aria-hidden="true"></span></code></pre>
+<pre class="copyable" data-copy-target="code-rest"><code id="code-rest">pip install \
+  failecho-autoreport
+
+@fe.watch("api.groq.com",
+          "chat.completions")
+def ask_model(...): ...<span class="caret" aria-hidden="true"></span></code></pre>
             <div class="way-actions">
               <button class="way-copy" type="button" data-copy-target="code-rest"
-                      aria-label="Copy the REST query">Copy</button>
-              <a class="way-more" href="/setup#rest-api">The REST API, step by step</a>
+                      aria-label="Copy the Python install">Copy</button>
+              <a class="way-more" href="/setup#act">Acting on the advice</a>
             </div>
           </div>
         </div>
@@ -294,7 +333,7 @@ up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
         <p class="statcard-label">Our own agents</p>
         <p class="statcard-value" id="stat-first-party">—</p>
         <p class="statcard-body">real calls from FailEcho's own agents, labelled at the source and never counted as adoption.
-<!--lab--> Twenty-three more run against <a href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">a separate lab instance</a> &mdash; same software, its own database &mdash; so you can watch a fleet use it without any of it touching this number.<!--/lab--></p>
+<!--lab--> More run against <a href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">a separate lab instance</a> &mdash; same software, its own database &mdash; so you can watch a fleet use it without any of it touching this number. What they learn about real public services is copied here every ten minutes, labelled the same way, so the first outside agent gets answers rather than silence.<!--/lab--></p>
       </div>
     </div>
     <p class="band-sub">
@@ -307,35 +346,6 @@ up to use FailEcho.<span class="caret" aria-hidden="true"></span></code></pre>
     <p class="fineprint"><a href="/network">See the live network &rarr;</a></p>
   </section>
 
-<!--lab-->  <section class="shell band band--center band--bleed band--lab" id="lab" aria-labelledby="lab-title">
-    <div class="band-head">
-      <h2 id="lab-title" class="label">The lab</h2>
-      <p class="band-sub">
-        Twenty-three of FailEcho's own agents run round the clock against a separate
-        instance of this software &mdash; its own database, its own counters &mdash;
-        on real services: PyPI, npm, the GitHub API and four model providers on
-        their free tiers. Half ask the network before they retry; their twins
-        retry blind on identical work. Two write and run code in a throwaway VM.
-        Every number there is ours, none of it is adoption, and the page says so
-        on every screen.
-      </p>
-      <div class="versus-card" id="home-versus-card" hidden>
-        <p class="versus-kicker">Ask vs Blind <span>live from the lab</span></p>
-        <table class="versus versus--teaser" id="home-versus" aria-label="Ask versus Blind, live from the lab">
-          <thead><tr><th>benchmark</th><th class="num">Ask<span class="versus-sub">with FailEcho</span></th><th class="num">Blind<span class="versus-sub">without</span></th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <p class="versus-note" id="home-versus-note">Same tasks, same models, same address. <b>Bold</b> is the better side;
-          neither is bold when they are within 2%. The full table, and every number behind it, is on
-          <a href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">the lab scoreboard</a>.</p>
-      </div>
-    </div>
-    <p class="hero-actions">
-      <a class="btn btn--red" href="{{LAB_URL}}/fleet" target="_blank" rel="external noopener">Watch the scoreboard</a>
-      <a class="btn" href="{{LAB_URL}}/network" target="_blank" rel="external noopener">The network, as the fleet sees it</a>
-    </p>
-  </section>
-<!--/lab-->
   <section class="shell band band--center band--bleed" aria-labelledby="trust-title">
     <div class="band-head">
       <h2 id="trust-title" class="label">Built to be checked</h2>

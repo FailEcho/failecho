@@ -949,37 +949,6 @@ footer.shell {
   font-size: 16.5px; line-height: 1.7; color: var(--ink-2);
 }
 .hero--lead .hero-actions { margin-top: 64px; }
-/* The endpoint an agent needs, at the far end of the buttons' row. It is a
-   button because copying is what it is for. */
-.hero-endpoint {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 10px;
-}
-/* Beside the button, not under it: the row keeps the button's own height. */
-.hero-endpoint-note {
-  font-size: 11.5px; line-height: 1.35; color: var(--ink-3);
-  font-family: var(--sans); text-align: right; max-width: 15ch;
-}
-.hero-endpoint-note a { color: var(--ink-2); }
-.hero-endpoint-note a:hover { color: var(--ink); }
-/* Dressed like the command blocks below it: same kind of thing, something to
-   copy. */
-.hero-endpoint-copy {
-  appearance: none; cursor: pointer; text-align: left;
-  background: rgba(255, 255, 255, 0.04);
-  border: 0; border-left: 2px solid var(--red-deep);
-  padding: 13px 18px 13px 16px;
-  transition: background 0.15s ease;
-}
-.hero-endpoint-copy code {
-  font-family: var(--mono); font-size: 13px; color: var(--ink-2);
-}
-.hero-endpoint-copy:hover { background: rgba(255, 255, 255, 0.07); }
-.hero-endpoint-copy:hover code { color: var(--ink); }
-.hero-endpoint-copy::after { top: -19px; right: 0; }
-.hero-endpoint-copy.is-copied code { color: var(--healthy); }
-@media (max-width: 760px) {
-  .hero-endpoint { margin-left: 0; width: 100%; }
-}
 
 /* ---- the four ways ------------------------------------------------------ */
 .install { padding-bottom: 72px; }
@@ -1168,7 +1137,9 @@ footer.shell {
    whose whole point never appears. */
 @media (hover: none) {
   .way-body { min-height: 0; }
-  .way-code { position: static; opacity: 1; visibility: visible; margin-top: 18px; }
+  /* undo the hidden state's shift and blur too: phones saw a smear (24 Sep) */
+  .way-code { position: static; opacity: 1; visibility: visible; margin-top: 18px;
+              transform: none; filter: none; }
   .way::before { opacity: 1 !important; }
 }
 
@@ -1540,3 +1511,9 @@ section[id], h2[id] { scroll-margin-top: 100px; }
   .versus { font-size: 13.5px; }
   .versus th, .versus td { padding: 8px 6px; }
 }
+
+/* measured | not shown yet: equal weight; stacked on a phone */
+.evidence-grid { text-align: left; display: grid; grid-template-columns: 1fr 1fr; gap: 28px 48px; max-width: 980px; margin: 8px auto 20px; }
+.evidence-head { margin: 0 0 14px; font-family: var(--serif); font-weight: 400; font-size: 21px; color: var(--ink); }
+.evidence-grid li { line-height: 1.55; }
+@media (max-width: 760px) { .evidence-grid { grid-template-columns: 1fr; } }

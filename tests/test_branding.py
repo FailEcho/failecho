@@ -56,7 +56,7 @@ def test_the_measured_numbers_never_appear_without_their_qualifiers(client):
     our own agents, and the control is a naive retry."""
     for body in (client.get("/llms.txt").text, client.get("/setup").text):
         flat = _flat(body)
-        assert "0.17" in flat, "the measured cost per run is missing"
+        assert "74" in flat and "31" in flat, "the headline recovery numbers are missing"
         assert "1.99" in flat, "the retry comparison is missing"
         assert "our own agents" in flat
         assert "0 independent reporters" in flat
@@ -452,7 +452,7 @@ def test_brand_entity_sentence_is_visible_html(client):
         "FailEcho is a shared failure intelligence network for AI agents and"
         in body
     )
-    assert "Connect your agent to shared failure and recovery evidence." in body
+    assert "FailEcho tells your agent what fixed" in body
     # The protocol is named on the front page, and spelled out on /about.
     assert "MCP" in body
     assert "Model Context Protocol (MCP)" in client.get("/about").text

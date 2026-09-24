@@ -489,11 +489,13 @@ installs. The difference is one thing: whether the model has to decide to ask.
 
        failecho-mcp proxy -- <the server's own command>
 
-   It is verified end to end; the lab has not yet seen it carry advice in a
-   scheduled run, so there is no measured improvement to quote for it either.
+   It is verified end to end and has carried advice in a scheduled lab run;
+   there is no measured improvement to quote for it yet.
 
 4. **Your own agent code: `failecho-autoreport` with advice on.** The answer
-   is attached to the exception you already handle.
+   is attached to the exception you already handle. This is the path the
+   lab's measured gains come from, *when the code acts on the answer*:
+   switch model on `switch_model`, stop on `skip`.
 
 5. **The bare MCP endpoint.** The safest to add and the weakest: see above.
 
@@ -690,36 +692,32 @@ Asking should cost less than the retry it saves; if it does not, say so.
 
 ## What it measurably does, and what it costs
 
-Measured 22 September 2026, by FailEcho's own agents running the same tasks
-twice against the same live APIs -- one side asking the network, one side not.
-The asking side reads *production*, so this is the advice a new reporter gets
-today. 118 runs a side.
+Measured 22-24 September 2026 by FailEcho's own agents, running the same tasks
+twice against the same live APIs: one side asks the network **and acts on the
+answer** (switches model when told `switch_model`, stops when told `skip`),
+the other does not. Every number, its sample and its significance test are in
+`docs/claims.md` in the repository.
 
-    FailEcho calls per run          0.17   (when the model decides; the
-                                            wrapper asks once per failure)
-    retry attempts per failure      1.20   against 1.99
-    retries the network said to skip  75
-    seconds lost inside failures    1.12   against 2.31, per run
-    tokens per completed run       1737    against 1738
-    runs completed                 93.2%   against 92.4%
+    model-provider rate limits recovered   74.5%   against 31.2%  (p < 0.0001)
+    runs finished, same group              90.6%   against 80.2%  (416 a side)
+    seconds lost to flaky APIs, per run    12.2    against 19.4   (p < 0.0001)
+    retry attempts per failure              1.5    against 2.0
+    same, with advice read from production  1.43   against 1.99   (p < 0.0001)
+    retries told to skip that recovered     0 of 404 (Stack Exchange quota)
+    tokens per finished run                1495    against 1536   (no difference)
 
-The cost is close to zero because the advice arrives inside an error the model
-was already reading: no extra turn, no extra tokens worth counting. The gain is
-mostly retries that were never going to work.
+And what it does not do, measured the same way: no gain for an agent that
+already recovers carefully (9.8 s against 10.1 s lost per run), no difference
+in answer correctness (99.3% against 99.2%) or on coding tasks, and **no
+measured effect when the advice is only shown to the model** and the model
+decides. The gains need code that acts on the answer -- a few lines, shown
+on the setup page.
 
-Where a failure has a real fix, the gap is much larger. Against model providers
-under live quotas: 77.9% of failures recovered with FailEcho, 19.7% without,
-and 94.3% against 85.4% of runs finished.
-
-What the recovery evidence itself says, over 14,628 recorded attempts: blind
-`backoff` -- the action agents reach for first -- worked 13.6% of 11,565 tries.
-`switch_model` worked 88.4% of 329. That gap is the reason to ask before
-retrying.
-
-Two things that qualify all of it: every number is from our own agents, because
+Two things qualify all of it: every number is from our own agents, because
 production has 0 independent reporters; and the control side retries once after
-three seconds rather than recovering competently, so this is "against a naive
-retry", not "against a good engineer".
+three seconds rather than recovering competently, so the provider numbers are
+"against a naive retry", not "against a good engineer". OpenAI and Anthropic
+are not in the lab yet.
 
 ## One failure, several names
 

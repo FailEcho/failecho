@@ -111,8 +111,9 @@
       Why the order: a tool the model has to choose to call is one it mostly
       does not call. In our lab, agents given FailEcho&rsquo;s MCP tools used
       them about <strong>once every five runs</strong>. The integrations that
-      put the answer where the model is already looking are the ones that
-      moved results &mdash; see <a href="#cost">what it costs, measured</a>.
+      put the answer in the tool path deliver it every time; the results we
+      have measured come from agents that then act on it &mdash; see
+      <a href="#cost">what it costs, measured</a>.
     </p>
   </section>
 
@@ -419,16 +420,31 @@ fe.recovered("github-mcp", "create_issue", "refresh_schema")  # what fixed it</c
     <figure class="snip">
       <pre><code>fe = FailEcho(advise=True)          # or FAILECHO_ADVISE=1
 
+@fe.watch(service="api.groq.com", operation="chat.completions")
+def ask_model(model, messages):
+    return client.chat.completions.create(model=model, messages=messages)
+
 try:
-    create_issue(...)
+    reply = ask_model("llama-3.3-70b-versatile", messages)
 except Exception as exc:
-    exc.failecho                    # the network's answer, or None
-    fe.advice_text(exc)             # one line: "FailEcho: try fe.advice_text(exc)             # "FailEcho: try switch_model, worked 62/64 ..."lt;actionfe.advice_text(exc)             # "FailEcho: try switch_model, worked 62/64 ..."gt;, worked n/m ..."</code></pre>
+    print(fe.advice_text(exc))      # e.g. "FailEcho: try switch_model, worked 310/341 ..."
+    action = ((getattr(exc, "failecho", None) or {}).get("recommendation") or {}).get("action")
+    if action == "switch_model":
+        reply = ask_model("llama-3.1-8b-instant", messages)   # what fixed it for others
+    elif action == "skip":
+        raise                       # nothing has worked for anyone lately: stop retrying
+    else:
+        ...                         # your usual retry</code></pre>
     </figure>
-    <p class="band-sub">
-      Put that line in the tool error your model sees, and the model gets the
-      evidence at the moment it decides whether to retry, without having to
-      think of asking. The read waits at most 3 seconds, on failures only.
+    <p class="band-sub" id="act">
+      <strong>The gains we have measured come from acting on the advice</strong>,
+      as above: in our lab, agents that switched model when told recovered
+      74% of model-provider rate-limit failures, against 31% for twins that
+      retried once. When the advice was only put in front of the model and
+      the model decided, we have measured no difference yet. Name the service
+      and operation the way the API does &mdash; its host and its endpoint
+      &mdash; so your failure meets everyone else&rsquo;s. The read waits at
+      most 3 seconds, on failures only.
     </p>
     <p class="band-sub">
       It never raises, never blocks (reports go to a worker thread, so an
@@ -629,31 +645,28 @@ provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
       <p class="band-sub">Two questions worth asking before you add anything to an agent loop: how much slower does it get, and does it pay for itself.</p>
     </div>
     <p class="prose">
-      Our own agents run the same tasks twice, one side asking FailEcho and one
-      side not, against the same live APIs. The numbers below are from the arm
-      that reads <strong>production</strong> — the same advice a new reporter
-      gets today — over 118 runs a side, on 22 September 2026.
+      Our own agents run the same tasks twice, one side asking FailEcho and
+      acting on the answer, one side not, against the same live APIs. Measured
+      22&ndash;24 September 2026; every number, its sample and its significance
+      test are in <!--github--><a href="{{GITHUB_URL}}/blob/main/docs/claims.md">docs/claims.md</a><!--/github-->.
     </p>
     <ul class="yes-list">
-      <li><strong>0.17 FailEcho calls per run</strong> when the model decides for itself whether to ask. The wrapper and the plugin ask once per failure instead, and never on a success.</li>
-      <li><strong>1.2 retry attempts per failure, against 1.99</strong> without. <strong>75</strong> of those retries were ones the network said to skip.</li>
-      <li><strong>1.12 s lost inside failures per run, against 2.31 s</strong> — the time saved is retries that were never going to work.</li>
-      <li><strong>1,737 tokens per completed run, against 1,738.</strong> The advice arrives inside an error the model was already reading, so it costs no extra turn.</li>
+      <li><strong>Model-provider rate limits: 74% of failures recovered, against 31%</strong>, and 91% against 80% of runs finished (416 runs a side, p &lt; 0.0001). The move that does it is <code>switch_model</code>, which on Groq&rsquo;s 429 had worked 310 times in 341.</li>
+      <li><strong>Flaky endpoints: 12.2 s lost inside failures per run, against 19.4 s</strong>, and 1.5 attempts per failure against 2.0: the time saved is retries that were never going to work.</li>
+      <li><strong>With advice read from production</strong> &mdash; what a new user gets &mdash; 1.43 attempts per failure against 1.99, and 1.1 s lost per run against 2.1 s.</li>
+      <li><strong>When it says stop, it is right.</strong> Agents told to skip an exhausted quota that retried anyway recovered 0 times in 404.</li>
+      <li><strong>No extra tokens</strong> (1,495 against 1,536 per finished run, no difference), and one round trip per failure, never on a success.</li>
     </ul>
-    <p class="prose">
-      Where a failure has a real fix, the gap is much larger: against model
-      providers under live quotas, <strong>77.9% of failures recovered with
-      FailEcho and 19.7% without</strong>, and <strong>94.3% against 85.4%</strong>
-      of runs finished. Blind backoff is what agents reach for, and across
-      11,565 recorded attempts it worked <strong>13.6%</strong> of the time;
-      <code>switch_model</code>, which almost nobody tries, worked
-      <strong>88.4%</strong> of 329.
-    </p>
+    <ul class="no-list">
+      <li><strong>No gain for an agent that already recovers carefully</strong> (9.8 s against 10.1 s lost per run: no difference).</li>
+      <li><strong>No difference in answer correctness</strong> (99.3% against 99.2%) or on coding tasks.</li>
+      <li><strong>No effect measured when the model alone decides</strong> what to do with the advice.</li>
+    </ul>
     <p class="fineprint">
       All of it is our own agents: production has 0 independent reporters, and
       the control side retries once after three seconds rather than recovering
-      competently. Both numbers are on <a href="/network">the live page</a>,
-      and<!--lab--> the runs are at <a href="{{LAB_URL}}/fleet">the lab scoreboard</a><!--/lab-->.
+      competently. OpenAI and Anthropic are not in the lab yet. Live numbers
+      are<!--lab--> on <a href="{{LAB_URL}}/fleet">the lab scoreboard</a> and<!--/lab--> on <a href="/network">the live page</a>.
     </p>
   </section>
 

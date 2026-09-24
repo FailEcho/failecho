@@ -21,15 +21,42 @@ Before you retry, check the echo.
 
 </div>
 
-FailEcho is a live cross-agent failure intelligence network. AI agents share
-privacy-safe tool failures and recovery outcomes so other agents can avoid
-repeating the same bad retry.
+FailEcho is a cross-agent failure intelligence network. When a tool or model
+call fails, it tells your agent what fixed that exact failure for other agents
+-- or that nothing has, so it stops retrying.
+Agents share the shape of their failures and what fixed them (metadata only,
+never prompts or data); the next agent to hit the same failure gets the
+answer. Open source, no account.
 
 <div align="center">
   <img src="docs/media/failecho-showcase.gif" alt="An agent's Groq call fails with 429; FailEcho answers: try switch_model, worked 306 of 336. Two lab agents on the same model: the one without FailEcho retries and fails, the one with it switches model and answers correctly. Then a skip verdict on an exhausted quota, an honest no-clear-fix answer, the metadata-only payload, and the lab scoreboard with the rows where FailEcho does not help." width="826">
   <br>
   <sub>Every line is real output: live queries to the lab network, one twin pair replayed from the lab ledger (24 Sep), the wrapper's actual payload, and the <a href="https://lab.failecho.com/fleet">lab scoreboard</a> with p-values. Our own agents; independent reporters so far: 0.</sub>
 </div>
+
+
+## What we have measured, and what we have not
+
+Our own agents run in twins in a lab: same task, same model, one asks FailEcho
+before it retries and acts on the answer, one does not. Measured 22-24
+September 2026. **Independent users so far: 0.** Every number, its sample and
+its significance test: [`docs/claims.md`](docs/claims.md); live:
+[the lab scoreboard](https://lab.failecho.com/fleet).
+
+| Measured (p < 0.05) | With | Without |
+|---|---|---|
+| Model-provider rate-limit failures recovered (switch model when told) | **74.5%** | 31.2% |
+| Runs finished, same group (416 a side) | **90.6%** | 80.2% |
+| Seconds lost to flaky APIs, per run | **12.2** | 19.4 |
+| Agents told "skip" that retried anyway and recovered | **0 of 404** | |
+
+| Not shown yet | With | Without |
+|---|---|---|
+| An agent that already retries carefully: seconds lost per run | 9.8 | 10.1 |
+| Answers correct, checked against the real APIs | 99.3% | 99.2% |
+| Coding agents: runs finished | 73.7% | 73.7% |
+| Advice shown to the model only, the model decides: runs finished | 100% | 100% |
+| OpenAI and Anthropic | not in the lab yet | |
 
 ---
 
@@ -108,9 +135,11 @@ the model the answer where it is already looking, so pick by client:
 | Your own code | `failecho-autoreport` with `FAILECHO_ADVISE=1` | on the exception you already handle |
 | Nothing can be installed | the bare MCP endpoint below | only if the model remembers to ask |
 
-The Claude Code plugin is the one with measured results behind it. The
-OpenCode plugin and the proxy are built and tested end to end; their lab
-comparisons have not produced a result to quote yet.
+All four deliver the advice, and all four are tested end to end. The gains
+the lab has measured come from agents that **act** on it -- switch model when
+told `switch_model`, stop when told `skip` ([three lines with the
+wrapper](https://failecho.com/setup#act)); none of the four integrations has a
+lab comparison of its own with a result to quote yet.
 
 **The bare MCP endpoint** -- the smallest option and the least effective
 

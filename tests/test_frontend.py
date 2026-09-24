@@ -36,12 +36,12 @@ def test_hero_states_the_product_immediately(client):
 
     body = re.sub(r"\s+", " ", client.get("/").text)
     assert "AI agents shouldn't debug" in body and "the same failure twice." in body
-    assert "Connect your agent to shared failure and recovery evidence." in body
+    assert "tells your agent what fixed that exact failure for other agents" in body
     assert "Before you retry, check the echo." in body
     assert "what actually worked, before you retry" in body
-    assert "Connect" in body
-    assert "See it work" in body
-    assert "Claude Code · MCP · REST · OpenAPI · No account required" in body
+    assert "Set up in two minutes" in body
+    assert "See the evidence" in body
+    assert "Claude Code · OpenCode · any MCP client · Python · open source · no account" in body
 
 
 def test_the_install_is_visible_without_scrolling(client):
@@ -57,14 +57,17 @@ def test_the_install_is_visible_without_scrolling(client):
 
 
 def test_the_front_page_is_not_a_claude_code_accessory(client):
-    """FailEcho is a protocol endpoint. One client must not own the top of
-    the page, and none of the four may be a tab-click away while another is
-    not."""
+    """One client must not own the top of the page, and none of the four may
+    be a tab-click away while another is not. Since 24 Sep the cards lead
+    with the in-path integrations -- the proxy for any MCP client, the Python
+    wrapper -- rather than the bare endpoint and a raw REST call: the lab
+    measured the endpoint as the weakest path, and the wrapper, acted on, is
+    where the measured gains come from. Both remain on /setup."""
     body = client.get("/").text
     ways = body[body.index('class="ways"'):body.index('class="install-note"')]
-    assert "/mcp" in ways and "/v1/query" in ways, "MCP and REST are products too"
+    assert "failecho-mcp proxy" in ways and "failecho-autoreport" in ways, "the in-path integrations lead"
     assert 'role="tab"' not in body, "one way is selected and three are hidden"
-    for way in ("Claude Code", "any MCP client", "Any language", "Let the agent"):
+    for way in ("Claude Code", "any MCP client", "Python", "Let the agent"):
         assert way in ways, way
     # The chrome names no client at all.
     nav = body[body.index('<nav'):body.index("</nav>")]
@@ -145,8 +148,8 @@ def test_interactive_elements_are_real_buttons_with_labels():
     mouse now; the button is the control, and it is a real one.
     """
     assert HTML.count('class="way-copy"') == 4, "one Copy button per card"
-    # Four cards x (button + block), plus the endpoint in the hero.
-    assert HTML.count("data-copy-target=") == 9
+    # Four cards x (button + block). The hero's endpoint chip went on 24 Sep.
+    assert HTML.count("data-copy-target=") == 8
     assert HTML.count('class="copyable"') == 4
     assert 'role="button"' not in HTML, "two tab stops per card is one too many"
     assert HTML.count("aria-label=") >= 4, "each button says what it copies"
@@ -811,7 +814,7 @@ def test_the_lede_is_left_alone():
     instant the page paints, not a second later."""
     assert "data-scramble" not in HTML
     assert "wireScramble" not in JS
-    assert "Connect your agent to shared failure and recovery evidence." in HTML
+    assert "FailEcho tells your agent what fixed" in HTML
 
 
 def test_the_primary_button_change_is_impossible_to_miss():
@@ -935,8 +938,8 @@ def test_copying_with_the_mouse_hands_the_focus_back():
 
 
 def test_each_card_says_where_the_full_steps_are():
-    links = ("/setup#claude-code", "/setup#mcp-clients",
-             "/setup#rest-api", "/setup#let-the-agent")
+    links = ("/setup#claude-code", "/setup#proxy",
+             "/setup#act", "/setup#let-the-agent")
     for href in links:
         assert 'href="%s"' % href in HTML, href
     assert HTML.count('class="way-more"') == 4
@@ -951,7 +954,7 @@ def test_the_question_sits_above_the_four_answers_to_it():
     that says what to do with them."""
     assert 'class="ways-lead">Before you retry, check the echo.' in HTML
     assert HTML.index('class="ways-lead"') < HTML.index('class="ways"')
-    assert 'class="hero-meta">Claude Code · MCP · REST' in HTML
+    assert 'class="hero-meta">Claude Code · OpenCode · any MCP client' in HTML
     assert "hero-tagline" not in HTML
 
 
@@ -1176,14 +1179,6 @@ def test_the_rearrange_runs_when_the_pointer_leaves_as_well():
     assert "shiftTo(null)" in ways, "leaving the row is a change like any other"
     assert "void ways.offsetWidth" in ways, "the animation will not restart without it"
     assert 'if (card === current) return;' in ways, "re-entering the same card is not a change"
-
-
-def test_the_hero_endpoint_is_dressed_like_the_commands_below_it():
-    block = CSS[CSS.index(".hero-endpoint-copy {"):]
-    block = block[:block.index("}")]
-    assert "border-left: 2px solid var(--red-deep)" in block
-    assert "rgba(255, 255, 255, 0.04)" in block
-    assert "border: 0;" in block, "the chip outline is back"
 
 
 def test_llms_txt_offers_the_reversible_option_before_the_committed_one(client):
@@ -1509,26 +1504,18 @@ def test_copied_label_fades_out_still_saying_copied(client):
     )
 
 
-def test_hero_endpoint_says_what_to_do_with_it(client):
-    """A bare URL in the hero is only useful to someone who already knows what
-    an MCP endpoint is. It carries one line of instruction and a way through."""
+def test_the_hero_leads_to_setup_and_the_evidence_not_the_weakest_path(client):
+    """Until 24 Sep the hero's second action was the bare MCP URL -- the path
+    our own lab measured as the weakest (a tool the model has to choose to
+    call, used about once every five runs), and the one every other page
+    ranks last. The hero now offers the setup page, which ranks the paths,
+    and the evidence: what is measured, and what is not."""
     import re
 
     body = re.sub(r"\s+", " ", client.get("/").text)
-    note = body[body.index("hero-endpoint-note"):][:220]
-    assert "Paste into your MCP client's config" in note
-    assert 'href="/setup"' in note, "no route to the actual steps"
-
-
-def test_hero_endpoint_note_does_not_add_height(client):
-    """The note belongs beside the copy button, not under it: a column made
-    the row taller and stretched the button out of shape."""
-    css = (STATIC / "style.css").read_text()
-    block = css[css.index(".hero-endpoint {"):]
-    block = block[: block.index("}")]
-    assert "align-items: center" in block, "the note must sit on the button's line"
-    assert "flex-direction: column" not in block, "a column makes the hero taller"
-
+    hero = body[body.index('class="shell hero hero--lead"'):body.index("</section>", body.index('class="shell hero hero--lead"'))]
+    assert 'href="/setup"' in hero
+    assert "/mcp</code>" not in hero and "hero-endpoint" not in hero
 
 def test_arrow_links_open_in_a_new_tab(client):
     """The ↗ marks a link that leaves the site, so it should behave like one.
