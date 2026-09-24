@@ -173,3 +173,18 @@ def test_both_pruners_have_a_writable_tmp():
     for name in ("failecho-prune.service", "failecho-lab-prune.service"):
         unit = (DEPLOY / name).read_text()
         assert "ProtectSystem=strict" in unit and "PrivateTmp=true" in unit, name
+
+
+def test_the_mirror_reports_to_production_only_labelled_and_reads_the_lab_only():
+    """The lab-to-production mirror (24 Sep). Unlabelled, its writes would be
+    counted as independent adoption; pointed the wrong way, it would feed the
+    lab its own traffic."""
+    service = (DEPLOY / "failecho-mirror.service").read_text()
+    timer = (DEPLOY / "failecho-mirror.timer").read_text()
+    assert "EnvironmentFile=/etc/failecho.env" in service, "the operator token lives there"
+    assert "FAILECHO_MIRROR_ENDPOINT=http://127.0.0.1:8000" in service, "production, on this host"
+    assert "FAILECHO_MIRROR_LAB_DB=/srv/failecho-lab/data/lab.db" in service
+    assert "/etc/failecho-lab.env" not in service
+    assert "ProtectSystem=strict" in service and "PrivateTmp=true" in service and "NoNewPrivileges=true" in service
+    assert "User=failecho" in service
+    assert "OnCalendar=*:02/10" in timer

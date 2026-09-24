@@ -1,0 +1,32 @@
+[Unit]
+Description=Mirror the FailEcho lab's real-service evidence into production (first-party)
+# 24 Sep: a new user's agent, pointed at production, got no answer for a Groq
+# 429 while the lab knew "switch_model, worked 310/341". Both are fed by our
+# own agents; production labels what they report first_party, apart from
+# adoption. What crosses, and what never does: failecho_mirror/__init__.py.
+After=failecho.service failecho-lab.service
+
+[Service]
+Type=oneshot
+User=failecho
+Group=failecho
+WorkingDirectory=/srv/failecho
+# FIN_FIRST_PARTY_TOKEN: without it the mirror refuses to run, because
+# unlabelled reports would count as independent adoption (CLAUDE.md)
+EnvironmentFile=/etc/failecho.env
+Environment=FAILECHO_MIRROR_ENABLED=1
+Environment=FAILECHO_MIRROR_ENDPOINT=http://127.0.0.1:8000
+Environment=FAILECHO_MIRROR_LAB_DB=/srv/failecho-lab/data/lab.db
+Environment=FAILECHO_MIRROR_MAX_ROWS=500
+Environment=FAILECHO_MIRROR_PER_MINUTE=60
+Environment=FAILECHO_MIRROR_BACKFILL_HOURS=6
+ExecStart=/srv/failecho/.venv/bin/python -m failecho_mirror
+StateDirectory=failecho-mirror
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=true
+# a reader of a WAL database touches its -shm file; the connection is opened
+# mode=ro, so no row of the lab can change
+ReadWritePaths=/srv/failecho-lab/data
+NoNewPrivileges=true
+MemoryMax=150M

@@ -1,0 +1,10 @@
+[Unit]
+Description=Every ten minutes, copy the lab's new real-service evidence into production
+
+[Timer]
+# :02, :12, ... -- away from production's prune at :15 and the lab's at :35
+OnCalendar=*:02/10
+Persistent=false
+
+[Install]
+WantedBy=timers.target
