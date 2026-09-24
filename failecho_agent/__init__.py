@@ -208,8 +208,7 @@ class Agent:
         if code:
             body["error_code"] = code
         req = urllib.request.Request(f"{ENDPOINT}/v1/query", data=json.dumps(body).encode(), method="POST",
-                                     headers={"Content-Type": "application/json", "User-Agent": UA,
-                                              "X-Reporter-ID": REPORTER_ID})
+                                     headers=_query_headers())
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 return json.load(r)
@@ -326,6 +325,22 @@ def _take_run_slot() -> int | None:
     return state["total"]
 
 
+def _query_headers(reporter: bool = True) -> dict:
+    """Headers for a read, labelled first-party like this agent's reports.
+
+    Until 24 Sep only the reports carried the operator token. Production then
+    counted every question this agent asked as outside demand -- the front
+    page's "known / unknown asks" chart -- and, when the answer was backed by
+    another reporter, possibly as cross-agent help, the one counter that is
+    meant to be the product working for somebody else."""
+    headers = {"Content-Type": "application/json", "User-Agent": UA}
+    if reporter:
+        headers["X-Reporter-ID"] = REPORTER_ID
+    if OPERATOR_TOKEN:
+        headers["X-FailEcho-Operator"] = OPERATOR_TOKEN
+    return headers
+
+
 def _is_local(endpoint: str) -> bool:
     host = urllib.parse.urlparse(endpoint).hostname or ""
     return host in ("127.0.0.1", "localhost", "::1")
@@ -342,7 +357,7 @@ def verify_first_party(fe: FailEcho, failures: list) -> bool:
     if code:
         body["error_code"] = code
     req = urllib.request.Request(f"{ENDPOINT}/v1/query", data=json.dumps(body).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", "User-Agent": UA})
+                                 headers=_query_headers(reporter=False))
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             d = json.load(r)

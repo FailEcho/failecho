@@ -154,3 +154,22 @@ def test_daily_budget_is_enforced(tmp_path, monkeypatch):
     assert A._take_run_slot() == 1
     assert A._take_run_slot() == 2
     assert A._take_run_slot() is None
+
+
+def test_the_agents_questions_are_labelled_first_party_too(monkeypatch):
+    """24 Sep: the agent's reports carried the operator token and its queries
+    did not, so production counted our own questions as outside demand on the
+    front page -- and a recommendation backed by another reporter as
+    cross-agent help."""
+    seen = []
+
+    def urlopen(req, timeout=None):
+        seen.append({k.lower(): v for k, v in req.header_items()})
+        raise OSError("no network in tests")
+
+    monkeypatch.setattr(A, "OPERATOR_TOKEN", "tok")
+    monkeypatch.setattr(A.urllib.request, "urlopen", urlopen)
+    ag = A.Agent(Recorder(), [])
+    assert ag.ask_network("api.github.com", "github_repo", "rate_limit", "403") is None
+    A.verify_first_party(Recorder(), [("api.github.com", "github_repo", "rate_limit", "403")])
+    assert len(seen) == 2 and all(h.get("x-failecho-operator") == "tok" for h in seen), seen
